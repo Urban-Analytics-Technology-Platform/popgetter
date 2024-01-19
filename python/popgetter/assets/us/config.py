@@ -1,3 +1,4 @@
+from popgetter.metadata import *
 
 SUMMARY_LEVELS={
     "tract": 140 ,
@@ -84,3 +85,20 @@ ACS_METADATA={
         }
      }
 }
+
+
+US_Meta = CountryMetadata(
+   name_short_en="USA",
+   name_official="United States of America",
+   iso3="USA",
+   iso2="US" 
+)
+
+US_Census_Bureau_Meta = DataPublisher(
+    name= "United States Census Bureau",
+    url="https://www.census.gov/",
+    description="The United States Census Bureau, officially the Bureau of the Census, is a principal agency of the U.S. Federal Statistical System, responsible for producing data about the American people and economy.",  
+    countries_of_interest=[US_Meta]
+)
+
+
