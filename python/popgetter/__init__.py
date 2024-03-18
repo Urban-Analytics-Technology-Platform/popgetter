@@ -29,6 +29,7 @@ all_assets: Sequence[AssetsDefinition | SourceAsset | CacheableAssetsDefinition]
     *load_assets_from_package_module(assets.us, group_name="us"),
     *load_assets_from_package_module(assets.be, group_name="be"),
     *load_assets_from_package_module(assets.uk, group_name="uk"),
+    *load_assets_from_package_module(assets.scotland, group_name="scotland", key_prefix="uk-scotland"),
 ]
 
 job_be: UnresolvedAssetJobDefinition = define_asset_job(
@@ -50,9 +51,27 @@ job_uk: UnresolvedAssetJobDefinition = define_asset_job(
     description="Downloads UK data.",
 )
 
+job_uk: UnresolvedAssetJobDefinition = define_asset_job(
+    name="job_scotland",
+    selection=AssetSelection.groups("scotland"),
+    description="Downloads Scotland data.",
+    # https://docs.dagster.io/guides/limiting-concurrency-in-data-pipelines#asset-based-jobs
+    config={
+        "execution": {
+            "config": {
+                "multiprocess": {
+                    "max_concurrent": 20, # limits concurrent assets
+                },
+            }
+        }
+    }
+)
+
 defs: Definitions = Definitions(
     assets=all_assets,
     schedules=[],
+    # Example with multiple configs including for production:
+    # https://docs.dagster.io/guides/dagster/transitioning-data-pipelines-from-development-to-production#production
     resources={"pipes_subprocess_client": PipesSubprocessClient()},
     jobs=[job_be, job_us, job_uk],
 )
