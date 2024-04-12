@@ -1,3 +1,5 @@
+use popgetter::hi;
+
 fn main() {
-    println!("Hello, world!");
+    println!("{} world", hi());
 }

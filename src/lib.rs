@@ -1,1 +1,3 @@
-pub struct HI {}
+pub fn hi() -> String {
+    "Hello!".into()
+}
