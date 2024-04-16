@@ -3,18 +3,19 @@ name = "popgetter_cli"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
 name = "popgetter"
 path = "src/lib.rs"
-
 
 [dependencies]
 flatgeobuf = "4.0"
 geozero = "0.11.0"
 anyhow = "1.0.75"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = {version="1.0"}
 tokio = { version = "1.30.0", features = ["full"] }
 clap = { version = "4.0", features = ["derive"] }
 polars = {version ="0.33.2", features=["lazy","aws", "parquet"]}
+typify = "0.0.16"
+chrono = "0.4.37"
+reqwest = {version = "0.12.3", features = ["json"]}

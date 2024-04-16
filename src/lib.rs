@@ -1,3 +1,1 @@
-pub fn hi() -> String {
-    "Hello!".into()
-}
+pub mod metadata;
