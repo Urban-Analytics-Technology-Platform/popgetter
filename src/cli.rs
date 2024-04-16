@@ -1,19 +1,20 @@
+use std::str::FromStr;
+
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Clone, Debug)]
 pub struct BBox(pub [f64; 4]);
 
-impl TryFrom<String> for BBox {
-    type Error = &'static str;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+impl FromStr for BBox {
+    type Err = &'static str;
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let parts: Vec<f64> = value
-            .split_whitespace()
-            .map(|s| s.parse::<f64>().map_err(|_| "Failed to parse bbox"))
+            .split(',')
+            .map(|s| s.trim().parse::<f64>().map_err(|_| "Failed to parse bbox"))
             .collect::<Result<Vec<_>, _>>()?;
 
         if parts.len() != 4 {
-            return Err("Bounding boxes need to have coords");
+            return Err("Bounding boxes need to have 4 coords");
         }
         let mut bbox = [0.0; 4];
         bbox.copy_from_slice(&parts);
@@ -23,9 +24,9 @@ impl TryFrom<String> for BBox {
 
 #[derive(Args, Debug)]
 pub struct DataArgs {
-    /// Only get data in  bounding box
+    /// Only get data in  bounding box ([min_lat,min_lng,max_lat,max_lng])
     #[arg(short, long)]
-    bbox: Option<String>,
+    bbox: Option<BBox>,
     /// Only get the specific metrics
     #[arg(short, long)]
     metrics: Option<String>,
@@ -33,16 +34,21 @@ pub struct DataArgs {
 
 #[derive(Args, Debug)]
 pub struct MetricArgs {
-    /// Only get data in  bounding box
+    /// Only get data in  bounding box ([min_lat,min_lng,max_lat,max_lng])
     #[arg(short, long)]
-    bbox: Option<String>,
+    bbox: Option<BBox>,
     /// Only get the specific metrics
     #[arg(short, long)]
     filter: Option<String>,
 }
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None, name="popgetter", long_about="Popgetter is a tool to quickly get the data you need!")]
+#[command(version, 
+          about, 
+          long_about = None, 
+          name="popgetter", 
+          long_about="Popgetter is a tool to quickly get the data you need!"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
