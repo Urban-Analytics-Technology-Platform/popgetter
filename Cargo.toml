@@ -19,3 +19,5 @@ polars = {version ="0.33.2", features=["lazy","aws", "parquet"]}
 typify = "0.0.16"
 chrono = "0.4.37"
 reqwest = {version = "0.12.3", features = ["json"]}
+strum = "0.26"
+strum_macros = "0.26"
