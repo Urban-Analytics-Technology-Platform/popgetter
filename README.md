@@ -23,6 +23,7 @@ This information is stored as a JSON schema in the `schema` subdirectory of this
 To generate this file, install the appropriate version of the `popgetter` library locally (see version table [above](#popgetter-version-compatibility)), and then run
 
 ```
-cd schema
-popgetter-export-schema .
+popgetter-export-schema ./schema
 ```
+
+from the top level of this repository.
