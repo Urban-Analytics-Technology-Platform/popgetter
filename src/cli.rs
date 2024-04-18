@@ -1,11 +1,8 @@
 use std::str::FromStr;
-
 use clap::{Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use serde_json;
 use strum_macros::EnumString;
 use popgetter::data_request_spec::BBox;
-
 
 #[derive(Clone,Debug,Deserialize,Serialize,EnumString,PartialEq, Eq)]
 #[strum(ascii_case_insensitive)]
@@ -61,7 +58,6 @@ pub enum Commands {
     /// Surveys
     Surveys,
 }
-
 
 #[cfg(test)]
 mod tests {
