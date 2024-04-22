@@ -3,8 +3,8 @@ use std::str::FromStr;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataRequestSpec {
-    region: Vec<RegionSpec>,
-    metrics: Vec<MetricSpec>,
+    pub region: Vec<RegionSpec>,
+    pub metrics: Vec<MetricSpec>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

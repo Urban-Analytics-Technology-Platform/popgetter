@@ -1905,6 +1905,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "enum_dispatch",
  "flatgeobuf",
  "geozero 0.11.0",
  "polars",

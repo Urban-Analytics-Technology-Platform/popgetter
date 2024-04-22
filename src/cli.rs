@@ -1,41 +1,118 @@
+// FromStr is required by EnumString. The compiler seems to not be able to 
+// see that and so is giving a warning. Dont remove it
 use std::str::FromStr;
 use clap::{Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
-use popgetter::data_request_spec::BBox;
+use popgetter::data_request_spec::{BBox, DataRequestSpec,  RegionSpec};
+use anyhow::Result;
+use enum_dispatch::enum_dispatch;
 
+/// Defines the output formats we are able to produce data in.
 #[derive(Clone,Debug,Deserialize,Serialize,EnumString,PartialEq, Eq)]
 #[strum(ascii_case_insensitive)]
 pub enum OutputFormat{
     GeoJSON,
-    CSV,
+    Csv,
     GeoParquet,
     FlatGeobuf,
 }
 
+/// Trait that defines what to run when a given subcommand is invoked.
+#[enum_dispatch]
+pub trait RunCommand{
+    fn run(&self)->Result<()>;
+} 
+
+/// The Data command is the one we invoke to get a set of metrics and geometry 
+/// for some given region and set of metrics. Currently it takes two arguments 
+/// - bbox: A Bounding box 
+/// - metrics: A comma seperated list of metrics to retrive.
+///
+/// The Data command can be converted into a `DataRequestSpec` which is the processed
+/// by the core library.
 #[derive(Args, Debug)]
-pub struct DataArgs {
+pub struct DataCommand{
     /// Only get data in  bounding box ([min_lat,min_lng,max_lat,max_lng])
     #[arg(short, long)]
     bbox: Option<BBox>,
     /// Only get the specific metrics
     #[arg(short, long)]
     metrics: Option<String>,
+    /// Specify output format
+    #[arg(short, long)]
+    output_format: OutputFormat,
 }
 
+impl RunCommand for DataCommand{
+    fn run(&self)->Result<()> {
+        println!("Running Data Command");
+        println!("{self:#?}");
+        Ok(())
+    }
+}
+
+impl From<DataCommand> for DataRequestSpec{
+        fn from(value: DataCommand) -> Self {
+            let region = if let Some(bbox) = value.bbox{
+                vec![RegionSpec::BoundingBox(bbox)] 
+            }
+            else{
+                vec![]
+            };
+            let metrics = vec![];
+            DataRequestSpec{
+                region,
+                metrics
+            }
+
+    }
+}
+
+/// The Metrics command allows a user to search for a set of metrics by bounding box and filter.
+/// The set of ways to search will likley increase over time
 #[derive(Args, Debug)]
-pub struct MetricArgs {
+pub struct MetricsCommand{
     /// Only get data in  bounding box ([min_lat,min_lng,max_lat,max_lng])
     #[arg(short, long)]
     bbox: Option<BBox>,
     /// Only get the specific metrics
     #[arg(short, long)]
     filter: Option<String>,
-    /// Specify output format
-    #[arg(short, long)]
-    output_format: OutputFormat,
 }
 
+impl RunCommand for MetricsCommand{
+    fn run(&self)->Result<()> {
+        println!("Running Metrics Command");
+        Ok(())
+    }
+}
+
+/// The Countries command should return information about the various countries we have data for.
+/// This could include metrics like the number of surveys / metrics / geographies avaliable for each country.
+#[derive(Args,Debug)]
+pub struct CountriesCommand;
+
+impl RunCommand for CountriesCommand{
+    fn run(&self)->Result<()> {
+        println!("Running Countries Command");
+        Ok(())
+    }
+}
+
+/// The Surveys command should list the various surveys that popgetter has access to and releated
+/// stastistics.
+#[derive(Args,Debug)]
+pub struct SurveysCommand;
+
+impl RunCommand for SurveysCommand{
+    fn run(&self)->Result<()> {
+        println!("Running Surveys Command");
+        Ok(())
+    }
+}
+
+/// The entrypoint for the CLI.
 #[derive(Parser, Debug)]
 #[command(version, 
           about, 
@@ -48,15 +125,20 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
+
+/// Commands contains the list of subcommands avaliable for use in the CLI. 
+/// Each command should implmement the RunCommand trait and specify the list 
+/// of required args for that command.
 #[derive(Subcommand, Debug)]
+#[enum_dispatch(RunCommand)]
 pub enum Commands {
-    Countries,
+    Countries(CountriesCommand),
     /// Produce a data file with the required metrics and geometry
-    Data(DataArgs),
+    Data(DataCommand),
     /// Search / List avaliable metrics
-    Metrics(MetricArgs),
+    Metrics(MetricsCommand),
     /// Surveys
-    Surveys,
+    Surveys(SurveysCommand),
 }
 
 #[cfg(test)]
