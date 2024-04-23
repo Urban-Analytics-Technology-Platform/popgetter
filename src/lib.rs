@@ -1,6 +1,5 @@
 use anyhow::Result;
 use metadata::{load_metadata, MetricMetadata, SourceDataRelease};
-
 pub mod data_request_spec;
 pub mod metadata;
 
