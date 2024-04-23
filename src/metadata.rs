@@ -4,7 +4,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use typify::import_types;
 
-import_types!("schema.json");
+import_types!("schema/popgetter_0.1.0.json");
 
 pub fn load_metadata(path: &str) -> Result<SourceDataRelease> {
     let file = File::open(path)?;
