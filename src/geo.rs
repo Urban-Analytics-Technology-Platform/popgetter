@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use flatgeobuf::{ FeatureProperties, HttpFgbReader, geozero};
 use geozero::ToWkt;
 use anyhow::Result;
+use crate::data_request_spec::BBox;
 
 /// Function to request geometries from a remotly hosted FGB 
 ///
@@ -10,7 +11,7 @@ use anyhow::Result;
 /// `bbox`: an optional bounding box to filter the features by 
 ///
 /// Returns: a Result object containing a vector of (geometry, properties).
-pub async fn get_geometries(file_url:&str, bbox:Option<&[f64;4]>) -> Result<Vec<(String, HashMap<String,String>)>>{
+pub async fn get_geometries(file_url:&str, bbox:Option<&BBox>) -> Result<Vec<(String, HashMap<String,String>)>>{
     let fgb = HttpFgbReader::open(file_url)
               .await?;
     
@@ -170,11 +171,11 @@ mod tests {
         // Generate a test FGB server
         let server = mock_fgb_server();
         // Get the geometries
-        let bbox = [ -3.018_352_090_792_945,
+        let bbox = BBox([ -3.018_352_090_792_945,
                      51.795_056_187_175_82,
                      -1.373_095_490_899_146_4,
                      53.026_908_220_355_35,
-                    ];
+                    ]);
         let geoms = get_geometries(&server.url("/fgb_example.fgb"),Some(&bbox)).await;
 
         assert!(geoms.is_ok(),"The geometry call should not error");

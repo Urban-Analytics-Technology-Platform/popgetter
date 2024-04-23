@@ -1,6 +1,7 @@
 use anyhow::Result;
-use metadata::{load_metadata, MetricMetadata, SourceDataRelease};
+use metadata::{load_metadata, SourceDataRelease};
 pub mod data_request_spec;
+pub mod geo;
 pub mod metadata;
 
 pub struct Popgetter {
