@@ -5,7 +5,7 @@ pub mod data_request_spec;
 pub mod metadata;
 
 pub struct Popgetter {
-    metadata: SourceDataRelease,
+    pub metadata: SourceDataRelease,
 }
 
 impl Popgetter {
