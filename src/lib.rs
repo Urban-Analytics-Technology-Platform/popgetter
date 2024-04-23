@@ -9,7 +9,7 @@ pub struct Popgetter {
 }
 
 impl Popgetter {
-    fn new() -> Result<Self> {
+    pub fn new() -> Result<Self> {
         let metadata = load_metadata("us_metadata.json")?;
         Ok(Self { metadata })
     }
