@@ -3,6 +3,7 @@ use metadata::{load_metadata, SourceDataRelease};
 pub mod data_request_spec;
 pub mod geo;
 pub mod metadata;
+pub mod parquet;
 
 pub struct Popgetter {
     pub metadata: SourceDataRelease,
