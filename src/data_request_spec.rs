@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use std::{
+    ops::{Index, IndexMut},
+    str::FromStr,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataRequestSpec {
@@ -25,6 +28,20 @@ pub struct Polygon;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BBox(pub [f64; 4]);
+
+impl Index<usize> for BBox {
+    type Output = f64;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<usize> for BBox {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
 
 impl FromStr for BBox {
     type Err = &'static str;
