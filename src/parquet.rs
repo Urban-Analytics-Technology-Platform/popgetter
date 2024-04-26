@@ -113,4 +113,31 @@ mod tests {
             "The returned dataframe should have the column we requested"
         );
     }
+
+    #[test]
+    fn test_fetching_metrics_with_geo_filter() {
+        let metrics  = [
+            MetricRequest{
+                file:"https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(), 
+                column:"B17021_E006".into() 
+            }];
+        let df = get_metrics(
+            &metrics,
+            Some(&["1400000US01001020100".into(), "1400000US01001020300".into()]),
+        );
+
+        println!("{df:#?}");
+        assert!(df.is_ok(), "We should get back a result");
+        let df = df.unwrap();
+        assert_eq!(
+            df.shape().1,
+            2,
+            "The returned dataframe should have the correct number of columns"
+        );
+        assert_eq!(
+            df.shape().0,
+            2,
+            "The returned dataframe should have the correct number of columns"
+        );
+    }
 }
