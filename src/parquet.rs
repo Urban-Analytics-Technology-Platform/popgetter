@@ -101,7 +101,7 @@ mod tests {
         assert_eq!(
             df.shape().0,
             74001,
-            "The returned dataframe should have the correct number of columns"
+            "The returned dataframe should have the correct number of rows"
         );
         assert!(
             df.column(GEO_ID_COL_NAME).is_ok(),
