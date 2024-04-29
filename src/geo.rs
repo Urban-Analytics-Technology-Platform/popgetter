@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use flatgeobuf::{ FeatureProperties, HttpFgbReader, geozero};
 use geozero::ToWkt;
-use anyhow::Result;
+use anyhow::{Context, Result};
+use polars::{frame::DataFrame, prelude::NamedFrom, series::Series};
 use crate::data_request_spec::BBox;
 
 /// Function to request geometries from a remotly hosted FGB 
@@ -11,8 +12,7 @@ use crate::data_request_spec::BBox;
 /// `bbox`: an optional bounding box to filter the features by 
 ///
 /// Returns: a Result object containing a vector of (geometry, properties).
-pub async fn get_geometries(file_url:&str, bbox:Option<&BBox>) -> Result<Vec<(String, HashMap<String,String>)>>{
-    println!("Getting geometries");
+pub async fn get_geometries(file_url:&str, bbox:Option<&BBox>) -> Result<DataFrame>{
     let fgb = HttpFgbReader::open(file_url)
               .await?;
     
@@ -25,15 +25,21 @@ pub async fn get_geometries(file_url:&str, bbox:Option<&BBox>) -> Result<Vec<(St
         .select_all()
         .await?
     };
-        
-    let mut features = Vec::new();
+
+    let mut geoms: Vec<String> = vec![];
+    let mut ids: Vec<String> = vec![];
     
     while let Some(feature) = fgb.next().await? {
         let props = feature.properties()?;
-        let geom = feature.to_wkt()?;
-        features.push((geom, props));
+        geoms.push(feature.to_wkt()?);
+        let id = props.get("AFFGEOID").with_context(|| "failed to get id")?;
+        ids.push(id.clone());
     }
-    Ok(features)
+
+    let ids = Series::new("GEOID",ids);
+    let geoms = Series::new("geometry", geoms);
+    let result = DataFrame::new(vec![ids,geoms])?;
+    Ok(result)
 }
 
 #[cfg(test)]

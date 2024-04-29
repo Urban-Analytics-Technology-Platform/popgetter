@@ -2,7 +2,7 @@ use anyhow::Result;
 use data_request_spec::DataRequestSpec;
 use metadata::{load_metadata, SourceDataRelease};
 use parquet::{get_metrics, MetricRequest};
-use polars::frame::DataFrame;
+use polars::{frame::DataFrame, prelude::DataFrameJoinOps};
 use tokio::try_join;
 
 use crate::geo::get_geometries;
@@ -35,6 +35,9 @@ impl Popgetter {
         // try_from requires us to have the errors from all futures be the same. 
         // We use anyhow to get it back properly
         let (metrics,geoms) = try_join!(async move { metrics.await.map_err(anyhow::Error::from)}, geoms)?;
-        metrics
+        
+        let result =metrics?.left_join(&geoms,["GEO_ID"],["GEOID"])?; 
+        Ok(result)
     }
 }
+

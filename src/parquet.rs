@@ -43,6 +43,7 @@ fn get_metrics_from_file(
 pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Result<DataFrame> {
     let file_list: HashSet<String> = metrics.iter().map(|m| m.file.clone()).collect();
 
+    // TODO Can we do this async so we can be downloading results from each file together?
     let dfs: Result<Vec<DataFrame>> = file_list
         .iter()
         .map(|file_url| {
