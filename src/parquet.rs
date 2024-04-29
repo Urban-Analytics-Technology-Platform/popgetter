@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 static GEO_ID_COL_NAME: &str = "GEO_ID";
 
+#[derive(Debug)]
 pub struct MetricRequest {
     pub column: String,
     pub file: String,

@@ -164,6 +164,14 @@
           "items": {
             "$ref": "#/definitions/CountryMetadata"
           }
+        },
+        "available_metrics":{
+          "title":"The metrics from this data source",
+          "description":"A list of metrics that are provided by this source",
+          "type":"array",
+          "items":{
+            "$ref":"#/definitions/MetricMetadata"
+          }
         }
       },
       "required": [
@@ -267,10 +275,7 @@
         "source_metric_id",
         "description",
         "hxl_tag",
-        "parquet_column_name",
-        "source_data_release_id",
-        "source_download_url",
-        "source_documentation_url"
+        "parquet_column_name"
       ]
     }
   },

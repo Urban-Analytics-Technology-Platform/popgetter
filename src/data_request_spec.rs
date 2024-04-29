@@ -1,13 +1,38 @@
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
+    any::Any,
     ops::{Index, IndexMut},
     str::FromStr,
 };
+
+use crate::{metadata::SourceDataRelease, parquet::MetricRequest};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataRequestSpec {
     pub region: Vec<RegionSpec>,
     pub metrics: Vec<MetricSpec>,
+}
+
+impl DataRequestSpec {
+    pub fn metric_requests(&self, catalouge: &SourceDataRelease) -> Result<Vec<MetricRequest>> {
+        let mut metric_requests: Vec<MetricRequest> = vec![];
+        println!("Try to get metrics {:#?}", self.metrics);
+        for metric_spec in &self.metrics {
+            match metric_spec {
+                MetricSpec::NamedMetric(name) => {
+                    metric_requests.push(
+                        catalouge
+                            .get_metric_details(&name)
+                            .with_context(|| "Failed to find metric")?
+                            .into(),
+                    );
+                }
+                _ => todo!("unsupported metric spec"),
+            }
+        }
+        Ok(metric_requests)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

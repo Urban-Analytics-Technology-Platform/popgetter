@@ -3,7 +3,10 @@
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
-use popgetter::data_request_spec::{BBox, DataRequestSpec, RegionSpec};
+use popgetter::{
+    data_request_spec::{BBox, DataRequestSpec, MetricSpec, RegionSpec},
+    Popgetter,
+};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use strum_macros::EnumString;
@@ -46,20 +49,30 @@ pub struct DataCommand {
 
 impl RunCommand for DataCommand {
     fn run(&self) -> Result<()> {
-        println!("Running Data Command");
-        println!("{self:#?}");
+        let popgetter = Popgetter::new()?;
+        let data_request = DataRequestSpec::from(self);
+        let results = popgetter.get_data_request(&data_request)?;
+        println!("{results:#?}");
         Ok(())
     }
 }
 
-impl From<DataCommand> for DataRequestSpec {
-    fn from(value: DataCommand) -> Self {
-        let region = if let Some(bbox) = value.bbox {
+impl From<&DataCommand> for DataRequestSpec {
+    fn from(value: &DataCommand) -> Self {
+        let region = if let Some(bbox) = value.bbox.clone() {
             vec![RegionSpec::BoundingBox(bbox)]
         } else {
             vec![]
         };
-        let metrics = vec![];
+
+        let metrics: Vec<MetricSpec> = if let Some(metric_string) = &value.metrics {
+            metric_string
+                .split(',')
+                .map(|s| MetricSpec::NamedMetric(s.trim().into()))
+                .collect()
+        } else {
+            vec![]
+        };
         DataRequestSpec { region, metrics }
     }
 }
