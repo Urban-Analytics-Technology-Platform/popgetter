@@ -12,6 +12,7 @@ use crate::data_request_spec::BBox;
 ///
 /// Returns: a Result object containing a vector of (geometry, properties).
 pub async fn get_geometries(file_url:&str, bbox:Option<&BBox>) -> Result<Vec<(String, HashMap<String,String>)>>{
+    println!("Getting geometries");
     let fgb = HttpFgbReader::open(file_url)
               .await?;
     
