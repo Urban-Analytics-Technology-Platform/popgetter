@@ -4,10 +4,11 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, RunCommand};
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = Cli::parse();
     if let Some(command) = args.command {
-        command.run()?;
+        command.run().await?;
     }
     Ok(())
 }

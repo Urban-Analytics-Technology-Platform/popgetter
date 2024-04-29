@@ -33,6 +33,10 @@ impl DataRequestSpec {
         }
         Ok(metric_requests)
     }
+
+    pub fn geom_details(&self, catalouge: &SourceDataRelease) -> Result<String> {
+        Ok(catalouge.geography_file.clone())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

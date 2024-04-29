@@ -24,7 +24,7 @@ pub enum OutputFormat {
 /// Trait that defines what to run when a given subcommand is invoked.
 #[enum_dispatch]
 pub trait RunCommand {
-    fn run(&self) -> Result<()>;
+    async fn run(&self) -> Result<()>;
 }
 
 /// The Data command is the one we invoke to get a set of metrics and geometry
@@ -48,10 +48,10 @@ pub struct DataCommand {
 }
 
 impl RunCommand for DataCommand {
-    fn run(&self) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         let popgetter = Popgetter::new()?;
         let data_request = DataRequestSpec::from(self);
-        let results = popgetter.get_data_request(&data_request)?;
+        let results = popgetter.get_data_request(&data_request).await?;
         println!("{results:#?}");
         Ok(())
     }
@@ -90,7 +90,7 @@ pub struct MetricsCommand {
 }
 
 impl RunCommand for MetricsCommand {
-    fn run(&self) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         println!("Running Metrics Command");
         Ok(())
     }
@@ -102,7 +102,7 @@ impl RunCommand for MetricsCommand {
 pub struct CountriesCommand;
 
 impl RunCommand for CountriesCommand {
-    fn run(&self) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         println!("Running Countries Command");
         Ok(())
     }
@@ -114,7 +114,7 @@ impl RunCommand for CountriesCommand {
 pub struct SurveysCommand;
 
 impl RunCommand for SurveysCommand {
-    fn run(&self) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         println!("Running Surveys Command");
         Ok(())
     }
