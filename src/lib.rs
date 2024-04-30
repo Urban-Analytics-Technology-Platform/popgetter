@@ -16,11 +16,14 @@ pub struct Popgetter {
 }
 
 impl Popgetter {
+    /// Setup the Popgetter object 
     pub fn new() -> Result<Self> {
         let metadata = load_metadata("us_metadata_test2.json")?;
         Ok(Self { metadata })
     }
 
+    /// Given a Data Request Spec 
+    /// Return a DataFrame of the selected dataset 
     pub async fn get_data_request(&self, data_request: &DataRequestSpec) -> Result<DataFrame> {
         let metric_requests = data_request.metric_requests(&self.metadata)?;
         let geom_file = data_request.geom_details(&self.metadata)?;
@@ -30,7 +33,7 @@ impl Popgetter {
             get_metrics(&metric_requests,None)
         });
 
-        let geoms = get_geometries(&geom_file, None);
+        let geoms = get_geometries(&geom_file, None, None);
 
         // try_from requires us to have the errors from all futures be the same. 
         // We use anyhow to get it back properly
