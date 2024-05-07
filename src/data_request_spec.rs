@@ -1,13 +1,42 @@
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
+    any::Any,
     ops::{Index, IndexMut},
     str::FromStr,
 };
+
+use crate::{metadata::SourceDataRelease, parquet::MetricRequest};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataRequestSpec {
     pub region: Vec<RegionSpec>,
     pub metrics: Vec<MetricSpec>,
+}
+
+impl DataRequestSpec {
+    pub fn metric_requests(&self, catalogue: &SourceDataRelease) -> Result<Vec<MetricRequest>> {
+        let mut metric_requests: Vec<MetricRequest> = vec![];
+        println!("Try to get metrics {:#?}", self.metrics);
+        for metric_spec in &self.metrics {
+            match metric_spec {
+                MetricSpec::NamedMetric(name) => {
+                    metric_requests.push(
+                        catalogue
+                            .get_metric_details(&name)
+                            .with_context(|| "Failed to find metric")?
+                            .into(),
+                    );
+                }
+                _ => todo!("unsupported metric spec"),
+            }
+        }
+        Ok(metric_requests)
+    }
+
+    pub fn geom_details(&self, catalogue: &SourceDataRelease) -> Result<String> {
+        Ok(catalogue.geography_file.clone())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

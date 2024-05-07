@@ -4,7 +4,37 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use typify::import_types;
 
+use crate::parquet::MetricRequest;
+
 import_types!("schema/popgetter_0.1.0.json");
+
+impl SourceDataRelease{
+    pub fn get_metric_details(&self,metric_id: &str)->Option<&MetricMetadata>{
+        self.available_metrics.iter().find(
+            |m| m.source_metric_id == metric_id
+        ) 
+    }
+}
+
+// TODO we might want to just pass the MetricMetaData rather than
+// having to 
+impl From<MetricMetadata> for MetricRequest{
+    fn from(value: MetricMetadata) -> Self {
+        MetricRequest { 
+            column: value.parquet_column_name.clone(),
+            file: value.metric_parquet_file_url.clone().unwrap()
+         }
+    }
+}
+
+impl From<&MetricMetadata> for MetricRequest{
+    fn from(value: &MetricMetadata) -> Self {
+        MetricRequest { 
+            column: value.parquet_column_name.clone(), 
+            file: value.metric_parquet_file_url.clone().unwrap()  
+        }
+    }
+}
 
 pub fn load_metadata(path: &str) -> Result<SourceDataRelease> {
     let file = File::open(path)?;
