@@ -35,7 +35,7 @@ impl Popgetter {
 
         let geoms = get_geometries(&geom_file, None, None);
 
-        // try_from requires us to have the errors from all futures be the same. 
+        // try_join requires us to have the errors from all futures be the same. 
         // We use anyhow to get it back properly
         let (metrics,geoms) = try_join!(async move { metrics.await.map_err(anyhow::Error::from)}, geoms)?;
         

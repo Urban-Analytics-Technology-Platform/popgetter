@@ -15,14 +15,14 @@ pub struct DataRequestSpec {
 }
 
 impl DataRequestSpec {
-    pub fn metric_requests(&self, catalouge: &SourceDataRelease) -> Result<Vec<MetricRequest>> {
+    pub fn metric_requests(&self, catalogue: &SourceDataRelease) -> Result<Vec<MetricRequest>> {
         let mut metric_requests: Vec<MetricRequest> = vec![];
         println!("Try to get metrics {:#?}", self.metrics);
         for metric_spec in &self.metrics {
             match metric_spec {
                 MetricSpec::NamedMetric(name) => {
                     metric_requests.push(
-                        catalouge
+                        catalogue
                             .get_metric_details(&name)
                             .with_context(|| "Failed to find metric")?
                             .into(),
@@ -34,8 +34,8 @@ impl DataRequestSpec {
         Ok(metric_requests)
     }
 
-    pub fn geom_details(&self, catalouge: &SourceDataRelease) -> Result<String> {
-        Ok(catalouge.geography_file.clone())
+    pub fn geom_details(&self, catalogue: &SourceDataRelease) -> Result<String> {
+        Ok(catalogue.geography_file.clone())
     }
 }
 
