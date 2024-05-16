@@ -8,7 +8,32 @@ use serde_json::json;
 use serde_json::Value;
 use std::io::Cursor;
 use std::io::Write;
+use wkb::geom_to_wkb;
 use wkt::TryFromWkt;
+
+/// Utility function to convert a polars series from WKT geometries to
+/// WKB geometries (as a string)
+fn convert_wkt_to_wkb_string(s: Series) -> PolarsResult<Option<Series>> {
+    let ca = s.str()?;
+    let wkb_series: Vec<Vec<u8>> = ca
+        .into_iter()
+        .map(|opt_wkt| {
+            opt_wkt
+                .map(|wkt_str| {
+                    let geom: Geometry<f64> =
+                        Geometry::try_from_wkt_str(wkt_str).expect("Failed to parse wkt");
+                    geom_to_wkb(&geom).expect("Failed to format geom")
+                })
+                .unwrap_or_else(Vec::new)
+        })
+        .collect();
+
+    let wkb_string_series: Vec<String> = wkb_series
+        .into_iter()
+        .map(|v| v.iter().map(|v| format!("{v}")).collect::<String>())
+        .collect();
+    Ok(Some(Series::new("geometry", wkb_string_series)))
+}
 
 /// Utility function to convert from polars `AnyValue` to `serde_json::Value`
 /// Doesn't cover all types but most of them.
@@ -117,7 +142,23 @@ pub struct CSVFormatter {
 
 impl OutputGenerator for CSVFormatter {
     fn save(&self, writer: &mut impl Write, df: &mut DataFrame) -> Result<()> {
-        CsvWriter::new(writer).finish(df)?;
+        if let Some(GeoFormat::Wkb) = self.geo_format {
+            let mut df = df
+                .clone()
+                .lazy()
+                .with_column(
+                    col("geometry")
+                        .map(
+                            convert_wkt_to_wkb_string,
+                            GetOutput::from_type(DataType::String),
+                        )
+                        .alias("geometry"),
+                )
+                .collect()?;
+            CsvWriter::new(writer).finish(&mut df)?;
+        } else {
+            CsvWriter::new(writer).finish(df)?;
+        };
         Ok(())
     }
 }
@@ -222,6 +263,26 @@ mod tests {
 3,3.0,three,POINT (20 20)
 4,4.0,four,POINT (30 44)
 ";
+
+        assert!(output.is_ok(), "Output should not error");
+        assert_eq!(output.unwrap(), correct_str, "Output should be correct");
+    }
+
+    #[test]
+    fn csv_formatter_with_wkb_should_work() {
+        let formatter = CSVFormatter {
+            geo_format: Some(GeoFormat::Wkb),
+        };
+        let mut df = test_df();
+        let output = formatter.format(&mut df);
+        let correct_str = [
+            "int_val,float_val,str_val,geometry",
+            "2,2.0,two,110000000000000000000",
+            "3,3.0,three,1100000000052640000005264",
+            "4,4.0,four,1100000000062640000007064",
+            "",
+        ]
+        .join("\n");
 
         assert!(output.is_ok(), "Output should not error");
         assert_eq!(output.unwrap(), correct_str, "Output should be correct");

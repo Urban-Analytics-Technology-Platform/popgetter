@@ -2685,6 +2685,7 @@ dependencies = [
  "strum_macros 0.26.2",
  "tokio",
  "typify",
+ "wkb",
  "wkt",
 ]
 
@@ -4257,6 +4258,16 @@ checksum = "a277a57398d4bfa075df44f501a17cfdf8542d224f0d36095a2adc7aee4ef0a5"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "wkb"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66c806dac841607a62b0e8babf620fea51429f6ea005545491198fcbfd9004a2"
+dependencies = [
+ "geo-types",
+ "num-traits",
 ]
 
 [[package]]
