@@ -21,7 +21,7 @@ impl DataRequestSpec {
             match metric_spec {
                 MetricSpec::NamedMetric(name) => {
                     metric_requests.push(
-                        catalouge
+                        catalogue
                             .get_metric_details(name)
                             .with_context(|| "Failed to find metric")?
                             .into(),
