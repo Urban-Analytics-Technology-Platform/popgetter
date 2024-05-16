@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use flatgeobuf::{ FeatureProperties, HttpFgbReader, geozero};
 use geozero::ToWkt;
 use anyhow::{Context, Result};
