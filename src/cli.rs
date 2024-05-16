@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use popgetter::{
     data_request_spec::{BBox, DataRequestSpec, MetricSpec, RegionSpec}, 
-    formatters::{CSVFormatter, GeoJSONFormatter, OutputFormatter, OutputGenerator}, Popgetter
+    formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, Popgetter
 };
 use serde::{Deserialize, Serialize};
 use std::{fs::File, str::FromStr};
@@ -16,6 +16,7 @@ use strum_macros::EnumString;
 #[strum(ascii_case_insensitive)]
 pub enum OutputFormat {
     GeoJSON,
+    GeoJSONSeq,
     Csv,
     GeoParquet,
     FlatGeobuf,
@@ -56,12 +57,15 @@ impl RunCommand for DataCommand {
         let data_request = DataRequestSpec::from(self);
         let mut results = popgetter.get_data_request(&data_request).await?;
 
-        let formatter = match(&self.output_format){
+        let formatter = match &self.output_format{
             OutputFormat::GeoJSON=>{
-                OutputFormatter::GeoJSON(GeoJSONFormatter::default())
+                OutputFormatter::GeoJSON(GeoJSONFormatter)
             },
             OutputFormat::Csv=>{
                 OutputFormatter::Csv(CSVFormatter::default())
+            },
+            OutputFormat::GeoJSONSeq=>{
+                OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter)
             },
             _=>todo!("output format not implemented")
         };

@@ -41,12 +41,19 @@ fn any_value_to_json(value: &AnyValue) -> Result<Value> {
 
 /// Trait to define different output generators. Defines two
 /// functions, format which generates a serialized string of the
-/// DataFrame and save which generates a file with the generated
+/// `DataFrame` and save which generates a file with the generated
 /// file
 #[enum_dispatch]
 pub trait OutputGenerator {
-    fn format(&self, df: &mut DataFrame) -> Result<String>;
     fn save(&self, writer: &mut impl Write, df: &mut DataFrame) -> Result<()>;
+    fn format(&self, df: &mut DataFrame) -> Result<String> {
+        // Just creating an empty vec to store the buffered output
+        let mut data: Vec<u8> = vec![0; 200];
+        let mut buff = Cursor::new(&mut data);
+        self.save(&mut buff, df)?;
+
+        Ok(String::from_utf8(data)?)
+    }
 }
 
 /// Enum of OutputFormatters one for each potential
@@ -66,12 +73,27 @@ pub enum OutputFormatter {
 pub struct GeoJSONSeqFormatter;
 
 impl OutputGenerator for GeoJSONSeqFormatter {
-    fn format(&self, df: &mut DataFrame) -> Result<String> {
-        Ok("Test".into())
-    }
-
     fn save(&self, writer: &mut impl Write, df: &mut DataFrame) -> Result<()> {
-        let output = self.format(df)?;
+        let geometry_col = df.column("geometry")?;
+        let other_cols = df.drop("geometry")?;
+        for (idx, geom) in geometry_col.str()?.into_iter().enumerate() {
+            if let Some(wkt_str) = geom {
+                let geom: Geometry<f64> = Geometry::try_from_wkt_str(wkt_str).unwrap();
+                let mut properties = serde_json::Map::new();
+                for col in other_cols.get_columns() {
+                    let val = any_value_to_json(&col.get(idx)?)?;
+                    properties.insert(col.name().to_string(), val);
+                }
+                let feature = geojson::Feature {
+                    bbox: None,
+                    geometry: Some(geojson::Geometry::from(&geom)),
+                    id: None,
+                    properties: Some(properties),
+                    foreign_members: None,
+                };
+                writeln!(writer, "{feature}")?;
+            }
+        }
         Ok(())
     }
 }
@@ -94,15 +116,6 @@ pub struct CSVFormatter {
 }
 
 impl OutputGenerator for CSVFormatter {
-    fn format(&self, df: &mut DataFrame) -> Result<String> {
-        // Just creating an empty vec to store the buffered output
-        let mut data: Vec<u8> = vec![0; 200];
-        let mut buff = Cursor::new(&mut data);
-        self.save(&mut buff, df)?;
-
-        Ok(String::from_utf8(data)?)
-    }
-
     fn save(&self, writer: &mut impl Write, df: &mut DataFrame) -> Result<()> {
         CsvWriter::new(writer).finish(df)?;
         Ok(())
