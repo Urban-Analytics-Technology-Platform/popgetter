@@ -258,11 +258,14 @@ mod tests {
         let formatter = CSVFormatter { geo_format: None };
         let mut df = test_df();
         let output = formatter.format(&mut df);
-        let correct_str = r"int_val,float_val,str_val,geometry
-2,2.0,two,POINT (0 0)
-3,3.0,three,POINT (20 20)
-4,4.0,four,POINT (30 44)
-";
+        let correct_str = [
+            "int_val,float_val,str_val,geometry",
+            "2,2.0,two,POINT (0 0)",
+            "3,3.0,three,POINT (20 20)",
+            "4,4.0,four,POINT (30 44)",
+            "",
+        ]
+        .join("\n");
 
         assert!(output.is_ok(), "Output should not error");
         assert_eq!(output.unwrap(), correct_str, "Output should be correct");
