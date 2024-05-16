@@ -48,7 +48,7 @@ pub trait OutputGenerator {
     fn save(&self, writer: &mut impl Write, df: &mut DataFrame) -> Result<()>;
     fn format(&self, df: &mut DataFrame) -> Result<String> {
         // Just creating an empty vec to store the buffered output
-        let mut data: Vec<u8> = vec![0; 200];
+        let mut data: Vec<u8> = vec![];
         let mut buff = Cursor::new(&mut data);
         self.save(&mut buff, df)?;
 
@@ -112,7 +112,7 @@ pub enum GeoFormat {
 /// geometry encoded in the specified format
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct CSVFormatter {
-    geo_format: Option<GeoFormat>,
+    pub geo_format: Option<GeoFormat>,
 }
 
 impl OutputGenerator for CSVFormatter {
@@ -169,5 +169,61 @@ impl OutputGenerator for GeoJSONFormatter {
         writer.write_all(result.as_bytes())?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_df() -> DataFrame {
+        df!(
+             "int_val" => &[2, 3, 4],
+             "float_val" => &[2.0, 3.0, 4.0],
+             "str_val" => &["two", "three", "four"],
+             "geometry" => &["POINT (0 0)", "POINT (20 20)", "POINT (30 44)"]
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn geojson_formatter_should_work() {
+        let formatter = GeoJSONFormatter;
+        let mut df = test_df();
+        let output = formatter.format(&mut df);
+        assert!(output.is_ok(), "Output should not error");
+        let correct_str = r#"{"features":[{"geometry":{"coordinates":[0.0,0.0],"type":"Point"},"properties":{"float_val":2.0,"int_val":2,"str_val":"two"},"type":"Feature"},{"geometry":{"coordinates":[20.0,20.0],"type":"Point"},"properties":{"float_val":3.0,"int_val":3,"str_val":"three"},"type":"Feature"},{"geometry":{"coordinates":[30.0,44.0],"type":"Point"},"properties":{"float_val":4.0,"int_val":4,"str_val":"four"},"type":"Feature"}],"type":"FeatureCollection"}"#;
+        assert_eq!(output.unwrap(), correct_str, "Output should be correct");
+    }
+
+    #[test]
+    fn geojsonseq_formatter_should_work() {
+        let formatter = GeoJSONSeqFormatter;
+        let mut df = test_df();
+        let output = formatter.format(&mut df);
+
+        let correct_str = [
+            r#"{"geometry":{"coordinates":[0.0,0.0],"type":"Point"},"properties":{"float_val":2.0,"int_val":2,"str_val":"two"},"type":"Feature"}"#,
+            r#"{"geometry":{"coordinates":[20.0,20.0],"type":"Point"},"properties":{"float_val":3.0,"int_val":3,"str_val":"three"},"type":"Feature"}"#,
+            r#"{"geometry":{"coordinates":[30.0,44.0],"type":"Point"},"properties":{"float_val":4.0,"int_val":4,"str_val":"four"},"type":"Feature"}"#,
+            ""
+        ].join("\n");
+        assert!(output.is_ok(), "Output should not error");
+        assert_eq!(output.unwrap(), correct_str, "Output should be correct");
+    }
+
+    #[test]
+    fn csv_formatter_should_work() {
+        let formatter = CSVFormatter { geo_format: None };
+        let mut df = test_df();
+        let output = formatter.format(&mut df);
+        let correct_str = r"int_val,float_val,str_val,geometry
+2,2.0,two,POINT (0 0)
+3,3.0,three,POINT (20 20)
+4,4.0,four,POINT (30 44)
+";
+
+        assert!(output.is_ok(), "Output should not error");
+        assert_eq!(output.unwrap(), correct_str, "Output should be correct");
     }
 }
