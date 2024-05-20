@@ -1,20 +1,21 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     ops::{Index, IndexMut},
     str::FromStr,
 };
 
-use crate::{metadata::SourceDataRelease, parquet::MetricRequest};
+use crate::{metadata::Metadata, parquet::MetricRequest};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataRequestSpec {
+    pub geometry: GeometrySpec,
     pub region: Vec<RegionSpec>,
     pub metrics: Vec<MetricSpec>,
 }
 
 impl DataRequestSpec {
-    pub fn metric_requests(&self, catalogue: &SourceDataRelease) -> Result<Vec<MetricRequest>> {
+    pub fn metric_requests(&self, catalogue: &Metadata) -> Result<Vec<MetricRequest>> {
         let mut metric_requests: Vec<MetricRequest> = vec![];
         println!("Try to get metrics {:#?}", self.metrics);
         for metric_spec in &self.metrics {
@@ -33,8 +34,8 @@ impl DataRequestSpec {
         Ok(metric_requests)
     }
 
-    pub fn geom_details(&self, catalogue: &SourceDataRelease) -> Result<String> {
-        Ok(catalogue.geography_file.clone())
+    pub fn geom_details(&self, catalogue: &Metadata) -> Result<String> {
+        catalogue.get_geom_details("municipalty")
     }
 }
 
@@ -42,6 +43,21 @@ impl DataRequestSpec {
 pub enum MetricSpec {
     NamedMetric(String),
     DataProduct(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GeometrySpec {
+    geometry_level: String,
+    include_geoms: bool,
+}
+
+impl Default for GeometrySpec {
+    fn default() -> Self {
+        Self {
+            include_geoms: true,
+            geometry_level: "admin2".into(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

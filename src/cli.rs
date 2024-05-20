@@ -4,8 +4,8 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use popgetter::{
-    data_request_spec::{BBox, DataRequestSpec, MetricSpec, RegionSpec}, 
-    formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, Popgetter
+    data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec},
+    Popgetter,
 };
 use serde::{Deserialize, Serialize};
 use std::{fs::File, str::FromStr};
@@ -94,7 +94,12 @@ impl From<&DataCommand> for DataRequestSpec {
         } else {
             vec![]
         };
-        DataRequestSpec { region, metrics }
+
+        DataRequestSpec {
+            geometry: GeometrySpec::default(), 
+            region, 
+            metrics 
+        }
     }
 }
 

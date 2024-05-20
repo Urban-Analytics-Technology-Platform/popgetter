@@ -1,7 +1,7 @@
 use anyhow::Result;
 use data_request_spec::DataRequestSpec;
-use metadata::{load_metadata, SourceDataRelease};
-use parquet::get_metrics;
+use metadata::Metadata;
+use parquet::{get_metrics, MetricRequest};
 use polars::{frame::DataFrame, prelude::DataFrameJoinOps};
 use tokio::try_join;
 
@@ -15,13 +15,13 @@ pub mod parquet;
 pub mod formatters;
 
 pub struct Popgetter {
-    pub metadata: SourceDataRelease,
+    pub metadata: Metadata,
 }
 
 impl Popgetter {
     /// Setup the Popgetter object 
     pub fn new() -> Result<Self> {
-        let metadata = load_metadata("us_metadata_test2.json")?;
+        let metadata = metadata::load_all(&["be"])?;
         Ok(Self { metadata })
     }
 

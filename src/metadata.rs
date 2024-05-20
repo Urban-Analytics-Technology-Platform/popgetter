@@ -1,81 +1,209 @@
-use std::{fs::File, io::BufReader};
-
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use typify::import_types;
+use anyhow::{anyhow, Result};
+use polars::{
+    frame::DataFrame,
+    lazy::frame::{IntoLazy, LazyFrame, ScanArgsParquet},
+    prelude::{col, lit, UnionArgs},
+};
+use std::default::Default;
 
 use crate::parquet::MetricRequest;
 
-import_types!("schema/popgetter_0.1.0.json");
-
-impl SourceDataRelease{
-    pub fn get_metric_details(&self,metric_id: &str)->Option<&MetricMetadata>{
-        self.available_metrics.iter().find(
-            |m| m.source_metric_id == metric_id
-        ) 
-    }
+pub struct CountryMetadataPaths {
+    base_url: String,
+    geometry: String,
+    metrics: String,
+    country: String,
+    sourceData: String,
+    dataPublishers: String,
 }
 
-// TODO we might want to just pass the MetricMetaData rather than
-// having to 
-impl From<MetricMetadata> for MetricRequest{
-    fn from(value: MetricMetadata) -> Self {
-        MetricRequest { 
-            column: value.parquet_column_name.clone(),
-            file: value.metric_parquet_file_url.clone().unwrap()
-         }
-    }
-}
-
-impl From<&MetricMetadata> for MetricRequest{
-    fn from(value: &MetricMetadata) -> Self {
-        MetricRequest { 
-            column: value.parquet_column_name.clone(), 
-            file: value.metric_parquet_file_url.clone().unwrap()  
+impl Default for CountryMetadataPaths {
+    fn default() -> Self {
+        Self {
+            // TODO move this to enviroment variable or config or something
+            base_url: "https://popgetter.blob.core.windows.net/popgetter-dagster-test/test_2"
+                .into(),
+            geometry: "geometry_metadata.parquet".into(),
+            metrics: "metric_metadata.parquet".into(),
+            country: "country_metadata.parquet".into(),
+            sourceData: "source_data_releases.parquet".into(),
+            dataPublishers: "data_publishers.parquet".into(),
         }
     }
 }
 
-pub fn load_metadata(path: &str) -> Result<SourceDataRelease> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    let release: SourceDataRelease = serde_json::from_reader(reader)?;
-    Ok(release)
+pub struct CountryMetadataLoader {
+    country: String,
+    paths: CountryMetadataPaths,
 }
 
-pub async fn load_metadata_from_url(
-    client: &reqwest::Client,
-    url: &str,
-) -> Result<SourceDataRelease> {
-    let release = client
-        .get(url)
-        .send()
-        .await?
-        .json::<SourceDataRelease>()
-        .await?;
-    Ok(release.clone())
+#[derive(Debug)]
+pub struct Metadata {
+    pub metrics: DataFrame,
+    pub geometries: DataFrame,
+    pub source_data_releases: DataFrame,
+    pub data_publishers: DataFrame,
+    pub countries: DataFrame,
+}
+
+impl Metadata {
+    pub fn get_metric_details(&self, metric_id: &str) -> Result<MetricRequest> {
+        let matches = self
+            .metrics
+            .clone()
+            .lazy()
+            .filter(col("hxl_tag").eq(lit(metric_id)))
+            .collect()?;
+
+        if matches.height() == 0 {
+            Err(anyhow!("Failed to find metric"))
+        } else if matches.height() > 1 {
+            Err(anyhow!("Multiple metrics match this id"))
+        } else {
+            let column: String = matches
+                .column("metric_parquet_column")?
+                .str()?
+                .get(0)
+                .unwrap()
+                .into();
+            let file: String = matches
+                .column("metric_parquet_file_url")?
+                .str()?
+                .get(0)
+                .unwrap()
+                .into();
+            Ok(MetricRequest { column, file })
+        }
+    }
+
+    pub fn get_geom_details(&self, geom_level: &str) -> Result<String> {
+        let matches = self
+            .geometries
+            .clone()
+            .lazy()
+            .filter(col("level").eq(lit(geom_level)))
+            .collect()?;
+
+        let file = matches
+            .column("filename_stem")?
+            .str()?
+            .get(0)
+            .unwrap()
+            .into();
+
+        Ok(file)
+    }
+}
+
+impl CountryMetadataLoader {
+    pub fn new(country: &str) -> Self {
+        let paths: CountryMetadataPaths = Default::default();
+        Self {
+            country: country.into(),
+            paths,
+        }
+    }
+
+    pub fn with_paths(&mut self, paths: CountryMetadataPaths) -> &mut Self {
+        self.paths = paths;
+        self
+    }
+
+    pub fn load(&self) -> Result<Metadata> {
+        Ok(Metadata {
+            metrics: self.load_metadata(&self.paths.metrics)?,
+            geometries: self.load_metadata(&self.paths.geometry)?,
+            source_data_releases: self.load_metadata(&self.paths.sourceData)?,
+            data_publishers: self.load_metadata(&self.paths.dataPublishers)?,
+            countries: self.load_metadata(&self.paths.country)?,
+        })
+    }
+
+    fn load_metadata(&self, path: &str) -> Result<DataFrame> {
+        let url = format!("{}/{}/{path}", self.paths.base_url, self.country);
+        let args = ScanArgsParquet::default();
+        println!("Attempting to load {url}");
+        let df: DataFrame = LazyFrame::scan_parquet(url, args)?.collect()?;
+        Ok(df)
+    }
+}
+
+pub fn load_all(countries: &[&str]) -> Result<Metadata> {
+    let metadata: Result<Vec<Metadata>> = countries
+        .iter()
+        .map(|c| CountryMetadataLoader::new(c).load())
+        .collect();
+    let metadata = metadata?;
+
+    // Merge metrics
+    let metric_dfs: Vec<LazyFrame> = metadata.iter().map(|m| m.metrics.clone().lazy()).collect();
+    let metrics = polars::prelude::concat(metric_dfs, UnionArgs::default())?.collect()?;
+
+    // Merge geometries
+    let geometries_dfs: Vec<LazyFrame> = metadata
+        .iter()
+        .map(|m| m.geometries.clone().lazy())
+        .collect();
+    let geometries = polars::prelude::concat(geometries_dfs, UnionArgs::default())?.collect()?;
+
+    // Merge source data relaeses
+    let source_data_dfs: Vec<LazyFrame> = metadata
+        .iter()
+        .map(|m| m.source_data_releases.clone().lazy())
+        .collect();
+
+    let source_data_releases =
+        polars::prelude::concat(source_data_dfs, UnionArgs::default())?.collect()?;
+
+    // Merge source data publishers
+    let data_publisher_dfs: Vec<LazyFrame> = metadata
+        .iter()
+        .map(|m| m.data_publishers.clone().lazy())
+        .collect();
+
+    let data_publishers =
+        polars::prelude::concat(data_publisher_dfs, UnionArgs::default())?.collect()?;
+
+    // Merge coutnries
+
+    let countries_dfs: Vec<LazyFrame> = metadata
+        .iter()
+        .map(|m| m.countries.clone().lazy())
+        .collect();
+
+    let countries = polars::prelude::concat(countries_dfs, UnionArgs::default())?.collect()?;
+
+    Ok(Metadata {
+        metrics,
+        geometries,
+        source_data_releases,
+        data_publishers,
+        countries,
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
 
     #[test]
-    fn test_loading_metadata() {
-        let data = load_metadata("us_metadata.json");
-        let data = data.expect("Metadata should load and parse fine");
-        assert_eq!(data.name, "ACS_2019_fiveYear");
+    fn country_metadata_should_load() {
+        let metadata = CountryMetadataLoader::new("be").load();
+        println!("{metadata:#?}");
+        assert!(metadata.is_ok(), "Data should have loaded ok");
     }
 
-    #[tokio::test]
-    async fn test_loading_metadata_from_url() {
-        let data = load_metadata_from_url(
-            &reqwest::Client::new(),
-            "https://popgetter.blob.core.windows.net/popgetter-cli-test/us_metadata.json",
-        )
-        .await;
-        let data = data.expect("Metadata should load and parse fine");
-        assert_eq!(data.name, "ACS_2019_fiveYear");
+    #[test]
+    fn all_metadata_should_load() {
+        let metadata = load_all(&["be"]);
+        println!("{metadata:#?}");
+        assert!(metadata.is_ok(), "Data should have loaded ok");
+    }
+
+    #[test]
+    fn we_should_be_able_to_find_metadata_by_id() {
+        let metadata = load_all(&["be"]).unwrap();
+        let metrics = metadata.get_metric_details("#population+children+age0_17");
+        println!("{metrics:#?}");
     }
 }
