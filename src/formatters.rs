@@ -111,7 +111,9 @@ impl OutputGenerator for GeoJSONSeqFormatter {
         let other_cols = df.drop("geometry")?;
         for (idx, geom) in geometry_col.str()?.into_iter().enumerate() {
             if let Some(wkt_str) = geom {
-                let geom: Geometry<f64> = Geometry::try_from_wkt_str(wkt_str).unwrap();
+                let geom: Geometry<f64> = Geometry::try_from_wkt_str(wkt_str).map_err(|err| {
+                    anyhow!("Invalid `Geometry<f64>` from well-known text string: {err}")
+                })?;
                 let mut properties = serde_json::Map::new();
                 for col in other_cols.get_columns() {
                     let val = any_value_to_json(&col.get(idx)?)?;
