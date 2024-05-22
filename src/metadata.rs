@@ -8,13 +8,18 @@ use std::default::Default;
 
 use crate::parquet::MetricRequest;
 
+/// This struct contains the base url and names of
+/// the files that contain the metadata. It has a
+/// default impl which give the version that we will
+/// normally use but this allows us to customise it
+/// if we need to.
 pub struct CountryMetadataPaths {
     base_url: String,
     geometry: String,
     metrics: String,
     country: String,
-    sourceData: String,
-    dataPublishers: String,
+    source_data: String,
+    data_publishers: String,
 }
 
 impl Default for CountryMetadataPaths {
@@ -26,17 +31,25 @@ impl Default for CountryMetadataPaths {
             geometry: "geometry_metadata.parquet".into(),
             metrics: "metric_metadata.parquet".into(),
             country: "country_metadata.parquet".into(),
-            sourceData: "source_data_releases.parquet".into(),
-            dataPublishers: "data_publishers.parquet".into(),
+            source_data: "source_data_releases.parquet".into(),
+            data_publishers: "data_publishers.parquet".into(),
         }
     }
 }
 
+/// `CountryMetadataLoader` takes a country iso string
+/// along with a CountryMetadataPaths and provides methods
+/// for fetching and construting a `Metadata` catalouge.
 pub struct CountryMetadataLoader {
     country: String,
     paths: CountryMetadataPaths,
 }
 
+/// The metadata struct contains the polars `DataFrames` for
+/// the various different metadata tables. Can be constructed
+/// from a single `CountryMetadataLoader` or for all countries.
+/// It also provides the various functions for searching and
+/// getting `MetricRequests` from the catalouge.
 #[derive(Debug)]
 pub struct Metadata {
     pub metrics: DataFrame,
@@ -47,6 +60,8 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    /// Given a `metric_id`, return the `MetricRequest` object
+    /// that corrisponds to it.
     pub fn get_metric_details(&self, metric_id: &str) -> Result<MetricRequest> {
         let matches = self
             .metrics
@@ -76,6 +91,8 @@ impl Metadata {
         }
     }
 
+    /// Given a geometry level return the path to the
+    /// geometry file that it corrisponds to
     pub fn get_geom_details(&self, geom_level: &str) -> Result<String> {
         let matches = self
             .geometries
@@ -96,29 +113,34 @@ impl Metadata {
 }
 
 impl CountryMetadataLoader {
+    /// Create a metadata loader for a specific Country
     pub fn new(country: &str) -> Self {
-        let paths: CountryMetadataPaths = Default::default();
+        let paths = CountryMetadataPaths::default();
         Self {
             country: country.into(),
             paths,
         }
     }
-
+    /// Overwrite the Paths object to specifiy custom
+    /// metadata filenames and `base_url`.
     pub fn with_paths(&mut self, paths: CountryMetadataPaths) -> &mut Self {
         self.paths = paths;
         self
     }
 
+    /// Load the Metadata catalouge for this country with
+    /// the specified metadata paths
     pub fn load(&self) -> Result<Metadata> {
         Ok(Metadata {
             metrics: self.load_metadata(&self.paths.metrics)?,
             geometries: self.load_metadata(&self.paths.geometry)?,
-            source_data_releases: self.load_metadata(&self.paths.sourceData)?,
-            data_publishers: self.load_metadata(&self.paths.dataPublishers)?,
+            source_data_releases: self.load_metadata(&self.paths.source_data)?,
+            data_publishers: self.load_metadata(&self.paths.data_publishers)?,
             countries: self.load_metadata(&self.paths.country)?,
         })
     }
 
+    /// Performs a load of a given metadata parquet file
     fn load_metadata(&self, path: &str) -> Result<DataFrame> {
         let url = format!("{}/{}/{path}", self.paths.base_url, self.country);
         let args = ScanArgsParquet::default();
@@ -128,6 +150,8 @@ impl CountryMetadataLoader {
     }
 }
 
+/// Load the metadata for a list of countries and merge them into
+/// a single `Metadata` catalouge.
 pub fn load_all(countries: &[&str]) -> Result<Metadata> {
     let metadata: Result<Vec<Metadata>> = countries
         .iter()

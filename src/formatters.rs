@@ -13,7 +13,7 @@ use wkt::TryFromWkt;
 
 /// Utility function to convert a polars series from WKT geometries to
 /// WKB geometries (as a string)
-fn convert_wkt_to_wkb_string(s: Series) -> PolarsResult<Option<Series>> {
+fn convert_wkt_to_wkb_string(s: &Series) -> PolarsResult<Option<Series>> {
     let ca = s.str()?;
     let wkb_series = ca
         .into_iter()
@@ -159,7 +159,7 @@ impl OutputGenerator for CSVFormatter {
                 .with_column(
                     col("geometry")
                         .map(
-                            convert_wkt_to_wkb_string,
+                            |s: Series| convert_wkt_to_wkb_string(&s),
                             GetOutput::from_type(DataType::String),
                         )
                         .alias("geometry"),

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use data_request_spec::DataRequestSpec;
 use metadata::Metadata;
-use parquet::{get_metrics, MetricRequest};
+use parquet::get_metrics;
 use polars::{frame::DataFrame, prelude::DataFrameJoinOps};
 use tokio::try_join;
 
