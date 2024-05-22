@@ -25,7 +25,8 @@ impl DataRequestSpec {
                 MetricSpec::NamedMetric(name) => {
                     metric_requests.push(
                         catalogue
-                            .get_metric_details(name)
+                            // TODO figure out the best way to pass these
+                            .get_metric_details(name, "municipality", "2022")
                             .with_context(|| "Failed to find metric")?,
                     );
                 }
