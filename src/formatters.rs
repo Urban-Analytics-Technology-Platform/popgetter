@@ -15,7 +15,7 @@ use wkt::TryFromWkt;
 /// WKB geometries (as a string)
 fn convert_wkt_to_wkb_string(s: Series) -> PolarsResult<Option<Series>> {
     let ca = s.str()?;
-   let wkb_series = ca
+    let wkb_series = ca
         .into_iter()
         .map(|opt_wkt| {
             opt_wkt
@@ -188,7 +188,8 @@ impl OutputGenerator for GeoJSONFormatter {
 
         for (idx, geom) in geometry_col.str()?.into_iter().enumerate() {
             if let Some(wkt_str) = geom {
-                let geom: Geometry<f64> = Geometry::try_from_wkt_str(wkt_str).unwrap();
+                let geom: Geometry<f64> = Geometry::try_from_wkt_str(wkt_str)
+                    .map_err(|_| anyhow!("Failed to parse geometry"))?;
                 let mut properties = serde_json::Map::new();
 
                 for col in other_cols.get_columns() {
