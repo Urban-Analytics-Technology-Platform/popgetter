@@ -1,8 +1,11 @@
 use anyhow::{anyhow, Result};
 use polars::{
     frame::DataFrame,
-    lazy::frame::{IntoLazy, LazyFrame, ScanArgsParquet},
-    prelude::{col, lit, UnionArgs},
+    lazy::{
+        dsl::col,
+        frame::{IntoLazy, LazyFrame, ScanArgsParquet},
+    },
+    prelude::{lit, JoinArgs, JoinType, UnionArgs},
 };
 use std::default::Default;
 
@@ -60,14 +63,39 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    /// Given a `metric_id`, return the `MetricRequest` object
-    /// that corrisponds to it.
-    pub fn get_metric_details(&self, metric_id: &str) -> Result<MetricRequest> {
-        let matches = self
-            .metrics
+    fn combined_metric_source_geometry(&self) -> LazyFrame {
+        // Join with source_data_release and geometry
+        self.metrics
             .clone()
             .lazy()
-            .filter(col("hxl_tag").eq(lit(metric_id)))
+            .join(
+                self.source_data_releases.clone().lazy(),
+                [col("source_data_release_id")],
+                [col("id")],
+                JoinArgs::new(JoinType::Inner),
+            )
+            .join(
+                self.geometries.clone().lazy(),
+                [col("geometry_metadata_id")],
+                [col("id")],
+                JoinArgs::new(JoinType::Inner),
+            )
+    }
+    /// Given a `metric_id`, geometry_level and year, return the
+    /// `MetricRequest` object that can be used to fetch that metric
+    pub fn get_metric_details(
+        &self,
+        metric_id: &str,
+        geometry_level: &str,
+        year: &str,
+    ) -> Result<MetricRequest> {
+        let matches = self
+            .combined_metric_source_geometry()
+            .filter(
+                col("hxl_tag").eq(lit(metric_id)
+                    .and(col("geometry_level").eq(lit(geometry_level)))
+                    .and(col("year").eq(lit(year)))),
+            )
             .collect()?;
 
         if matches.height() == 0 {
@@ -227,7 +255,8 @@ mod tests {
     #[test]
     fn we_should_be_able_to_find_metadata_by_id() {
         let metadata = load_all(&["be"]).unwrap();
-        let metrics = metadata.get_metric_details("#population+children+age0_17");
+        let metrics =
+            metadata.get_metric_details("#population+children+age0_17", "municipality", "2022");
         println!("{metrics:#?}");
     }
 }
