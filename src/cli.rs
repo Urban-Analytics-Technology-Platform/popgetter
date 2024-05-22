@@ -38,7 +38,7 @@ pub trait RunCommand {
 #[derive(Args, Debug)]
 pub struct DataCommand {
     /// Only get data in  bounding box ([min_lat,min_lng,max_lat,max_lng])
-    #[arg(short, long)]
+    #[arg(short, long, allow_hyphen_values(true))]
     bbox: Option<BBox>,
     /// Only get the specific metrics
     #[arg(short, long)]
