@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     ops::{Index, IndexMut},
@@ -15,6 +15,8 @@ pub struct DataRequestSpec {
 }
 
 impl DataRequestSpec {
+    /// Generates a vector of metric requests from a `DataRequestSpec`
+    /// and a catalouge.
     pub fn metric_requests(&self, catalogue: &Metadata) -> Result<Vec<MetricRequest>> {
         let mut metric_requests: Vec<MetricRequest> = vec![];
         println!("Try to get metrics {:#?}", self.metrics);
@@ -24,8 +26,7 @@ impl DataRequestSpec {
                     metric_requests.push(
                         catalogue
                             .get_metric_details(name)
-                            .with_context(|| "Failed to find metric")?
-                            .into(),
+                            .with_context(|| "Failed to find metric")?,
                     );
                 }
                 MetricSpec::DataProduct(_) => todo!("unsupported metric spec"),
@@ -34,6 +35,8 @@ impl DataRequestSpec {
         Ok(metric_requests)
     }
 
+    /// Get the details of a geometry file from a `DataRequestSpec` and
+    /// a catalouge.
     pub fn geom_details(&self, catalogue: &Metadata) -> Result<String> {
         catalogue.get_geom_details("municipalty")
     }

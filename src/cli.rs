@@ -4,11 +4,10 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use popgetter::{
-    data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec},
-    Popgetter,
+    data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, Popgetter
 };
 use serde::{Deserialize, Serialize};
-use std::{fs::File, str::FromStr};
+use std::fs::File;
 use strum_macros::EnumString;
 
 /// Defines the output formats we are able to produce data in.
@@ -171,6 +170,8 @@ pub enum Commands {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
