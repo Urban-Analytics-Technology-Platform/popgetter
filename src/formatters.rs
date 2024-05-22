@@ -133,8 +133,8 @@ impl OutputGenerator for GeoJSONSeqFormatter {
 
 /// Define what format geometries are represented in
 ///
-/// Wkb: Well known binary
-/// Wkt: Well knoen text
+/// Wkb: Well-known binary
+/// Wkt: Well-known text
 #[derive(Serialize, Deserialize, Debug)]
 pub enum GeoFormat {
     Wkb,
