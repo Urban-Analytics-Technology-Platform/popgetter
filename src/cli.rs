@@ -4,11 +4,11 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use popgetter::{
-    data_request_spec::{BBox, DataRequestSpec, MetricSpec, RegionSpec},
-    Popgetter,
+    data_request_spec::{BBox, DataRequestSpec, MetricSpec, RegionSpec}, 
+    formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, Popgetter
 };
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use std::{fs::File, str::FromStr};
 use strum_macros::EnumString;
 
 /// Defines the output formats we are able to produce data in.
@@ -16,6 +16,7 @@ use strum_macros::EnumString;
 #[strum(ascii_case_insensitive)]
 pub enum OutputFormat {
     GeoJSON,
+    GeoJSONSeq,
     Csv,
     GeoParquet,
     FlatGeobuf,
@@ -43,16 +44,36 @@ pub struct DataCommand {
     #[arg(short, long)]
     metrics: Option<String>,
     /// Specify output format
-    #[arg(short, long)]
+    #[arg(short='f', long)]
     output_format: OutputFormat,
+
+    #[arg(short='o',long)]
+    output_file: String
 }
 
 impl RunCommand for DataCommand {
     async fn run(&self) -> Result<()> {
         let popgetter = Popgetter::new()?;
         let data_request = DataRequestSpec::from(self);
-        let results = popgetter.get_data_request(&data_request).await?;
+        let mut results = popgetter.get_data_request(&data_request).await?;
+
+        let formatter = match &self.output_format{
+            OutputFormat::GeoJSON=>{
+                OutputFormatter::GeoJSON(GeoJSONFormatter)
+            },
+            OutputFormat::Csv=>{
+                OutputFormatter::Csv(CSVFormatter::default())
+            },
+            OutputFormat::GeoJSONSeq=>{
+                OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter)
+            },
+            _=>todo!("output format not implemented")
+        };
+
         println!("{results:#?}");
+        let mut f = File::create(&self.output_file)?;
+        formatter.save(&mut f,&mut results)?;
+
         Ok(())
     }
 }

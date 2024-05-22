@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
-    any::Any,
     ops::{Index, IndexMut},
     str::FromStr,
 };
@@ -23,12 +22,12 @@ impl DataRequestSpec {
                 MetricSpec::NamedMetric(name) => {
                     metric_requests.push(
                         catalogue
-                            .get_metric_details(&name)
+                            .get_metric_details(name)
                             .with_context(|| "Failed to find metric")?
                             .into(),
                     );
                 }
-                _ => todo!("unsupported metric spec"),
+                MetricSpec::DataProduct(_) => todo!("unsupported metric spec"),
             }
         }
         Ok(metric_requests)

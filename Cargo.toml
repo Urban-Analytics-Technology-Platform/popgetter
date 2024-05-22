@@ -21,5 +21,14 @@ strum = "0.26"
 strum_macros = "0.26"
 enum_dispatch = "0.3"
 flatgeobuf = "4.1.0"
-geozero = {version = "0.12.0", features= []} 
+geozero = {version = "0.12.0", features= ["with-csv","with-geojson"]} 
 httpmock = "0.7.0-rc.1"
+geojson={version="0.24.1", optional=true }
+geo = "0.28.0"
+wkt = "0.10.3"
+wkb = "0.7.1"
+
+
+[features]
+default = ["formatters"]
+formatters= ["dep:geojson"]
