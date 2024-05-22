@@ -15,18 +15,26 @@ use wkt::TryFromWkt;
 /// WKB geometries (as a string)
 fn convert_wkt_to_wkb_string(s: Series) -> PolarsResult<Option<Series>> {
     let ca = s.str()?;
-    let wkb_series: Vec<Vec<u8>> = ca
+   let wkb_series = ca
         .into_iter()
         .map(|opt_wkt| {
             opt_wkt
                 .map(|wkt_str| {
-                    let geom: Geometry<f64> =
-                        Geometry::try_from_wkt_str(wkt_str).expect("Failed to parse wkt");
-                    geom_to_wkb(&geom).expect("Failed to format geom")
+                    Geometry::try_from_wkt_str(wkt_str)
+                        .map_err(|err| {
+                            PolarsError::ComputeError(
+                                format!("Failed to parse wkt: {err:?}").into(),
+                            )
+                        })
+                        .and_then(|geom: Geometry<f64>| {
+                            geom_to_wkb(&geom).map_err(|_| {
+                                PolarsError::ComputeError("Failed to format geom: {err:?}".into())
+                            })
+                        })
                 })
-                .unwrap_or_else(Vec::new)
+                .unwrap_or_else(|| Ok(Vec::new()))
         })
-        .collect();
+        .collect::<Result<Vec<Vec<u8>>, _>>()?;
 
     let wkb_string_series: Vec<String> = wkb_series
         .into_iter()
