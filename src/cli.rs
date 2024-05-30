@@ -9,6 +9,7 @@ use popgetter::{
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use strum_macros::EnumString;
+use log::{info,debug};
 
 /// Defines the output formats we are able to produce data in.
 #[derive(Clone, Debug, Deserialize, Serialize, EnumString, PartialEq, Eq)]
@@ -52,6 +53,8 @@ pub struct DataCommand {
 
 impl RunCommand for DataCommand {
     async fn run(&self) -> Result<()> {
+        info!("Running `data` subcommand");
+
         let popgetter = Popgetter::new()?;
         let data_request = DataRequestSpec::from(self);
         let mut results = popgetter.get_data_request(&data_request).await?;
@@ -69,7 +72,7 @@ impl RunCommand for DataCommand {
             _=>todo!("output format not implemented")
         };
 
-        println!("{results:#?}");
+        debug!("{results:#?}");
         let mut f = File::create(&self.output_file)?;
         formatter.save(&mut f,&mut results)?;
 
@@ -116,7 +119,7 @@ pub struct MetricsCommand {
 
 impl RunCommand for MetricsCommand {
     async fn run(&self) -> Result<()> {
-        println!("Running Metrics Command");
+        info!("Running `metrics` subcommand");
         Ok(())
     }
 }
@@ -128,7 +131,7 @@ pub struct CountriesCommand;
 
 impl RunCommand for CountriesCommand {
     async fn run(&self) -> Result<()> {
-        println!("Running Countries Command");
+        info!("Running `countries` subcommand");
         Ok(())
     }
 }
@@ -140,7 +143,7 @@ pub struct SurveysCommand;
 
 impl RunCommand for SurveysCommand {
     async fn run(&self) -> Result<()> {
-        println!("Running Surveys Command");
+        info!("Running `surveys` subcommand");
         Ok(())
     }
 }

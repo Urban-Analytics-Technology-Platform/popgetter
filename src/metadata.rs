@@ -8,6 +8,7 @@ use polars::{
     prelude::{lit, JoinArgs, JoinType, UnionArgs},
 };
 use std::default::Default;
+use log::info;
 
 use crate::parquet::MetricRequest;
 
@@ -172,7 +173,7 @@ impl CountryMetadataLoader {
     fn load_metadata(&self, path: &str) -> Result<DataFrame> {
         let url = format!("{}/{}/{path}", self.paths.base_url, self.country);
         let args = ScanArgsParquet::default();
-        println!("Attempting to load {url}");
+        info!("Attempting to load {url}");
         let df: DataFrame = LazyFrame::scan_parquet(url, args)?.collect()?;
         Ok(df)
     }

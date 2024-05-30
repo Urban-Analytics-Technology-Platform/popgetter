@@ -4,6 +4,7 @@ use std::{
     ops::{Index, IndexMut},
     str::FromStr,
 };
+use log::debug;
 
 use crate::{metadata::Metadata, parquet::MetricRequest};
 
@@ -19,7 +20,7 @@ impl DataRequestSpec {
     /// and a catalouge.
     pub fn metric_requests(&self, catalogue: &Metadata) -> Result<Vec<MetricRequest>> {
         let mut metric_requests: Vec<MetricRequest> = vec![];
-        println!("Try to get metrics {:#?}", self.metrics);
+        debug!("Try to get metrics {:#?}", self.metrics);
         for metric_spec in &self.metrics {
             match metric_spec {
                 MetricSpec::NamedMetric(name) => {

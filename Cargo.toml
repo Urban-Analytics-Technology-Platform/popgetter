@@ -27,6 +27,8 @@ geojson={version="0.24.1", optional=true }
 geo = "0.28.0"
 wkt = "0.10.3"
 wkb = "0.7.1"
+log = "0.4.21"
+pretty_env_logger = "0.5.0"
 
 
 [features]
