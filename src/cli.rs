@@ -3,13 +3,18 @@
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
+use log::{debug, info};
 use popgetter::{
-    data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, Popgetter
+    config::Config,
+    data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec},
+    formatters::{
+        CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
+    },
+    Popgetter,
 };
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use strum_macros::EnumString;
-use log::{info,debug};
 
 /// Defines the output formats we are able to produce data in.
 #[derive(Clone, Debug, Deserialize, Serialize, EnumString, PartialEq, Eq)]
@@ -25,7 +30,7 @@ pub enum OutputFormat {
 /// Trait that defines what to run when a given subcommand is invoked.
 #[enum_dispatch]
 pub trait RunCommand {
-    async fn run(&self) -> Result<()>;
+    async fn run(&self, config: &Config) -> Result<()>;
 }
 
 /// The Data command is the one we invoke to get a set of metrics and geometry
@@ -44,37 +49,31 @@ pub struct DataCommand {
     #[arg(short, long)]
     metrics: Option<String>,
     /// Specify output format
-    #[arg(short='f', long)]
+    #[arg(short = 'f', long)]
     output_format: OutputFormat,
 
-    #[arg(short='o',long)]
-    output_file: String
+    #[arg(short = 'o', long)]
+    output_file: String,
 }
 
 impl RunCommand for DataCommand {
-    async fn run(&self) -> Result<()> {
+    async fn run(&self, config: &Config) -> Result<()> {
         info!("Running `data` subcommand");
 
-        let popgetter = Popgetter::new()?;
+        let popgetter = Popgetter::new(config).await?;
         let data_request = DataRequestSpec::from(self);
         let mut results = popgetter.get_data_request(&data_request).await?;
 
-        let formatter = match &self.output_format{
-            OutputFormat::GeoJSON=>{
-                OutputFormatter::GeoJSON(GeoJSONFormatter)
-            },
-            OutputFormat::Csv=>{
-                OutputFormatter::Csv(CSVFormatter::default())
-            },
-            OutputFormat::GeoJSONSeq=>{
-                OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter)
-            },
-            _=>todo!("output format not implemented")
+        let formatter = match &self.output_format {
+            OutputFormat::GeoJSON => OutputFormatter::GeoJSON(GeoJSONFormatter),
+            OutputFormat::Csv => OutputFormatter::Csv(CSVFormatter::default()),
+            OutputFormat::GeoJSONSeq => OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter),
+            _ => todo!("output format not implemented"),
         };
 
         debug!("{results:#?}");
         let mut f = File::create(&self.output_file)?;
-        formatter.save(&mut f,&mut results)?;
+        formatter.save(&mut f, &mut results)?;
 
         Ok(())
     }
@@ -98,9 +97,9 @@ impl From<&DataCommand> for DataRequestSpec {
         };
 
         DataRequestSpec {
-            geometry: GeometrySpec::default(), 
-            region, 
-            metrics 
+            geometry: GeometrySpec::default(),
+            region,
+            metrics,
         }
     }
 }
@@ -118,7 +117,7 @@ pub struct MetricsCommand {
 }
 
 impl RunCommand for MetricsCommand {
-    async fn run(&self) -> Result<()> {
+    async fn run(&self, _config: &Config) -> Result<()> {
         info!("Running `metrics` subcommand");
         Ok(())
     }
@@ -130,8 +129,8 @@ impl RunCommand for MetricsCommand {
 pub struct CountriesCommand;
 
 impl RunCommand for CountriesCommand {
-    async fn run(&self) -> Result<()> {
-        info!("Running `countries` subcommand");
+    async fn run(&self, config: &Config) -> Result<()> {
+        let _popgetter = Popgetter::new(config).await?;
         Ok(())
     }
 }
@@ -142,7 +141,7 @@ impl RunCommand for CountriesCommand {
 pub struct SurveysCommand;
 
 impl RunCommand for SurveysCommand {
-    async fn run(&self) -> Result<()> {
+    async fn run(&self, _config: &Config) -> Result<()> {
         info!("Running `surveys` subcommand");
         Ok(())
     }

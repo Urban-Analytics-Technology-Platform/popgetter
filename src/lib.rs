@@ -6,7 +6,9 @@ use polars::{frame::DataFrame, prelude::DataFrameJoinOps};
 use tokio::try_join;
 use log::debug;
 
+use crate::config::Config;
 use crate::geo::get_geometries;
+pub mod config;
 pub mod data_request_spec;
 pub mod geo;
 pub mod metadata;
@@ -21,8 +23,8 @@ pub struct Popgetter {
 
 impl Popgetter {
     /// Setup the Popgetter object 
-    pub fn new() -> Result<Self> {
-        let metadata = metadata::load_all(&["be"])?;
+    pub async fn new(config: &Config) -> Result<Self> {
+        let metadata = metadata::load_all(config).await?;
         Ok(Self { metadata })
     }
 
@@ -51,4 +53,3 @@ impl Popgetter {
         Ok(result)
     }
 }
-
