@@ -172,14 +172,14 @@ impl CountryMetadataLoader {
     /// Performs a load of a given metadata parquet file
     async fn load_metadata(&self, path: &str, config: &Config) -> Result<DataFrame> {
         let full_path = format!("{}/{}/{path}", config.base_path, self.country);
-        // TODO: can we avoid this clone?
-        let full_path_clone = full_path.clone();
         let args = ScanArgsParquet::default();
         info!("Attempting to load {full_path}");
-        let df: DataFrame =
-            tokio::task::spawn_blocking(|| LazyFrame::scan_parquet(full_path, args)?.collect())
-                .await?
-                .map_err(|e| anyhow!("Failed to load '{full_path_clone}': {e}"))?;
+        let df: DataFrame = tokio::task::spawn_blocking(move || {
+            LazyFrame::scan_parquet(&full_path, args)?
+                .collect()
+                .map_err(|e| anyhow!("Failed to load '{full_path}': {e}"))
+        })
+        .await??;
         Ok(df)
     }
 }
