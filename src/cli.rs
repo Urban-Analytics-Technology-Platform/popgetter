@@ -5,7 +5,6 @@ use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use log::{debug, info};
 use popgetter::{
-    config::Config,
     data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec},
     formatters::{
         CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
@@ -30,7 +29,7 @@ pub enum OutputFormat {
 /// Trait that defines what to run when a given subcommand is invoked.
 #[enum_dispatch]
 pub trait RunCommand {
-    async fn run(&self, config: &Config) -> Result<()>;
+    async fn run(&self) -> Result<()>;
 }
 
 /// The Data command is the one we invoke to get a set of metrics and geometry
@@ -57,10 +56,10 @@ pub struct DataCommand {
 }
 
 impl RunCommand for DataCommand {
-    async fn run(&self, config: &Config) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         info!("Running `data` subcommand");
 
-        let popgetter = Popgetter::new(config).await?;
+        let popgetter = Popgetter::new().await?;
         let data_request = DataRequestSpec::from(self);
         let mut results = popgetter.get_data_request(&data_request).await?;
 
@@ -117,7 +116,7 @@ pub struct MetricsCommand {
 }
 
 impl RunCommand for MetricsCommand {
-    async fn run(&self, _config: &Config) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         info!("Running `metrics` subcommand");
         Ok(())
     }
@@ -129,8 +128,8 @@ impl RunCommand for MetricsCommand {
 pub struct CountriesCommand;
 
 impl RunCommand for CountriesCommand {
-    async fn run(&self, config: &Config) -> Result<()> {
-        let _popgetter = Popgetter::new(config).await?;
+    async fn run(&self) -> Result<()> {
+        let _popgetter = Popgetter::new().await?;
         Ok(())
     }
 }
@@ -141,7 +140,7 @@ impl RunCommand for CountriesCommand {
 pub struct SurveysCommand;
 
 impl RunCommand for SurveysCommand {
-    async fn run(&self, _config: &Config) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         info!("Running `surveys` subcommand");
         Ok(())
     }
