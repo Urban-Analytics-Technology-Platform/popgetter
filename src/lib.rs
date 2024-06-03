@@ -10,6 +10,7 @@ pub mod data_request_spec;
 pub mod geo;
 pub mod metadata;
 pub mod parquet;
+pub mod search;
 
 #[cfg(feature="formatters")]
 pub mod formatters;
