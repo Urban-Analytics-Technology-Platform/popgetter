@@ -2678,6 +2678,7 @@ dependencies = [
  "geozero",
  "httpmock",
  "polars",
+ "regex",
  "reqwest 0.12.3",
  "serde",
  "serde_json",
