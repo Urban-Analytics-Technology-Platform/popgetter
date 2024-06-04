@@ -12,6 +12,7 @@ use polars::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, default::Default};
+use futures::try_join;
 
 use crate::config::Config;
 
@@ -229,14 +230,25 @@ impl CountryMetadataLoader {
     /// Load the Metadata catalouge for this country with
     /// the specified metadata paths
     pub async fn load(self, config: &Config) -> Result<Metadata> {
+        let metrics_future = self.load_metadata(&self.paths.metrics, config);
+        let geometries_future = self.load_metadata(&self.paths.geometry, config);
+        let source_data_future = self.load_metadata(&self.paths.source_data, config);
+        let data_publishers_future = self.load_metadata(&self.paths.data_publishers, config);
+        let countries_future = self.load_metadata(&self.paths.country, config);
+
+        let t = try_join!(
+            metrics_future,
+            geometries_future,
+            source_data_future,
+            data_publishers_future,
+            countries_future
+        )?;
         Ok(Metadata {
-            metrics: self.load_metadata(&self.paths.metrics, config).await?,
-            geometries: self.load_metadata(&self.paths.geometry, config).await?,
-            source_data_releases: self.load_metadata(&self.paths.source_data, config).await?,
-            data_publishers: self
-                .load_metadata(&self.paths.data_publishers, config)
-                .await?,
-            countries: self.load_metadata(&self.paths.country, config).await?,
+            metrics: t.0,
+            geometries: t.1,
+            source_data_releases: t.2,
+            data_publishers: t.3,
+            countries: t.4,
         })
     }
 
@@ -244,14 +256,13 @@ impl CountryMetadataLoader {
     async fn load_metadata(&self, path: &str, config: &Config) -> Result<DataFrame> {
         let full_path = format!("{}/{}/{path}", config.base_path, self.country);
         let args = ScanArgsParquet::default();
-        info!("Attempting to load {full_path}");
-        let df: DataFrame = tokio::task::spawn_blocking(move || {
+        info!("Attempting to load dataframe from {full_path}");
+        tokio::task::spawn_blocking(move || {
             LazyFrame::scan_parquet(&full_path, args)?
                 .collect()
                 .map_err(|e| anyhow!("Failed to load '{full_path}': {e}"))
         })
-        .await??;
-        Ok(df)
+        .await?
     }
 }
 
@@ -371,7 +382,10 @@ mod tests {
     #[tokio::test]
     async fn metric_ids_should_expand_properly() {
         let config = Config::default();
-        let metadata = CountryMetadataLoader::new("be").load(&config).await.unwrap();
+        let metadata = CountryMetadataLoader::new("be")
+            .load(&config)
+            .await
+            .unwrap();
         let expanded_metrics =
             metadata.expand_wildcard_metric(&MetricId::Hxl("population-*".into()));
         assert!(
@@ -409,7 +423,10 @@ mod tests {
     #[tokio::test]
     async fn human_readable_metric_ids_should_expand_properly() {
         let config = Config::default();
-        let metadata = CountryMetadataLoader::new("be").load(&config).await.unwrap();
+        let metadata = CountryMetadataLoader::new("be")
+            .load(&config)
+            .await
+            .unwrap();
         let expanded_metrics =
             metadata.expand_wildcard_metric(&MetricId::CommonName("Children*".into()));
 
@@ -443,7 +460,10 @@ mod tests {
     #[tokio::test]
     async fn fully_defined_metric_ids_should_expand_to_itself() {
         let config = Config::default();
-        let metadata = CountryMetadataLoader::new("be").load(&config).await.unwrap();
+        let metadata = CountryMetadataLoader::new("be")
+            .load(&config)
+            .await
+            .unwrap();
         let expanded_metrics = metadata
             .expand_wildcard_metric(&MetricId::Hxl(r"#population\+infants\+age0\_4".into()));
         assert!(
