@@ -6,7 +6,7 @@ use parquet::get_metrics;
 use polars::{frame::DataFrame, prelude::DataFrameJoinOps};
 use tokio::try_join;
 
-use crate::{config::Config, data_request_spec::MetricSpec, geo::get_geometries};
+use crate::{config::Config, geo::get_geometries};
 pub mod config;
 pub mod data_request_spec;
 pub mod geo;

@@ -14,7 +14,6 @@ use std::{
     ops::{Index, IndexMut},
     str::FromStr,
 };
-use log::debug;
 
 use crate::{
     metadata::{Metadata, MetricId},

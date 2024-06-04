@@ -127,7 +127,7 @@ impl From<&DataCommand> for DataRequestSpec {
 
         let metrics = value.gather_metric_requests()
                            .into_iter()
-                           .map(|metric_id| MetricSpec::Metric(metric_id))
+                           .map(MetricSpec::Metric)
                            .collect();
 
         DataRequestSpec {

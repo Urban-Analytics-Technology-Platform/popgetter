@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use futures::future::join_all;
 use log::info;
 use polars::{
-    frame::{explode, DataFrame},
+    frame::DataFrame,
     lazy::{
         dsl::{col, Expr},
         frame::{IntoLazy, LazyFrame, ScanArgsParquet},
@@ -10,12 +10,10 @@ use polars::{
     prelude::{lit, JoinArgs, JoinType, NamedFrom, UnionArgs},
     series::Series,
 };
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, default::Default};
 
 use crate::config::Config;
-use crate::parquet::MetricRequest;
 
 /// This struct contains the base url and names of
 /// the files that contain the metadata. It has a
@@ -76,9 +74,9 @@ impl MetricId {
     }
 }
 
-impl Into<Expr> for MetricId {
-    fn into(self) -> Expr {
-        self.to_polars_expr()
+impl From<MetricId> for Expr {
+    fn from(val: MetricId) -> Self {
+        val.to_polars_expr()
     }
 }
 
@@ -120,7 +118,6 @@ impl Metadata {
     /// If our metric_id is a regex, expand it in to a list of explicit `MetricIds`
     pub fn expand_wildcard_metric(&self, metric_id: &MetricId) -> Result<Vec<MetricId>> {
         let col_name = metric_id.to_col_name();
-        let query = metric_id.to_query_string();
         let catalouge = self.combined_metric_source_geometry();
 
         catalouge
@@ -352,8 +349,6 @@ pub async fn load_all(config: &Config) -> Result<Metadata> {
 
 #[cfg(test)]
 mod tests {
-    use geo::Extremes;
-
     use super::*;
     /// TODO stub out a mock here that we can use to test with.
 
@@ -376,7 +371,7 @@ mod tests {
     #[tokio::test]
     async fn metric_ids_should_expand_properly() {
         let config = Config::default();
-        let metadata = load_all(&config).await.unwrap();
+        let metadata = CountryMetadataLoader::new("be").load(&config).await.unwrap();
         let expanded_metrics =
             metadata.expand_wildcard_metric(&MetricId::Hxl("population-*".into()));
         assert!(
