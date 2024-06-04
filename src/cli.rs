@@ -5,11 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use log::{debug, info};
 use popgetter::{
-    data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec},
-    formatters::{
-        CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
-    },
-    Popgetter,
+    data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, metadata::MetricId, Popgetter
 };
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -42,17 +38,60 @@ pub trait RunCommand {
 #[derive(Args, Debug)]
 pub struct DataCommand {
     /// Only get data in  bounding box ([min_lat,min_lng,max_lat,max_lng])
-    #[arg(short, long, allow_hyphen_values(true))]
+    #[arg(short, long, allow_hyphen_values(true), help="Bounding box in which to get the results. Format is: min_lon, min_lat, max_lon, max_lat ")]
     bbox: Option<BBox>,
-    /// Only get the specific metrics
-    #[arg(short, long)]
-    metrics: Option<String>,
+    /// Specify a metric by hxl
+    #[arg(short='h', long, help="Specify a metric by Humanitarian Exchange Language tag")]
+    hxl: Option<Vec<String>>,
+
+    // Specify a metric by id
+    #[arg(short='i', long, help="Specify a metric by uuid, can be a partial uuid")]
+    id: Option<Vec<String>>,
+
+    // Specify a metric by name 
+    #[arg(short='n', long, help="Specify a metric by Human readable name")]
+    name: Option<Vec<String>>,
+
     /// Specify output format
-    #[arg(short = 'f', long)]
+    #[arg(short='f', long, help="One of GeoJSON, CSV, GeoJSONSeq")]
     output_format: OutputFormat,
 
-    #[arg(short = 'o', long)]
+    /// Specify where the result should be saved
+    #[arg(short='o',long, help="Output file to place the results")]
     output_file: String,
+
+    /// Specify the years we should get the result for
+    #[arg(short='y', long, help="Specify the year ranges for which you are interested in the metrics")]
+    years: Option<Vec<String>>
+}
+
+
+impl DataCommand{
+    pub fn gather_metric_requests(&self)->Vec<MetricId>{
+        let mut metric_ids: Vec<MetricId> = vec![];
+
+        if let Some(ids) = &self.id{
+            for id in ids{
+                metric_ids.push(MetricId::Id(id.clone()));
+            }
+        } 
+
+        if let Some(hxls) = &self.hxl{
+            for hxl in hxls{
+                metric_ids.push(MetricId::Hxl(hxl.clone()));
+            }
+        } 
+
+        if let Some(names) = &self.name{
+            for name in names{
+                metric_ids.push(MetricId::CommonName(name.clone()));
+            }
+        } 
+
+        metric_ids
+
+    
+    }
 }
 
 impl RunCommand for DataCommand {
@@ -86,19 +125,16 @@ impl From<&DataCommand> for DataRequestSpec {
             vec![]
         };
 
-        let metrics: Vec<MetricSpec> = if let Some(metric_string) = &value.metrics {
-            metric_string
-                .split(',')
-                .map(|s| MetricSpec::NamedMetric(s.trim().into()))
-                .collect()
-        } else {
-            vec![]
-        };
+        let metrics = value.gather_metric_requests()
+                           .into_iter()
+                           .map(|metric_id| MetricSpec::Metric(metric_id))
+                           .collect();
 
         DataRequestSpec {
-            geometry: GeometrySpec::default(),
-            region,
+            geometry: GeometrySpec::default(), 
+            region, 
             metrics,
+            years: None, 
         }
     }
 }
