@@ -376,7 +376,7 @@ mod tests {
     #[tokio::test]
     async fn metric_ids_should_expand_properly() {
         let config = Config::default();
-        let metadata = load_all(&config).await?;
+        let metadata = load_all(&config).await.unwrap();
         let expanded_metrics =
             metadata.expand_wildcard_metric(&MetricId::Hxl("population-*".into()));
         assert!(
@@ -414,7 +414,7 @@ mod tests {
     #[tokio::test]
     async fn human_readable_metric_ids_should_expand_properly() {
         let config = Config::default();
-        let metadata = CountryMetadataLoader::new("be").load(&config).await?;
+        let metadata = CountryMetadataLoader::new("be").load(&config).await.unwrap();
         let expanded_metrics =
             metadata.expand_wildcard_metric(&MetricId::CommonName("Children*".into()));
 
@@ -448,7 +448,7 @@ mod tests {
     #[tokio::test]
     async fn fully_defined_metric_ids_should_expand_to_itself() {
         let config = Config::default();
-        let metadata = CountryMetadataLoader::new("be").load(&config).await?;
+        let metadata = CountryMetadataLoader::new("be").load(&config).await.unwrap();
         let expanded_metrics = metadata
             .expand_wildcard_metric(&MetricId::Hxl(r"#population\+infants\+age0\_4".into()));
         assert!(
