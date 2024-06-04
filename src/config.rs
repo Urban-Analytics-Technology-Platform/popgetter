@@ -1,14 +1,39 @@
-#[derive(Debug)]
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(default)]
 pub struct Config {
     pub base_path: String,
 }
 
-pub fn init() -> Config {
-    let default_base_path: String =
-        "https://popgetter.blob.core.windows.net/popgetter-dagster-test/test_2".into();
-    let base_path = std::env::var("POPGETTER_CLI_BASE_PATH").unwrap_or(default_base_path);
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            base_path: "https://popgetter.blob.core.windows.net/popgetter-dagster-test/test_2"
+                .into(),
+        }
+    }
+}
 
-    Config {
-        base_path,
+impl Config {
+    fn xdg_config_path() -> PathBuf {
+        let xdg_dirs = xdg::BaseDirectories::with_prefix("popgetter").unwrap();
+        xdg_dirs.place_config_file("config.toml").unwrap()
+    }
+
+    pub fn from_toml() -> Self {
+        let file_path = Self::xdg_config_path();
+
+        match std::fs::read_to_string(file_path) {
+            Ok(contents) => toml::from_str(&contents).expect("Invalid TOML in config file"),
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    Config::default()
+                } else {
+                    panic!("Error reading config file: {:#?}", e);
+                }
+            }
+        }
     }
 }

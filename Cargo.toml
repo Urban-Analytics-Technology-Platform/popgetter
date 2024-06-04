@@ -30,6 +30,8 @@ wkb = "0.7.1"
 log = "0.4.21"
 pretty_env_logger = "0.5.0"
 futures = "0.3.30"
+toml = "0.8.13"
+xdg = "2.5.2"
 
 
 [features]
