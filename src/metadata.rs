@@ -145,7 +145,7 @@ impl Metadata {
     }
 
     /// Generate a Lazy DataFrame which joins the metrics, source and geometry metadata
-    fn combined_metric_source_geometry(&self) -> LazyFrame {
+    pub fn combined_metric_source_geometry(&self) -> LazyFrame {
         // Join with source_data_release and geometry
         self.metrics
             .clone()
