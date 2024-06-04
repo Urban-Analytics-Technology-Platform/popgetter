@@ -279,19 +279,18 @@ pub async fn load_all(config: &Config) -> Result<Metadata> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config;
 
-    #[test]
-    fn country_metadata_should_load() {
-        let config = config::init();
-        let metadata = CountryMetadataLoader::new("be").load(&config);
+    #[tokio::test]
+    async fn country_metadata_should_load() {
+        let config = Config::default();
+        let metadata = CountryMetadataLoader::new("be").load(&config).await;
         println!("{metadata:#?}");
         assert!(metadata.is_ok(), "Data should have loaded ok");
     }
 
     #[tokio::test]
     async fn all_metadata_should_load() {
-        let config = config::init();
+        let config = Config::default();
         let metadata = load_all(&config).await;
         println!("{metadata:#?}");
         assert!(metadata.is_ok(), "Data should have loaded ok");
@@ -299,7 +298,7 @@ mod tests {
 
     #[tokio::test]
     async fn we_should_be_able_to_find_metadata_by_id() {
-        let config = config::init();
+        let config = Config::default();
         let metadata = load_all(&config).await.unwrap();
         let metrics =
             metadata.get_metric_details("#population+children+age0_17", "municipality", "2022");
