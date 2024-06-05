@@ -230,18 +230,12 @@ impl CountryMetadataLoader {
     /// Load the Metadata catalouge for this country with
     /// the specified metadata paths
     pub async fn load(self, config: &Config) -> Result<Metadata> {
-        let metrics_future = self.load_metadata(&self.paths.metrics, config);
-        let geometries_future = self.load_metadata(&self.paths.geometry, config);
-        let source_data_future = self.load_metadata(&self.paths.source_data, config);
-        let data_publishers_future = self.load_metadata(&self.paths.data_publishers, config);
-        let countries_future = self.load_metadata(&self.paths.country, config);
-
         let t = try_join!(
-            metrics_future,
-            geometries_future,
-            source_data_future,
-            data_publishers_future,
-            countries_future
+            self.load_metadata(&self.paths.metrics, config),
+            self.load_metadata(&self.paths.geometry, config),
+            self.load_metadata(&self.paths.source_data, config),
+            self.load_metadata(&self.paths.data_publishers, config),
+            self.load_metadata(&self.paths.country, config),
         )?;
         Ok(Metadata {
             metrics: t.0,
