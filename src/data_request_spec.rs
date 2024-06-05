@@ -85,8 +85,6 @@ impl DataRequestSpec {
 
         let filtered_possible_metrics = filtered_possible_metrics.collect()?;
 
-        let mut metric_requests: Vec<MetricRequest> = vec![];
-
         // Iterate through the results and generate the metric requests
 
         let mut column_iter = filtered_possible_metrics
@@ -99,21 +97,20 @@ impl DataRequestSpec {
             .str()?
             .into_iter();
 
-        for _ in 0..filtered_possible_metrics.height() {
-            let column = column_iter
-                .next()
-                .expect("should have as many iterations as rows")
-                .expect("should have a value")
-                .to_owned();
-
-            let file = file_iter
-                .next()
-                .expect("should have as many iterations as rows")
-                .expect("should have a value")
-                .to_owned();
-
-            metric_requests.push(MetricRequest { column, file })
-        }
+        let  metric_requests: Vec<MetricRequest> = column_iter
+            .zip(file_iter)
+            .into_iter()
+            .filter_map(|(column, file)| {
+                if let (Some(column), Some(file)) = (column, file) {
+                    Some(MetricRequest {
+                        column: column.to_owned(),
+                        file: file.to_owned(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let selected_geometry = filtered_possible_metrics
             .column("geometry_level")?
