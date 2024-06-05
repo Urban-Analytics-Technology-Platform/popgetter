@@ -149,7 +149,7 @@ impl RunCommand for SurveysCommand {
 /// The Recipe command loads a recipy file and generates the output data requested
 #[derive(Args, Debug)]
 pub struct RecipeCommand{
-    #[arg(short, long)]
+    #[arg(index=1)]
     recipe_file: String,
 
     #[arg(short='f', long)]
