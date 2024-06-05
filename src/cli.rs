@@ -68,6 +68,12 @@ impl From<&OutputFormat> for OutputFormatter{
     }
 }
 
+impl From<OutputFormat> for OutputFormatter{
+    fn from(value: OutputFormat) -> Self {
+        Self::from(&value)
+    }
+}
+
 impl RunCommand for DataCommand {
     async fn run(&self) -> Result<()> {
         let popgetter = Popgetter::new()?;
