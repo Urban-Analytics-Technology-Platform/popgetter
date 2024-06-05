@@ -2,8 +2,6 @@
 
 #[derive(thiserror::Error, Debug)]
 pub enum PopgetterError {
-    #[error("Wrapped anyhow error: {0}")]
-    AnyhowError(#[from] anyhow::Error),
     #[error("Connection failure.")]
     FailedConnection,
     #[error("Metric not found.")]
