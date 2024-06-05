@@ -18,14 +18,14 @@ pub enum PopgetterError {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::anyhow;
+    use polars::error::{ErrString, PolarsError};
 
     use super::*;
 
     #[test]
-    fn test_anyhow() {
-        let anyhow_error = anyhow!("An anyhow error");
-        let popgetter_error: PopgetterError = anyhow_error.into();
+    fn test_from_polars_error() {
+        let polars_error = PolarsError::ShapeMismatch(ErrString::from("An example polars error"));
+        let popgetter_error: PopgetterError = polars_error.into();
         println!("{}", popgetter_error);
     }
 }
