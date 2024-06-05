@@ -8,7 +8,7 @@ use popgetter::{
     formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, Popgetter
 };
 use serde::{Deserialize, Serialize};
-use std::{fs::File, str::FromStr};
+use std::{fs::{self, File}, str::FromStr};
 use strum_macros::EnumString;
 
 /// Defines the output formats we are able to produce data in.
@@ -51,13 +51,9 @@ pub struct DataCommand {
     output_file: String
 }
 
-impl RunCommand for DataCommand {
-    async fn run(&self) -> Result<()> {
-        let popgetter = Popgetter::new()?;
-        let data_request = DataRequestSpec::from(self);
-        let mut results = popgetter.get_data_request(&data_request).await?;
-
-        let formatter = match &self.output_format{
+impl From<&OutputFormat> for OutputFormatter{
+    fn from(value: &OutputFormat) -> Self {
+        match value{
             OutputFormat::GeoJSON=>{
                 OutputFormatter::GeoJSON(GeoJSONFormatter)
             },
@@ -68,10 +64,25 @@ impl RunCommand for DataCommand {
                 OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter)
             },
             _=>todo!("output format not implemented")
-        };
+        }
+    }
+}
+
+impl From<OutputFormat> for OutputFormatter{
+    fn from(value: OutputFormat) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl RunCommand for DataCommand {
+    async fn run(&self) -> Result<()> {
+        let popgetter = Popgetter::new()?;
+        let data_request = DataRequestSpec::from(self);
+        let mut results = popgetter.get_data_request(&data_request).await?;
 
         println!("{results:#?}");
         let mut f = File::create(&self.output_file)?;
+        let formatter: OutputFormatter = (&self.output_format).into();
         formatter.save(&mut f,&mut results)?;
 
         Ok(())
@@ -141,6 +152,33 @@ impl RunCommand for SurveysCommand {
     }
 }
 
+/// The Recipe command loads a recipy file and generates the output data requested
+#[derive(Args, Debug)]
+pub struct RecipeCommand{
+    #[arg(index=1)]
+    recipe_file: String,
+
+    #[arg(short='f', long)]
+    output_format: OutputFormat,
+
+    #[arg(short='o',long)]
+    output_file: String
+}
+
+impl RunCommand for RecipeCommand{
+    async fn run(&self) -> Result<()> {
+        let popgetter = Popgetter::new()?;
+        let config = fs::read_to_string(&self.recipe_file)?;
+        let data_request: DataRequestSpec = serde_json::from_str(&config)?;
+        let mut results = popgetter.get_data_request(&data_request).await?;
+        println!("{results}");
+        let formatter: OutputFormatter = (&self.output_format).into();
+        let mut f = File::create(&self.output_file)?;
+        formatter.save(&mut f,&mut results)?;
+        Ok(())
+    }
+}
+
 /// The entrypoint for the CLI.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None, name="popgetter", long_about="Popgetter is a tool to quickly get the data you need!")]
@@ -162,7 +200,10 @@ pub enum Commands {
     Metrics(MetricsCommand),
     /// Surveys
     Surveys(SurveysCommand),
+    /// From recipe
+    Recipe(RecipeCommand)
 }
+
 
 #[cfg(test)]
 mod tests {
