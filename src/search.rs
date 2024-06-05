@@ -3,7 +3,7 @@
 use polars::lazy::dsl::{col, lit, Expr};
 use polars::frame::DataFrame;
 use serde::{Deserialize, Serialize};
-use crate::metadata::{MetricId, Metadata};
+use crate::metadata::Metadata;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 enum SearchContext {

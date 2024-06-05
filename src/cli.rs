@@ -3,8 +3,9 @@
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
+use log::{debug, info};
 use popgetter::{
-    data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, metadata::MetricId, Popgetter
+    config::Config, data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, metadata::MetricId, Popgetter
 };
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -24,7 +25,7 @@ pub enum OutputFormat {
 /// Trait that defines what to run when a given subcommand is invoked.
 #[enum_dispatch]
 pub trait RunCommand {
-    async fn run(&self) -> Result<()>;
+    async fn run(&self, config: Config) -> Result<()>;
 }
 
 /// The Data command is the one we invoke to get a set of metrics and geometry
@@ -88,33 +89,27 @@ impl DataCommand{
         } 
 
         metric_ids
-
-    
     }
 }
 
 impl RunCommand for DataCommand {
-    async fn run(&self) -> Result<()> {
-        let popgetter = Popgetter::new()?;
+    async fn run(&self, config: Config) -> Result<()> {
+        info!("Running `data` subcommand");
+
+        let popgetter = Popgetter::new_with_config(config).await?;
         let data_request = DataRequestSpec::from(self);
         let mut results = popgetter.get_data_request(&data_request).await?;
 
-        let formatter = match &self.output_format{
-            OutputFormat::GeoJSON=>{
-                OutputFormatter::GeoJSON(GeoJSONFormatter)
-            },
-            OutputFormat::Csv=>{
-                OutputFormatter::Csv(CSVFormatter::default())
-            },
-            OutputFormat::GeoJSONSeq=>{
-                OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter)
-            },
-            _=>todo!("output format not implemented")
+        let formatter = match &self.output_format {
+            OutputFormat::GeoJSON => OutputFormatter::GeoJSON(GeoJSONFormatter),
+            OutputFormat::Csv => OutputFormatter::Csv(CSVFormatter::default()),
+            OutputFormat::GeoJSONSeq => OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter),
+            _ => todo!("output format not implemented"),
         };
 
-        println!("{results:#?}");
+        debug!("{results:#?}");
         let mut f = File::create(&self.output_file)?;
-        formatter.save(&mut f,&mut results)?;
+        formatter.save(&mut f, &mut results)?;
 
         Ok(())
     }
@@ -130,7 +125,7 @@ impl From<&DataCommand> for DataRequestSpec {
 
         let metrics = value.gather_metric_requests()
                            .into_iter()
-                           .map(|metric_id| MetricSpec::Metric(metric_id))
+                           .map(MetricSpec::Metric)
                            .collect();
 
         DataRequestSpec {
@@ -155,8 +150,8 @@ pub struct MetricsCommand {
 }
 
 impl RunCommand for MetricsCommand {
-    async fn run(&self) -> Result<()> {
-        println!("Running Metrics Command");
+    async fn run(&self, config: Config) -> Result<()> {
+        info!("Running `metrics` subcommand");
         Ok(())
     }
 }
@@ -167,8 +162,8 @@ impl RunCommand for MetricsCommand {
 pub struct CountriesCommand;
 
 impl RunCommand for CountriesCommand {
-    async fn run(&self) -> Result<()> {
-        println!("Running Countries Command");
+    async fn run(&self, config: Config) -> Result<()> {
+        let _popgetter = Popgetter::new_with_config(config).await?;
         Ok(())
     }
 }
@@ -179,8 +174,8 @@ impl RunCommand for CountriesCommand {
 pub struct SurveysCommand;
 
 impl RunCommand for SurveysCommand {
-    async fn run(&self) -> Result<()> {
-        println!("Running Surveys Command");
+    async fn run(&self, config: Config) -> Result<()> {
+        info!("Running `surveys` subcommand");
         Ok(())
     }
 }

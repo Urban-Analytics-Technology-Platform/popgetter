@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Result};
+use futures::future::join_all;
+use log::info;
 use polars::{
-    frame::{explode, DataFrame},
+    frame::DataFrame,
     lazy::{
         dsl::{col, Expr},
         frame::{IntoLazy, LazyFrame, ScanArgsParquet},
@@ -8,11 +10,11 @@ use polars::{
     prelude::{lit, JoinArgs, JoinType, NamedFrom, UnionArgs},
     series::Series,
 };
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, default::Default};
+use futures::try_join;
 
-use crate::parquet::MetricRequest;
+use crate::config::Config;
 
 /// This struct contains the base url and names of
 /// the files that contain the metadata. It has a
@@ -20,7 +22,6 @@ use crate::parquet::MetricRequest;
 /// normally use but this allows us to customise it
 /// if we need to.
 pub struct CountryMetadataPaths {
-    base_url: String,
     geometry: String,
     metrics: String,
     country: String,
@@ -74,18 +75,15 @@ impl MetricId {
     }
 }
 
-impl Into<Expr> for MetricId {
-    fn into(self) -> Expr {
-        self.to_polars_expr()
+impl From<MetricId> for Expr {
+    fn from(val: MetricId) -> Self {
+        val.to_polars_expr()
     }
 }
 
 impl Default for CountryMetadataPaths {
     fn default() -> Self {
         Self {
-            // TODO move this to enviroment variable or config or something
-            base_url: "https://popgetter.blob.core.windows.net/popgetter-dagster-test/test_2"
-                .into(),
             geometry: "geometry_metadata.parquet".into(),
             metrics: "metric_metadata.parquet".into(),
             country: "country_metadata.parquet".into(),
@@ -121,7 +119,6 @@ impl Metadata {
     /// If our metric_id is a regex, expand it in to a list of explicit `MetricIds`
     pub fn expand_wildcard_metric(&self, metric_id: &MetricId) -> Result<Vec<MetricId>> {
         let col_name = metric_id.to_col_name();
-        let query = metric_id.to_query_string();
         let catalouge = self.combined_metric_source_geometry();
 
         catalouge
@@ -232,38 +229,77 @@ impl CountryMetadataLoader {
 
     /// Load the Metadata catalouge for this country with
     /// the specified metadata paths
-    pub fn load(&self) -> Result<Metadata> {
+    pub async fn load(self, config: &Config) -> Result<Metadata> {
+        let t = try_join!(
+            self.load_metadata(&self.paths.metrics, config),
+            self.load_metadata(&self.paths.geometry, config),
+            self.load_metadata(&self.paths.source_data, config),
+            self.load_metadata(&self.paths.data_publishers, config),
+            self.load_metadata(&self.paths.country, config),
+        )?;
         Ok(Metadata {
-            metrics: self.load_metadata(&self.paths.metrics)?,
-            geometries: self.load_metadata(&self.paths.geometry)?,
-            source_data_releases: self.load_metadata(&self.paths.source_data)?,
-            data_publishers: self.load_metadata(&self.paths.data_publishers)?,
-            countries: self.load_metadata(&self.paths.country)?,
+            metrics: t.0,
+            geometries: t.1,
+            source_data_releases: t.2,
+            data_publishers: t.3,
+            countries: t.4,
         })
     }
 
     /// Performs a load of a given metadata parquet file
-    fn load_metadata(&self, path: &str) -> Result<DataFrame> {
-        let url = format!("{}/{}/{path}", self.paths.base_url, self.country);
+    async fn load_metadata(&self, path: &str, config: &Config) -> Result<DataFrame> {
+        let full_path = format!("{}/{}/{path}", config.base_path, self.country);
         let args = ScanArgsParquet::default();
-        println!("Attempting to load {url}");
-        let df: DataFrame = LazyFrame::scan_parquet(url, args)?.collect()?;
-        Ok(df)
+        info!("Attempting to load dataframe from {full_path}");
+        tokio::task::spawn_blocking(move || {
+            LazyFrame::scan_parquet(&full_path, args)?
+                .collect()
+                .map_err(|e| anyhow!("Failed to load '{full_path}': {e}"))
+        })
+        .await?
     }
 }
 
 /// Load the metadata for a list of countries and merge them into
 /// a single `Metadata` catalouge.
-pub fn load_all(countries: &[&str]) -> Result<Metadata> {
-    let metadata: Result<Vec<Metadata>> = countries
-        .iter()
-        .map(|c| CountryMetadataLoader::new(c).load())
+pub async fn load_all(config: &Config) -> Result<Metadata> {
+    let country_text_file = format!("{}/countries.txt", config.base_path);
+    let country_names: Vec<String> = reqwest::Client::new()
+        .get(&country_text_file)
+        .send()
+        .await?
+        .text()
+        .await?
+        .lines()
+        .map(|s| s.to_string())
         .collect();
+    info!("Detected country names: {:?}", country_names);
+
+    let metadata: Result<Vec<Metadata>> = join_all(
+        country_names
+            .iter()
+            .map(|c| CountryMetadataLoader::new(c).load(config)),
+    )
+    .await
+    .into_iter()
+    .collect();
     let metadata = metadata?;
 
     // Merge metrics
+    // to_supertypes is set to true here because for BE, source_archive_file_path is always a
+    // string, but for NI source_archive_file_path is always null and polars infers the column type
+    // to be null. If merged directly polars will error as the types are incompatible. Setting
+    // to_supertypes to true lets polars concatenate to a single string-type column.
     let metric_dfs: Vec<LazyFrame> = metadata.iter().map(|m| m.metrics.clone().lazy()).collect();
-    let metrics = polars::prelude::concat(metric_dfs, UnionArgs::default())?.collect()?;
+    let metrics = polars::prelude::concat(
+        metric_dfs,
+        UnionArgs {
+            to_supertypes: true,
+            ..Default::default()
+        },
+    )?
+    .collect()?;
+    info!("Merged metrics with shape: {:?}", metrics.shape());
 
     // Merge geometries
     let geometries_dfs: Vec<LazyFrame> = metadata
@@ -271,6 +307,7 @@ pub fn load_all(countries: &[&str]) -> Result<Metadata> {
         .map(|m| m.geometries.clone().lazy())
         .collect();
     let geometries = polars::prelude::concat(geometries_dfs, UnionArgs::default())?.collect()?;
+    info!("Merged geometries with shape: {:?}", geometries.shape());
 
     // Merge source data relaeses
     let source_data_dfs: Vec<LazyFrame> = metadata
@@ -280,6 +317,10 @@ pub fn load_all(countries: &[&str]) -> Result<Metadata> {
 
     let source_data_releases =
         polars::prelude::concat(source_data_dfs, UnionArgs::default())?.collect()?;
+    info!(
+        "Merged source data releases with shape: {:?}",
+        source_data_releases.shape()
+    );
 
     // Merge source data publishers
     let data_publisher_dfs: Vec<LazyFrame> = metadata
@@ -289,15 +330,18 @@ pub fn load_all(countries: &[&str]) -> Result<Metadata> {
 
     let data_publishers =
         polars::prelude::concat(data_publisher_dfs, UnionArgs::default())?.collect()?;
+    info!(
+        "Merged data publishers with shape: {:?}",
+        data_publishers.shape()
+    );
 
-    // Merge coutnries
-
+    // Merge countries
     let countries_dfs: Vec<LazyFrame> = metadata
         .iter()
         .map(|m| m.countries.clone().lazy())
         .collect();
-
     let countries = polars::prelude::concat(countries_dfs, UnionArgs::default())?.collect()?;
+    info!("Merged countries with shape: {:?}", countries.shape());
 
     Ok(Metadata {
         metrics,
@@ -310,28 +354,32 @@ pub fn load_all(countries: &[&str]) -> Result<Metadata> {
 
 #[cfg(test)]
 mod tests {
-    use geo::Extremes;
-
     use super::*;
     /// TODO stub out a mock here that we can use to test with.
 
-    #[test]
-    fn country_metadata_should_load() {
-        let metadata = CountryMetadataLoader::new("be").load();
+    #[tokio::test]
+    async fn country_metadata_should_load() {
+        let config = Config::default();
+        let metadata = CountryMetadataLoader::new("be").load(&config).await;
         println!("{metadata:#?}");
         assert!(metadata.is_ok(), "Data should have loaded ok");
     }
 
-    #[test]
-    fn all_metadata_should_load() {
-        let metadata = load_all(&["be"]);
+    #[tokio::test]
+    async fn all_metadata_should_load() {
+        let config = Config::default();
+        let metadata = load_all(&config).await;
         println!("{metadata:#?}");
         assert!(metadata.is_ok(), "Data should have loaded ok");
     }
 
-    #[test]
-    fn metric_ids_should_expand_properly() {
-        let metadata = load_all(&["be"]).unwrap();
+    #[tokio::test]
+    async fn metric_ids_should_expand_properly() {
+        let config = Config::default();
+        let metadata = CountryMetadataLoader::new("be")
+            .load(&config)
+            .await
+            .unwrap();
         let expanded_metrics =
             metadata.expand_wildcard_metric(&MetricId::Hxl("population-*".into()));
         assert!(
@@ -366,9 +414,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn human_readable_metric_ids_should_expand_properly() {
-        let metadata = load_all(&["be"]).unwrap();
+    #[tokio::test]
+    async fn human_readable_metric_ids_should_expand_properly() {
+        let config = Config::default();
+        let metadata = CountryMetadataLoader::new("be")
+            .load(&config)
+            .await
+            .unwrap();
         let expanded_metrics =
             metadata.expand_wildcard_metric(&MetricId::CommonName("Children*".into()));
 
@@ -398,9 +450,14 @@ mod tests {
             "should get the correct metrics"
         );
     }
-    #[test]
-    fn fully_defined_metric_ids_should_expand_to_itself() {
-        let metadata = load_all(&["be"]).unwrap();
+
+    #[tokio::test]
+    async fn fully_defined_metric_ids_should_expand_to_itself() {
+        let config = Config::default();
+        let metadata = CountryMetadataLoader::new("be")
+            .load(&config)
+            .await
+            .unwrap();
         let expanded_metrics = metadata
             .expand_wildcard_metric(&MetricId::Hxl(r"#population\+infants\+age0\_4".into()));
         assert!(
