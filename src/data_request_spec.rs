@@ -63,7 +63,6 @@ impl DataRequestSpec {
         }
 
         // Extract the possible matches for the given metrics
-
         let possible_metrics = possible_metrics.context("Failed to find matching metrics")?;
 
         // If a geometry level is specified filter out only those metrics with the level
@@ -86,20 +85,15 @@ impl DataRequestSpec {
         let filtered_possible_metrics = filtered_possible_metrics.collect()?;
 
         // Iterate through the results and generate the metric requests
-
-        let mut column_iter = filtered_possible_metrics
+        let metric_requests: Vec<MetricRequest> = filtered_possible_metrics
             .column("parquet_metric_id")?
             .str()?
-            .into_iter();
-
-        let mut file_iter = filtered_possible_metrics
-            .column("parquet_metric_file")?
-            .str()?
-            .into_iter();
-
-        let  metric_requests: Vec<MetricRequest> = column_iter
-            .zip(file_iter)
             .into_iter()
+            .zip(
+                filtered_possible_metrics
+                    .column("parquet_metric_file")?
+                    .str()?,
+            )
             .filter_map(|(column, file)| {
                 if let (Some(column), Some(file)) = (column, file) {
                     Some(MetricRequest {
