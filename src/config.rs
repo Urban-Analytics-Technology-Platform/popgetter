@@ -15,25 +15,3 @@ impl Default for Config {
         }
     }
 }
-
-impl Config {
-    fn xdg_config_path() -> PathBuf {
-        let xdg_dirs = xdg::BaseDirectories::with_prefix("popgetter").unwrap();
-        xdg_dirs.place_config_file("config.toml").unwrap()
-    }
-
-    pub fn from_toml() -> Self {
-        let file_path = Self::xdg_config_path();
-
-        match std::fs::read_to_string(file_path) {
-            Ok(contents) => toml::from_str(&contents).expect("Invalid TOML in config file"),
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    Config::default()
-                } else {
-                    panic!("Error reading config file: {:#?}", e);
-                }
-            }
-        }
-    }
-}

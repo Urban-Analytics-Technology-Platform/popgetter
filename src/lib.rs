@@ -23,9 +23,13 @@ pub struct Popgetter {
 }
 
 impl Popgetter {
-    /// Setup the Popgetter object
+    /// Setup the Popgetter object with default configuration
     pub async fn new() -> Result<Self> {
-        let config = Config::from_toml();
+        Self::new_with_config(Config::default()).await
+    }
+
+    /// Setup the Popgetter object with custom configuration
+    pub async fn new_with_config(config: Config) -> Result<Self> {
         debug!("config: {config:?}");
         let metadata = metadata::load_all(&config).await?;
         Ok(Self { metadata, config })
