@@ -1,9 +1,35 @@
 //! Search
 
-use polars::lazy::dsl::{col, lit, Expr};
-use polars::frame::DataFrame;
-use serde::{Deserialize, Serialize};
 use crate::metadata::Metadata;
+use polars::lazy::dsl::{col, lit, Expr};
+use polars::prelude::{DataFrame, LazyFrame};
+use serde::{Deserialize, Serialize};
+
+/// Combine multiple queries with OR. If there are no queries in the input list, returns None.
+fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
+    let mut query: Option<Expr> = None;
+    for expr in exprs {
+        query = if let Some(partial_query) = query {
+            Some(partial_query.or(expr))
+        } else {
+            Some(expr)
+        };
+    }
+    query
+}
+
+/// Combine multiple queries with AND. If there are no queries in the input list, returns None.
+fn combine_exprs_with_and(exprs: Vec<Expr>) -> Option<Expr> {
+    let mut query: Option<Expr> = None;
+    for expr in exprs {
+        query = if let Some(partial_query) = query {
+            Some(partial_query.and(expr))
+        } else {
+            Some(expr)
+        };
+    }
+    query
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 enum SearchContext {
@@ -18,80 +44,103 @@ impl SearchContext {
     }
 }
 
-// TODO: wrapping trait for From conversions
-
-
 /// Implementing conversion from `SearchText` to a polars expression enables a
 /// `SearchText` to be passed to polars dataframe for filtering results.
-// TODO: consider try from to fix unwrap for empty query
-impl From<SearchText> for Expr {
-    fn from(search_text: SearchText) -> Self {
-        let mut query: Option<Expr> = None;
-        for field in search_text.context {
-            let sub_query = match field {
-                SearchContext::Hxl => col("hxl_tag"),
-                SearchContext::HumanReadableName => col("human_readable_name"),
-                SearchContext::Description => col("description"),
-            }
-            .eq(lit(search_text.text.clone()));
-            // TODO (enhancement): fuzzy matching crate (e.g. https://github.com/bnm3k/polars-fuzzy-match/blob/master/Cargo.toml)
-            // Fuzzy string version
-            // .str()?.contains(lit(search_text.text.clone()));
-
-            query = if let Some(partial_query) = query {
-                Some(partial_query.or(sub_query))
-            } else {
-                Some(sub_query)
-            };
-        }
-        query.unwrap()
+impl From<SearchText> for Option<Expr> {
+    fn from(val: SearchText) -> Self {
+        let queries = val
+            .context
+            .into_iter()
+            .map(|field| {
+                match field {
+                    SearchContext::Hxl => col("hxl_tag"),
+                    SearchContext::HumanReadableName => col("human_readable_name"),
+                    SearchContext::Description => col("description"),
+                }
+                .eq(lit(val.text.clone()))
+            })
+            .collect();
+        combine_exprs_with_or(queries)
     }
 }
 
-impl From<Year> for Expr {
+impl From<Year> for Option<Expr> {
     fn from(value: Year) -> Self {
-        todo!()
+        combine_exprs_with_or(
+            value
+                .0
+                .into_iter()
+                .map(|val| col("year").eq(lit(val)))
+                .collect(),
+        )
     }
 }
 
-impl From<DataPublisher> for Expr {
+impl From<DataPublisher> for Option<Expr> {
     fn from(value: DataPublisher) -> Self {
-        todo!()
+        combine_exprs_with_or(
+            value
+                .0
+                .into_iter()
+                .map(|val| col("data_publisher").eq(lit(val)))
+                .collect(),
+        )
     }
 }
 
-impl From<SourceDataRelease> for Expr {
+impl From<SourceDataRelease> for Option<Expr> {
     fn from(value: SourceDataRelease) -> Self {
-        todo!()
+        combine_exprs_with_or(
+            value
+                .0
+                .into_iter()
+                .map(|val| col("source_data_release").eq(lit(val)))
+                .collect(),
+        )
     }
 }
 
-impl From<GeometryLevel> for Expr {
+impl From<GeometryLevel> for Option<Expr> {
     fn from(value: GeometryLevel) -> Self {
-        todo!()
+        combine_exprs_with_or(
+            value
+                .0
+                .into_iter()
+                .map(|val| col("geometry_level").eq(lit(val)))
+                .collect(),
+        )
     }
 }
 
-impl From<Country> for Expr {
+impl From<Country> for Option<Expr> {
     fn from(value: Country) -> Self {
-        todo!()
+        combine_exprs_with_or(
+            value
+                .0
+                .into_iter()
+                .map(|val| col("country").eq(lit(val)))
+                .collect(),
+        )
     }
 }
 
-impl From<CensusTable> for Expr {
-    fn from(value: CensusTable) -> Self {
-        todo!()
+impl From<SourceMetricId> for Option<Expr> {
+    fn from(value: SourceMetricId) -> Self {
+        combine_exprs_with_or(
+            value
+                .0
+                .into_iter()
+                .map(|val| col("source_metric_id").eq(lit(val)))
+                .collect(),
+        )
     }
 }
 
-
-/// Search text is th
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct SearchText {
     pub text: String,
     pub context: Vec<SearchContext>,
 }
-
 
 impl Default for SearchText {
     fn default() -> Self {
@@ -101,16 +150,6 @@ impl Default for SearchText {
         }
     }
 }
-
-/// Trait to enable collections of search request fields (not currently used)
-trait SearchRequestField {}
-impl SearchRequestField for Year {}
-impl SearchRequestField for GeometryLevel {}
-impl SearchRequestField for SearchText {}
-impl SearchRequestField for SourceDataRelease {}
-impl SearchRequestField for DataPublisher {}
-impl SearchRequestField for Country {}
-impl SearchRequestField for CensusTable {}
 
 // Whether year is string or int has implications with how it's encoded in the dfs
 // TODO: open ticket to capture how to progress this
@@ -135,14 +174,13 @@ struct Country(pub Vec<String>);
 
 /// Census tables: set of census tables to be included in the search
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct CensusTable(pub Vec<String>);
-
+struct SourceMetricId(pub Vec<String>);
 
 /// Ways of searching metadata: the approach is that you can provide
 /// a set of optional filters that can be composed to produce the
 /// overall search query:
 ///  - Some sort of fuzzy string match on hxltags, human readable
-///    name and descriptions (may want to subset place to search
+///    name or descriptions (may want to subset place to search
 ///    for the text, e.g. only search hxltags)
 ///  - Country
 ///  - Census table name (e.g. identifier on source website)
@@ -158,72 +196,94 @@ struct SearchRequest {
     pub source_data_release: Option<SourceDataRelease>,
     pub data_publisher: Option<DataPublisher>,
     pub country: Option<Country>,
-    pub census_table: Option<CensusTable>,
-
+    pub census_table: Option<SourceMetricId>,
     // TODO (possible enhancement): refactor field to `Expr`
     // - search_fields: Vec<Box<dyn SearchRequestField>>>
     // - Also enum dispatch pattren in the commands for CLI
 }
 
 impl SearchRequest {
-    fn with_country(self, country: &str) -> Self {
-        todo!()
+    pub fn new() -> Self {
+        Self {
+            text: None,
+            year: None,
+            geometry_level: None,
+            source_data_release: None,
+            data_publisher: None,
+            country: None,
+            census_table: None,
+        }
     }
-    fn with_data_publisher(&mut self, country: &str) -> Self {
-        todo!()
+
+    pub fn with_country(mut self, country: &str) -> Self {
+        self.country = Some(Country(vec![country.to_string()]));
+        self
     }
-    // TODO: add other methods for builder 
 
+    pub fn with_data_publisher(mut self, data_publisher: &str) -> Self {
+        self.data_publisher = Some(DataPublisher(vec![data_publisher.to_string()]));
+        self
+    }
 
-    // TODO: Perform filtering on full metadata catalog
-    fn search_results(self, metadata: &Metadata) -> anyhow::Result<SearchResults>{
-        let result: DataFrame = metadata.combined_metric_source_geometry().filter(self.into()).collect()?;
+    pub fn with_source_data_release(mut self, source_data_release: &str) -> Self {
+        self.source_data_release = Some(SourceDataRelease(vec![source_data_release.to_string()]));
+        self
+    }
+
+    pub fn with_year(mut self, year: &str) -> Self {
+        self.year = Some(Year(vec![year.to_string()]));
+        self
+    }
+
+    pub fn with_geometry_level(mut self, geometry_level: &str) -> Self {
+        self.geometry_level = Some(GeometryLevel(vec![geometry_level.to_string()]));
+        self
+    }
+
+    pub fn with_census_table(mut self, census_table: &str) -> Self {
+        self.census_table = Some(SourceMetricId(vec![census_table.to_string()]));
+        self
+    }
+
+    pub fn search_results(self, metadata: &Metadata) -> anyhow::Result<SearchResults> {
+        let expr: Option<Expr> = self.into();
+        let full_results: LazyFrame = metadata.combined_metric_source_geometry();
+        let result: DataFrame = match expr {
+            Some(expr) => full_results.filter(expr),
+            None => full_results,
+        }
+        .collect()?;
         Ok(SearchResults(result))
     }
-
 }
 
 struct SearchResults(pub DataFrame);
 
-
-
 // impl std::fmt::Display for SearchResults {
 //     // TODO: display method
-    
+
 //     todo!()
 // }
 
-
-fn combine_queries<T>(q1_opt: Option<Expr>, q2_opt: Option<T>) -> Option<Expr>
-where T : Into<Expr> {
-    match (q1_opt, q2_opt) {
-        (Some(q1), Some(q2)) => Some(q1.and(q2.into())),
-        (Some(q1), None) => Some(q1),
-        (None, Some(q2)) => Some(q2.into()),
-        (None, None) => None,
-    }
-}
-
-
-// impl TryFrom<SearchRequest> for Expr {
-impl From<SearchRequest> for Expr {
+impl From<SearchRequest> for Option<Expr> {
     fn from(value: SearchRequest) -> Self {
-        let mut query: Option<Expr> = None;
-        
-        query = combine_queries(query, value.text);
-        query = combine_queries(query, value.year);
-        query = combine_queries(query, value.geometry_level);
-        query = combine_queries(query, value.source_data_release);
-        query = combine_queries(query, value.data_publisher);
-        query = combine_queries(query, value.country);
-        query = combine_queries(query, value.census_table);
-        query.unwrap()
+        let subexprs: Vec<Option<Expr>> = vec![
+            value.text?.into(),
+            value.year?.into(),
+            value.geometry_level?.into(),
+            value.source_data_release?.into(),
+            value.data_publisher?.into(),
+            value.country?.into(),
+            value.census_table?.into(),
+        ];
+        // Remove the Nones and unwrap the Somes
+        let valid_subexprs: Vec<Expr> = subexprs.into_iter().flatten().collect();
+        combine_exprs_with_and(valid_subexprs)
     }
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     // #[test]
