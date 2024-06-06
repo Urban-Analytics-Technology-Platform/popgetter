@@ -30,8 +30,8 @@ pub struct DataRequestSpec {
 
 /// This is the response to requesting a set of metrics.
 /// It contains the matched Metric Requests along with
-/// the geometry that was selected we can also potentially
-/// use this to give feedback on other options in the future
+/// the geometry that was selected.
+// TODO (enhancement): We can also potentially use this to give feedback on other options in the future
 pub struct MetricRequestResult {
     pub metrics: Vec<MetricRequest>,
     pub selected_geometry: String,
