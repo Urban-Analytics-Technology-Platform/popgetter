@@ -548,7 +548,7 @@ mod tests {
 
         let metric_names: Vec<&str> = expanded_metrics
             .iter()
-            .map(metadata::MetricId::to_query_string)
+            .map(MetricId::to_query_string)
             .collect();
 
         assert_eq!(
