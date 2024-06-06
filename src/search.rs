@@ -70,11 +70,11 @@ impl From<SearchText> for Option<Expr> {
             .map(|field| {
                 match field {
                     SearchContext::Hxl =>
-                        case_insensitive_contains("hxl_tag", &val.text),
+                        case_insensitive_contains("metric_hxl_tag", &val.text),
                     SearchContext::HumanReadableName =>
                         case_insensitive_contains("human_readable_name", &val.text),
                     SearchContext::Description =>
-                        case_insensitive_contains("description", &val.text),
+                        case_insensitive_contains("metric_description", &val.text),
                 }
             })
             .collect();
@@ -101,7 +101,7 @@ impl From<DataPublisher> for Option<Expr> {
             value
                 .0
                 .iter()
-                .map(|val| case_insensitive_contains("data_publisher", val))
+                .map(|val| case_insensitive_contains("data_publisher_name", val))
                 .collect(),
         )
     }
@@ -125,7 +125,7 @@ impl From<GeometryLevel> for Option<Expr> {
             value
                 .0
                 .iter()
-                .map(|val| case_insensitive_contains("level", val))
+                .map(|val| case_insensitive_contains("geometry_level", val))
                 .collect(),
         )
     }
@@ -137,7 +137,7 @@ impl From<Country> for Option<Expr> {
             value
                 .0
                 .iter()
-                .map(|val| case_insensitive_contains("country", val))
+                .map(|val| case_insensitive_contains("country_name", val))
                 .collect(),
         )
     }
@@ -274,14 +274,12 @@ pub struct SearchResults(pub DataFrame);
 impl std::fmt::Display for SearchResults {
 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // ["human_readable_name", "source_metric_id", "description", "hxl_tag", "metric_parquet_path", "parquet_column_name", "parquet_margin_of_error_column", "parquet_margin_of_error_file", "potential_denominator_ids", "parent_metric_id", "source_data_release_id", "source_download_url", "source_archive_file_path", "source_documentation_url", "id", "name", "date_published", "reference_period_start", "reference_period_end", "collection_period_start", "collection_period_end", "expect_next_update", "url", "data_publisher_id", "description_right", "geometry_metadata_id", "validity_period_start", "validity_period_end", "level", "hxl_tag_right", "filename_stem"]
-
         for (metric_id, hrn, desc, hxl, level) in izip!(
-            self.0.column("id").unwrap().iter(),
+            self.0.column("metric_id").unwrap().iter(),
             self.0.column("human_readable_name").unwrap().iter(),
-            self.0.column("description").unwrap().iter(),
-            self.0.column("hxl_tag").unwrap().iter(),
-            self.0.column("level").unwrap().iter(),
+            self.0.column("metric_description").unwrap().iter(),
+            self.0.column("metric_hxl_tag").unwrap().iter(),
+            self.0.column("geometry_level").unwrap().iter(),
         ) {
             let mut table = Table::new();
             table

@@ -13,6 +13,7 @@ use polars::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, default::Default};
 use futures::try_join;
+use log::debug;
 
 use crate::config::Config;
 
@@ -143,22 +144,63 @@ impl Metadata {
 
     /// Generate a Lazy DataFrame which joins the metrics, source and geometry metadata
     pub fn combined_metric_source_geometry(&self) -> LazyFrame {
-        // Join with source_data_release and geometry
-        self.metrics
+        let df = self.metrics
             .clone()
             .lazy()
+            // Rename these first because they will cause clashes when merging
+            .rename(["id", "description", "hxl_tag"],
+                ["metric_id", "metric_description", "metric_hxl_tag"]
+            )
+            // Join source data releases
             .join(
                 self.source_data_releases.clone().lazy(),
                 [col("source_data_release_id")],
                 [col("id")],
                 JoinArgs::new(JoinType::Inner),
             )
+            .rename(
+                ["url", "description", "name", "date_published", "reference_period_start",
+                    "reference_period_end", "collection_period_start", "collection_period_end",
+                    "expect_next_update"],
+                ["release_url", "release_description", "release_name",
+                    "release_date_published", "release_reference_period_start",
+                    "release_reference_period_end", "release_collection_period_start",
+                    "release_collection_period_end", "release_expect_next_update"]
+            )
+            // Join geometry metadata
             .join(
                 self.geometries.clone().lazy(),
                 [col("geometry_metadata_id")],
                 [col("id")],
                 JoinArgs::new(JoinType::Inner),
             )
+            .rename(
+                ["validity_period_start", "validity_period_end", "level", "hxl_tag", "filename_stem"],
+                ["geometry_validity_period_start", "geometry_validity_period_end", "geometry_level", "geometry_hxl_tag", "geometry_filename_stem"]
+            )
+            // Join data publishers
+            .join(
+                self.data_publishers.clone().lazy(),
+                [col("data_publisher_id")],
+                [col("id")],
+                JoinArgs::new(JoinType::Inner),
+            )
+            .rename(
+                ["url", "description", "name"],
+                ["data_publisher_url", "data_publisher_description", "data_publisher_name"]
+            )
+            // Get rid of intermediate IDs as we don't need them
+            .drop(["source_data_release_id", "geometry_metadata_id", "data_publisher_id"])
+        ;
+        // TODO: Add a country_id column to the metadata, and merge in the countries as well. See
+        // https://github.com/Urban-Analytics-Technology-Platform/popgetter/issues/104
+
+        // Debug print the column names so that we know what we can access
+        let schema = df.schema().unwrap();
+        let column_names = schema.iter_names().map(|s| s.as_str()).collect::<Vec<&str>>();
+        debug!("Column names in merged metadata: {:?}", column_names);
+
+        df
     }
 
     /// Given a list of metric ids return a Data Frame with the
@@ -286,19 +328,8 @@ pub async fn load_all(config: &Config) -> Result<Metadata> {
     let metadata = metadata?;
 
     // Merge metrics
-    // to_supertypes is set to true here because for BE, source_archive_file_path is always a
-    // string, but for NI source_archive_file_path is always null and polars infers the column type
-    // to be null. If merged directly polars will error as the types are incompatible. Setting
-    // to_supertypes to true lets polars concatenate to a single string-type column.
     let metric_dfs: Vec<LazyFrame> = metadata.iter().map(|m| m.metrics.clone().lazy()).collect();
-    let metrics = polars::prelude::concat(
-        metric_dfs,
-        UnionArgs {
-            to_supertypes: true,
-            ..Default::default()
-        },
-    )?
-    .collect()?;
+    let metrics = polars::prelude::concat(metric_dfs, Default::default())?.collect()?;
     info!("Merged metrics with shape: {:?}", metrics.shape());
 
     // Merge geometries
