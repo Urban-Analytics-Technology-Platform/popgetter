@@ -96,7 +96,7 @@ impl Default for CountryMetadataPaths {
 
 /// `CountryMetadataLoader` takes a country iso string
 /// along with a CountryMetadataPaths and provides methods
-/// for fetching and construting a `Metadata` catalouge.
+/// for fetching and construting a `Metadata` catalogue.
 pub struct CountryMetadataLoader {
     country: String,
     paths: CountryMetadataPaths,
@@ -233,7 +233,7 @@ impl ExpandedMetdataTable {
 /// the various different metadata tables. Can be constructed
 /// from a single `CountryMetadataLoader` or for all countries.
 /// It also provides the various functions for searching and
-/// getting `MetricRequests` from the catalouge.
+/// getting `MetricRequests` from the catalogue.
 #[derive(Debug)]
 pub struct Metadata {
     pub metrics: DataFrame,
@@ -271,9 +271,9 @@ impl Metadata {
     pub fn expand_regex_metric(&self, metric_id: &MetricId) -> Result<Vec<MetricId>> {
         let col_name = metric_id.to_col_name();
         let query = metric_id.to_query_string();
-        let catalouge = self.combined_metric_source_geometry();
+        let catalogue = self.combined_metric_source_geometry();
 
-        catalouge
+        catalogue
             .as_df()
             .filter(metric_id.to_fuzzy_polars_expr())
             .collect()?
@@ -433,7 +433,7 @@ impl CountryMetadataLoader {
         self
     }
 
-    /// Load the Metadata catalouge for this country with
+    /// Load the Metadata catalogue for this country with
     /// the specified metadata paths
     pub fn load(&self) -> Result<Metadata> {
         Ok(Metadata {
@@ -456,7 +456,7 @@ impl CountryMetadataLoader {
 }
 
 /// Load the metadata for a list of countries and merge them into
-/// a single `Metadata` catalouge.
+/// a single `Metadata` catalogue.
 pub fn load_all(countries: &[&str]) -> Result<Metadata> {
     let metadata: Result<Vec<Metadata>> = countries
         .iter()

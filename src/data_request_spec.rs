@@ -26,7 +26,7 @@ pub struct MetricRequestResult {
 }
 
 impl DataRequestSpec {
-    /// Generates a vector of metric requests from a `DataRequestSpec` and a catalog.
+    /// Generates a vector of metric requests from a `DataRequestSpec` and a catalogue.
     pub fn metric_requests(&self, catalogue: &Metadata) -> Result<MetricRequestResult> {
         // Find all the metrics which match the requested ones, expanding
         // any regex matches as we do so
