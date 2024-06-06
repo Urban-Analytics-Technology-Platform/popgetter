@@ -66,7 +66,7 @@ impl MetricId {
     }
 
     /// Generate a polars Expr that will generate
-    /// a fuzzy search for the content of the Id
+    /// a regex search for the content of the Id
     pub fn to_fuzzy_polars_expr(&self) -> Expr {
         col(&self.to_col_name())
             .str()
