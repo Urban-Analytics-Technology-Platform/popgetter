@@ -119,7 +119,7 @@ pub struct Metadata {
 
 impl Metadata {
     /// If our metric_id is a regex, expand it in to a list of explicit `MetricIds`
-    pub fn expand_wildcard_metric(&self, metric_id: &MetricId) -> Result<Vec<MetricId>> {
+    pub fn expand_regex_metric(&self, metric_id: &MetricId) -> Result<Vec<MetricId>> {
         let col_name = metric_id.to_col_name();
         let query = metric_id.to_query_string();
         let catalouge = self.combined_metric_source_geometry();
