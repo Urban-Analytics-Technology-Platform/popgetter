@@ -194,7 +194,7 @@ impl Metadata {
     }
 
     /// Given a geometry level return the path to the
-    /// geometry file that it corrisponds to
+    /// geometry file that it corresponds to
     pub fn get_geom_details(&self, geom_level: &str) -> Result<String> {
         let matches = self
             .geometries
