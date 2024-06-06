@@ -28,7 +28,7 @@ pub struct DataRequestSpec {
     pub years: Option<Vec<String>>,
 }
 
-/// This is the respone to requesting a set of metrics
+/// This is the response to requesting a set of metrics.
 /// it contains the matched Metric Requests along with
 /// the geometry that was selected we can also potentially
 /// use this to give feedback on other options in the future
