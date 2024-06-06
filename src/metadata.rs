@@ -207,7 +207,7 @@ impl Metadata {
             .column("filename_stem")?
             .str()?
             .get(0)
-            .unwrap()
+            .ok_or(anyhow!("Matches does not contain 'filename_stem' column"))?
             .into();
 
         Ok(file)
