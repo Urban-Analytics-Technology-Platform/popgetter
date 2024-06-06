@@ -102,13 +102,17 @@ pub struct CountryMetadataLoader {
     paths: CountryMetadataPaths,
 }
 
+/// A structure that represents a full joined lazy data frame
+/// containing all of the metadata
 pub struct ExpandedMetdataTable(pub LazyFrame);
 
 impl ExpandedMetdataTable {
+    /// Get access to the lazy data frame
     pub fn as_df(&self) -> LazyFrame {
         self.0.clone()
     }
 
+    /// Filter the dataframe by the specified metrics
     pub fn select_metrics(&self, metrics: &[MetricId]) -> Self {
         let mut id_collections: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -132,6 +136,7 @@ impl ExpandedMetdataTable {
         ExpandedMetdataTable(self.as_df().filter(filter_expression.unwrap()))
     }
 
+    /// Convert the metrics in the dataframe to MetricRequests
     pub fn to_metric_requests(&self) -> Result<Vec<MetricRequest>> {
         let df = self
             .as_df()
@@ -157,9 +162,12 @@ impl ExpandedMetdataTable {
         Ok(metric_requests)
     }
 
+    /// Select a specific geometry level in the dataframe filtering out all others
     pub fn select_geometry(&self, geometry: &str) -> Self {
         ExpandedMetdataTable(self.as_df().filter(col("geometry_level").eq(geometry)))
     }
+
+    /// Select a specific set of years in the dataframe filtering out all others
     pub fn select_years<T>(&self, years: &[T]) -> Self
     where
         T: AsRef<str>,
@@ -235,6 +243,10 @@ pub struct Metadata {
     pub countries: DataFrame,
 }
 
+/// Describes a fully specified selection plan. The MetricIds should all
+/// be the ID variant. Geometry and years are backed in now.
+/// Advice specifies and alternative options that the user should
+/// be aware of.
 pub struct FullSelectionPlan {
     pub explicit_metric_ids: Vec<MetricId>,
     pub geometry: String,
@@ -304,12 +316,16 @@ impl Metadata {
         )
     }
 
+    /// Return a list of MetricRequests for the given metrics_ids
     pub fn get_metric_requests(&self, metric_ids: Vec<MetricId>) -> Result<Vec<MetricRequest>> {
         self.combined_metric_source_geometry()
             .select_metrics(&metric_ids);
         Ok(vec![])
     }
 
+    /// Generates a FullSelectionPlan which takes in to account
+    /// what the user has requested with sane fallbacks if geography
+    /// or years have not been specified.
     pub fn generate_selection_plan(
         &self,
         metrics: &[MetricId],
