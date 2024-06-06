@@ -109,7 +109,7 @@ impl DataRequestSpec {
             .column("geometry_level")?
             .str()?
             .get(0)
-            .expect("Should have geometry")
+            .ok_or(anyhow!("Filtered possible metrics does not contain 'geometry_level'"))?
             .to_owned();
 
         Ok(MetricRequestResult {
