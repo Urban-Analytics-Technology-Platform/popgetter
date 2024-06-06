@@ -290,8 +290,7 @@ pub fn load_all(countries: &[&str]) -> Result<Metadata> {
     let data_publishers =
         polars::prelude::concat(data_publisher_dfs, UnionArgs::default())?.collect()?;
 
-    // Merge coutnries
-
+    // Merge countries
     let countries_dfs: Vec<LazyFrame> = metadata
         .iter()
         .map(|m| m.countries.clone().lazy())
