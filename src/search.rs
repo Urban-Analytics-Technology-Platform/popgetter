@@ -4,6 +4,16 @@ use crate::metadata::Metadata;
 use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, LazyFrame};
 use serde::{Deserialize, Serialize};
+use log::debug;
+use itertools::izip;
+use comfy_table::{
+    Table,
+    Cell,
+    Attribute,
+    CellAlignment,
+    ContentArrangement,
+    presets::NOTHING
+};
 
 /// Combine multiple queries with OR. If there are no queries in the input list, returns None.
 fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
@@ -32,14 +42,14 @@ fn combine_exprs_with_and(exprs: Vec<Expr>) -> Option<Expr> {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-enum SearchContext {
+pub enum SearchContext {
     Hxl,
     HumanReadableName,
     Description,
 }
 
 impl SearchContext {
-    fn all() -> Vec<Self> {
+    pub fn all() -> Vec<Self> {
         vec![Self::Hxl, Self::HumanReadableName, Self::Description]
     }
 }
@@ -137,7 +147,7 @@ impl From<SourceMetricId> for Option<Expr> {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct SearchText {
+pub struct SearchText {
     pub text: String,
     pub context: Vec<SearchContext>,
 }
@@ -154,58 +164,43 @@ impl Default for SearchText {
 // Whether year is string or int has implications with how it's encoded in the dfs
 // TODO: open ticket to capture how to progress this
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct Year(pub Vec<String>);
+pub struct Year(pub Vec<String>);
 
 /// To allow search over multiple years
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct GeometryLevel(pub Vec<String>);
+pub struct GeometryLevel(pub Vec<String>);
 
 /// Source data release: set of strings that will search over this
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct SourceDataRelease(pub Vec<String>);
+pub struct SourceDataRelease(pub Vec<String>);
 
 /// Data publisher: set of strings that will search over this
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct DataPublisher(pub Vec<String>);
+pub struct DataPublisher(pub Vec<String>);
 
 /// Countries: set of countries to be included in the search
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct Country(pub Vec<String>);
+pub struct Country(pub Vec<String>);
 
 /// Census tables: set of census tables to be included in the search
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct SourceMetricId(pub Vec<String>);
+pub struct SourceMetricId(pub Vec<String>);
 
-/// Ways of searching metadata: the approach is that you can provide
-/// a set of optional filters that can be composed to produce the
-/// overall search query:
-///  - Some sort of fuzzy string match on hxltags, human readable
-///    name or descriptions (may want to subset place to search
-///    for the text, e.g. only search hxltags)
-///  - Country
-///  - Census table name (e.g. identifier on source website)
-///  - Information about source release
-///  - Information about data publisher
-///  - Time (year of census)
-///  - Geo level
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct SearchRequest {
-    pub text: Option<SearchText>,
+pub struct SearchRequest {
+    pub text: Vec<SearchText>,
     pub year: Option<Year>,
     pub geometry_level: Option<GeometryLevel>,
     pub source_data_release: Option<SourceDataRelease>,
     pub data_publisher: Option<DataPublisher>,
     pub country: Option<Country>,
     pub census_table: Option<SourceMetricId>,
-    // TODO (possible enhancement): refactor field to `Expr`
-    // - search_fields: Vec<Box<dyn SearchRequestField>>>
-    // - Also enum dispatch pattren in the commands for CLI
 }
 
 impl SearchRequest {
     pub fn new() -> Self {
         Self {
-            text: None,
+            text: vec![],
             year: None,
             geometry_level: None,
             source_data_release: None,
@@ -246,6 +241,7 @@ impl SearchRequest {
     }
 
     pub fn search_results(self, metadata: &Metadata) -> anyhow::Result<SearchResults> {
+        debug!("Searching with request: {:?}", self);
         let expr: Option<Expr> = self.into();
         let full_results: LazyFrame = metadata.combined_metric_source_geometry();
         let result: DataFrame = match expr {
@@ -257,25 +253,74 @@ impl SearchRequest {
     }
 }
 
-struct SearchResults(pub DataFrame);
+impl Default for SearchRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-// impl std::fmt::Display for SearchResults {
-//     // TODO: display method
+#[derive(Clone, Debug)]
+pub struct SearchResults(pub DataFrame);
 
-//     todo!()
-// }
+impl std::fmt::Display for SearchResults {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // ["human_readable_name", "source_metric_id", "description", "hxl_tag", "metric_parquet_path", "parquet_column_name", "parquet_margin_of_error_column", "parquet_margin_of_error_file", "potential_denominator_ids", "parent_metric_id", "source_data_release_id", "source_download_url", "source_archive_file_path", "source_documentation_url", "id", "name", "date_published", "reference_period_start", "reference_period_end", "collection_period_start", "collection_period_end", "expect_next_update", "url", "data_publisher_id", "description_right", "geometry_metadata_id", "validity_period_start", "validity_period_end", "level", "hxl_tag_right", "filename_stem"]
+
+        for (metric_id, hrn, desc, hxl, level) in izip!(
+            self.0.column("id").unwrap().iter(),
+            self.0.column("human_readable_name").unwrap().iter(),
+            self.0.column("description").unwrap().iter(),
+            self.0.column("hxl_tag").unwrap().iter(),
+            self.0.column("level").unwrap().iter(),
+        ) {
+            let mut table = Table::new();
+            table
+                .load_preset(NOTHING)
+                .set_content_arrangement(ContentArrangement::Dynamic)
+                .add_row(vec![
+                    Cell::new("Metric ID").add_attribute(Attribute::Bold),
+                    metric_id.get_str().unwrap().into(), 
+                ])
+                .add_row(vec![
+                    Cell::new("Human readable name").add_attribute(Attribute::Bold),
+                    hrn.get_str().unwrap().into(),
+                ])
+                .add_row(vec![
+                    Cell::new("Description").add_attribute(Attribute::Bold),
+                    desc.get_str().unwrap().into(),
+                ])
+                .add_row(vec![
+                    Cell::new("HXL tag").add_attribute(Attribute::Bold),
+                    hxl.get_str().unwrap().into(),
+                ])
+                .add_row(vec![
+                    Cell::new("Geometry level").add_attribute(Attribute::Bold),
+                    level.get_str().unwrap().into(),
+                ]);
+
+            let column = table.column_mut(0).unwrap();
+            column.set_cell_alignment(CellAlignment::Right);
+
+            writeln!(f, "\n{}", table)?;
+        }
+        Ok(())
+    }
+}
 
 impl From<SearchRequest> for Option<Expr> {
     fn from(value: SearchRequest) -> Self {
-        let subexprs: Vec<Option<Expr>> = vec![
-            value.text?.into(),
-            value.year?.into(),
-            value.geometry_level?.into(),
-            value.source_data_release?.into(),
-            value.data_publisher?.into(),
-            value.country?.into(),
-            value.census_table?.into(),
+        let mut subexprs: Vec<Option<Expr>> =
+            value.text.into_iter().map(|text| text.into()).collect();
+        let other_subexprs: Vec<Option<Expr>> = vec![
+            value.year.and_then(|v| v.into()),
+            value.geometry_level.and_then(|v| v.into()),
+            value.source_data_release.and_then(|v| v.into()),
+            value.data_publisher.and_then(|v| v.into()),
+            value.country.and_then(|v| v.into()),
+            value.census_table.and_then(|v| v.into()),
         ];
+        subexprs.extend(other_subexprs);
         // Remove the Nones and unwrap the Somes
         let valid_subexprs: Vec<Expr> = subexprs.into_iter().flatten().collect();
         combine_exprs_with_and(valid_subexprs)

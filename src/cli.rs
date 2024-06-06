@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use log::{debug, info};
 use popgetter::{
-    config::Config, data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, metadata::MetricId, Popgetter
+    config::Config, data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, metadata::MetricId, Popgetter, search::*
 };
 use serde::{Deserialize, Serialize};
 use std::{fs::{self, File}, str::FromStr};
@@ -158,17 +158,80 @@ impl From<&DataCommand> for DataRequestSpec {
 /// The set of ways to search will likley increase over time
 #[derive(Args, Debug)]
 pub struct MetricsCommand {
-    /// Only get data in  bounding box ([min_lat,min_lng,max_lat,max_lng])
-    #[arg(short, long)]
+    #[arg(
+        short,
+        long,
+        value_name="min_lat,min_lng,max_lat,max_lng",
+        help="Bounding box in which to get the results")
+    ]
     bbox: Option<BBox>,
-    /// Only get the specific metrics
-    #[arg(short, long)]
-    filter: Option<String>,
+    #[arg(short, long, help="Filter by year")]
+    year: Option<Vec<String>>,
+    #[arg(short, long, help="Filter by geometry level")]
+    geometry_level: Option<Vec<String>>,
+    #[arg(short, long, help="Filter by source data release name")]
+    source_data_release: Option<Vec<String>>,
+    #[arg(short, long, help="Filter by data publisher name")]
+    publisher: Option<Vec<String>>,
+    #[arg(short, long, help="Filter by country")]
+    country: Option<Vec<String>>,
+    #[arg(long, help="Filter by source metric ID (i.e. the name of the table in the original data release)")]
+    source_metric_id: Option<Vec<String>>,
+    // Filters for text
+    #[arg(long, help="Filter by HXL tag", num_args=0..)]
+    hxl: Vec<String>,
+    #[arg(long, help="Filter by metric name", num_args=0..)]
+    name: Vec<String>,
+    #[arg(long, help="Filter by metric description", num_args=0..)]
+    description: Vec<String>,
+    #[arg(short, long, help="Filter by HXL tag, name, or description", num_args=0..)]
+    text: Vec<String>,
+    // Output options
+    #[arg(short, long, help="Show all metrics even if there are a large number")]
+    full: bool,
 }
 
 impl RunCommand for MetricsCommand {
     async fn run(&self, config: Config) -> Result<()> {
         info!("Running `metrics` subcommand");
+        debug!("{:#?}", self);
+
+        let mut all_text_searches: Vec<SearchText> = vec![];
+        all_text_searches.extend(self.hxl.iter()
+            .map(|t| SearchText { text: t.clone(), context: vec![SearchContext::Hxl] })
+        );
+        all_text_searches.extend(self.name.iter()
+            .map(|t| SearchText { text: t.clone(), context: vec![SearchContext::HumanReadableName] })
+        );
+        all_text_searches.extend(self.description.iter()
+            .map(|t| SearchText { text: t.clone(), context: vec![SearchContext::Description] })
+        );
+        all_text_searches.extend(self.text.iter()
+            .map(|t| SearchText { text: t.clone(), context: SearchContext::all() })
+        );
+
+        let search_request = SearchRequest {
+            text: all_text_searches,
+            year: self.year.clone().map(Year),
+            geometry_level: self.geometry_level.clone().map(GeometryLevel),
+            source_data_release: self.source_data_release.clone().map(SourceDataRelease),
+            data_publisher: self.publisher.clone().map(DataPublisher),
+            country: self.country.clone().map(Country),
+            census_table: self.source_metric_id.clone().map(SourceMetricId),
+        };
+        let popgetter = Popgetter::new_with_config(config).await?;
+        let metadata = popgetter.metadata;
+        let search_results = search_request.search_results(&metadata)?;
+
+        let len_requests = search_results.0.shape().0;
+        println!("Found {} metrics.", len_requests);
+        if len_requests > 50 && !self.full {
+            let truncated_results = SearchResults(search_results.0.head(Some(50)));
+            println!("{}", truncated_results);
+            println!("{} more results not shown. Use --full to show all results.", len_requests - 50);
+        } else {
+            println!("{}", search_results);
+        }
         Ok(())
     }
 }
@@ -238,10 +301,12 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 #[enum_dispatch(RunCommand)]
 pub enum Commands {
+    /// List countries for which data are available
     Countries(CountriesCommand),
-    /// Produce a data file with the required metrics and geometry
+    /// Output data for a given region and set of metrics
     Data(DataCommand),
-    /// Search / List avaliable metrics
+    /// List and filter available metrics. Multiple filters are applied conjunctively, i.e. this
+    /// command only returns metrics that match all filters.
     Metrics(MetricsCommand),
     /// Surveys
     Surveys(SurveysCommand),

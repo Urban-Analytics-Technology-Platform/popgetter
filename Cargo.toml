@@ -33,6 +33,8 @@ futures = "0.3.30"
 toml = "0.8.13"
 xdg = "2.5.2"
 regex = "1.10.4"
+itertools = "0.13.0"
+comfy-table = "7.1.1"
 
 
 [features]
