@@ -7,7 +7,7 @@ use popgetter::{
     data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, metadata::MetricId, Popgetter
 };
 use serde::{Deserialize, Serialize};
-use std::fs::File;
+use std::fs::{self, File};
 use strum_macros::EnumString;
 
 /// Defines the output formats we are able to produce data in.
