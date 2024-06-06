@@ -74,9 +74,9 @@ impl MetricId {
     }
 }
 
-impl Into<Expr> for MetricId {
-    fn into(self) -> Expr {
-        self.to_polars_expr()
+impl From<MetricId> for Expr {
+    fn from(value: MetricId) -> Self {
+        value.to_polars_expr()
     }
 }
 
