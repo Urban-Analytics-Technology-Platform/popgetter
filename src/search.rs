@@ -41,6 +41,12 @@ fn combine_exprs_with_and(exprs: Vec<Expr>) -> Option<Expr> {
     query
 }
 
+/// Search in a column case-insensitively for a string literal (i.e. not a regex!)
+fn case_insensitive_contains(column: &str, value: &str) -> Expr {
+    let regex = format!("(?i){}", regex::escape(value));
+    col(column).str().contains(lit(regex), false)
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SearchContext {
     Hxl,
@@ -60,14 +66,16 @@ impl From<SearchText> for Option<Expr> {
     fn from(val: SearchText) -> Self {
         let queries = val
             .context
-            .into_iter()
+            .iter()
             .map(|field| {
                 match field {
-                    SearchContext::Hxl => col("hxl_tag"),
-                    SearchContext::HumanReadableName => col("human_readable_name"),
-                    SearchContext::Description => col("description"),
+                    SearchContext::Hxl =>
+                        case_insensitive_contains("hxl_tag", &val.text),
+                    SearchContext::HumanReadableName =>
+                        case_insensitive_contains("human_readable_name", &val.text),
+                    SearchContext::Description =>
+                        case_insensitive_contains("description", &val.text),
                 }
-                .eq(lit(val.text.clone()))
             })
             .collect();
         combine_exprs_with_or(queries)
@@ -80,6 +88,7 @@ impl From<Year> for Option<Expr> {
             value
                 .0
                 .into_iter()
+                // TODO
                 .map(|val| col("year").eq(lit(val)))
                 .collect(),
         )
@@ -91,8 +100,8 @@ impl From<DataPublisher> for Option<Expr> {
         combine_exprs_with_or(
             value
                 .0
-                .into_iter()
-                .map(|val| col("data_publisher").eq(lit(val)))
+                .iter()
+                .map(|val| case_insensitive_contains("data_publisher", val))
                 .collect(),
         )
     }
@@ -103,8 +112,8 @@ impl From<SourceDataRelease> for Option<Expr> {
         combine_exprs_with_or(
             value
                 .0
-                .into_iter()
-                .map(|val| col("source_data_release").eq(lit(val)))
+                .iter()
+                .map(|val| case_insensitive_contains("source_data_release_id", val))
                 .collect(),
         )
     }
@@ -115,8 +124,8 @@ impl From<GeometryLevel> for Option<Expr> {
         combine_exprs_with_or(
             value
                 .0
-                .into_iter()
-                .map(|val| col("geometry_level").eq(lit(val)))
+                .iter()
+                .map(|val| case_insensitive_contains("level", val))
                 .collect(),
         )
     }
@@ -127,8 +136,8 @@ impl From<Country> for Option<Expr> {
         combine_exprs_with_or(
             value
                 .0
-                .into_iter()
-                .map(|val| col("country").eq(lit(val)))
+                .iter()
+                .map(|val| case_insensitive_contains("country", val))
                 .collect(),
         )
     }
@@ -139,8 +148,8 @@ impl From<SourceMetricId> for Option<Expr> {
         combine_exprs_with_or(
             value
                 .0
-                .into_iter()
-                .map(|val| col("source_metric_id").eq(lit(val)))
+                .iter()
+                .map(|val| case_insensitive_contains("source_metric_id", val))
                 .collect(),
         )
     }
