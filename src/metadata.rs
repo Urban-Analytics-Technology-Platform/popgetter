@@ -47,8 +47,8 @@ impl MetricId {
     /// Returns the column in the metadata that this id type corrispondes to
     pub fn to_col_name(&self) -> String {
         match self {
-            MetricId::Hxl(_) => "hxl_tag".into(),
-            MetricId::Id(_) => "id".into(),
+            MetricId::Hxl(_) => "metric_hxl_tag".into(),
+            MetricId::Id(_) => "metric_id".into(),
             MetricId::CommonName(_) => "human_readable_name".into(),
         }
     }

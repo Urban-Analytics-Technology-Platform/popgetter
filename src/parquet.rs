@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(
             df.shape().0,
             2,
-            "The returned dataframe should have the correct number of columns"
+            "The returned dataframe should have the correct number of rows"
         );
     }
 }

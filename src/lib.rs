@@ -9,6 +9,7 @@ use tokio::try_join;
 use crate::{config::Config, geo::get_geometries};
 pub mod config;
 pub mod data_request_spec;
+pub mod error;
 pub mod geo;
 pub mod metadata;
 pub mod parquet;
