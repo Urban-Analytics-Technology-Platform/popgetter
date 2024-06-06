@@ -38,8 +38,7 @@ pub struct MetricRequestResult {
 }
 
 impl DataRequestSpec {
-    /// Generates a vector of metric requests from a `DataRequestSpec`
-    /// and a catalouge.
+    /// Generates a vector of metric requests from a `DataRequestSpec` and a catalog.
     pub fn metric_requests(&self, catalogue: &Metadata) -> Result<MetricRequestResult> {
         let mut possible_metrics: Option<DataFrame> = None;
 
