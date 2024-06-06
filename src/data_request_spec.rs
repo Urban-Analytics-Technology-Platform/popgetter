@@ -91,7 +91,7 @@ impl DataRequestSpec {
             .zip(
                 filtered_possible_metrics
                     .column("parquet_metric_file")?
-                    .str()?,
+                    .str()?
             )
             .filter_map(|(column, file)| {
                 if let (Some(column), Some(file)) = (column, file) {
