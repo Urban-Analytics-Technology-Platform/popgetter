@@ -104,9 +104,9 @@ pub struct CountryMetadataLoader {
 
 /// A structure that represents a full joined lazy data frame
 /// containing all of the metadata
-pub struct ExpandedMetdataTable(pub LazyFrame);
+pub struct ExpandedMetadataTable(pub LazyFrame);
 
-impl ExpandedMetdataTable {
+impl ExpandedMetadataTable {
     /// Get access to the lazy data frame
     pub fn as_df(&self) -> LazyFrame {
         self.0.clone()
@@ -133,7 +133,7 @@ impl ExpandedMetdataTable {
             };
         }
 
-        ExpandedMetdataTable(self.as_df().filter(filter_expression.unwrap()))
+        ExpandedMetadataTable(self.as_df().filter(filter_expression.unwrap()))
     }
 
     /// Convert the metrics in the dataframe to MetricRequests
@@ -164,7 +164,7 @@ impl ExpandedMetdataTable {
 
     /// Select a specific geometry level in the dataframe filtering out all others
     pub fn select_geometry(&self, geometry: &str) -> Self {
-        ExpandedMetdataTable(self.as_df().filter(col("geometry_level").eq(geometry)))
+        ExpandedMetadataTable(self.as_df().filter(col("geometry_level").eq(geometry)))
     }
 
     /// Select a specific set of years in the dataframe filtering out all others
@@ -174,7 +174,7 @@ impl ExpandedMetdataTable {
     {
         let years: Vec<&str> = years.iter().map(std::convert::AsRef::as_ref).collect();
         let years_series = Series::new("years", years);
-        ExpandedMetdataTable(self.as_df().filter(col("year").is_in(lit(years_series))))
+        ExpandedMetadataTable(self.as_df().filter(col("year").is_in(lit(years_series))))
     }
 
     /// Return a ranked list of avaliable geometries
@@ -294,9 +294,9 @@ impl Metadata {
     }
 
     /// Generate a Lazy DataFrame which joins the metrics, source and geometry metadata
-    fn combined_metric_source_geometry(&self) -> ExpandedMetdataTable {
+    fn combined_metric_source_geometry(&self) -> ExpandedMetadataTable {
         // Join with source_data_release and geometry
-        ExpandedMetdataTable(
+        ExpandedMetadataTable(
             self.metrics
                 .clone()
                 .lazy()
