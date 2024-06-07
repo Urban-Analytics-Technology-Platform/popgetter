@@ -42,11 +42,12 @@ impl Popgetter {
         let metric_requests = data_request.metric_requests(&self.metadata)?;
 
         // Required because polars is blocking
-        let metrics = tokio::task::spawn_blocking(move || {
-            get_metrics(&metric_requests.metrics,None)
-        });
-        
-        let geom_file  = self.metadata.get_geom_details(&metric_requests.selected_geometry)?;
+        let metrics =
+            tokio::task::spawn_blocking(move || get_metrics(&metric_requests.metrics, None));
+
+        let geom_file = self
+            .metadata
+            .get_geom_details(&metric_requests.selected_geometry)?;
         let geoms = get_geometries(&geom_file, None, None);
 
         // try_join requires us to have the errors from all futures be the same.

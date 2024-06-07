@@ -1,10 +1,10 @@
 //! Search
 
 use crate::metadata::Metadata;
+use log::debug;
 use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, LazyFrame};
 use serde::{Deserialize, Serialize};
-use log::debug;
 
 /// Combine multiple queries with OR. If there are no queries in the input list, returns None.
 fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
@@ -58,14 +58,13 @@ impl From<SearchText> for Option<Expr> {
         let queries = val
             .context
             .iter()
-            .map(|field| {
-                match field {
-                    SearchContext::Hxl =>
-                        case_insensitive_contains("metric_hxl_tag", &val.text),
-                    SearchContext::HumanReadableName =>
-                        case_insensitive_contains("human_readable_name", &val.text),
-                    SearchContext::Description =>
-                        case_insensitive_contains("metric_description", &val.text),
+            .map(|field| match field {
+                SearchContext::Hxl => case_insensitive_contains("metric_hxl_tag", &val.text),
+                SearchContext::HumanReadableName => {
+                    case_insensitive_contains("human_readable_name", &val.text)
+                }
+                SearchContext::Description => {
+                    case_insensitive_contains("metric_description", &val.text)
                 }
             })
             .collect();

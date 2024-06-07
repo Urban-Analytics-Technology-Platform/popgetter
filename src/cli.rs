@@ -5,7 +5,14 @@ use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use log::{debug, info};
 use popgetter::{
-    config::Config, data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, metadata::MetricId, Popgetter, search::*
+    config::Config,
+    data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec},
+    formatters::{
+        CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
+    },
+    metadata::MetricId,
+    search::*,
+    Popgetter,
 };
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
@@ -40,78 +47,88 @@ pub trait RunCommand {
 #[derive(Args, Debug)]
 pub struct DataCommand {
     /// Only get data in  bounding box ([min_lat,min_lng,max_lat,max_lng])
-    #[arg(short, long, allow_hyphen_values(true), help="Bounding box in which to get the results. Format is: min_lon, min_lat, max_lon, max_lat ")]
+    #[arg(
+        short,
+        long,
+        allow_hyphen_values(true),
+        help = "Bounding box in which to get the results. Format is: min_lon, min_lat, max_lon, max_lat "
+    )]
     bbox: Option<BBox>,
     /// Specify a metric by hxl
-    #[arg(short='h', long, help="Specify a metric by Humanitarian Exchange Language tag")]
+    #[arg(
+        short = 'h',
+        long,
+        help = "Specify a metric by Humanitarian Exchange Language tag"
+    )]
     hxl: Option<Vec<String>>,
 
     // Specify a metric by id
-    #[arg(short='i', long, help="Specify a metric by uuid, can be a partial uuid")]
+    #[arg(
+        short = 'i',
+        long,
+        help = "Specify a metric by uuid, can be a partial uuid"
+    )]
     id: Option<Vec<String>>,
 
-    // Specify a metric by name 
-    #[arg(short='n', long, help="Specify a metric by Human readable name")]
+    // Specify a metric by name
+    #[arg(short = 'n', long, help = "Specify a metric by Human readable name")]
     name: Option<Vec<String>>,
 
     /// Specify output format
-    #[arg(short='f', long, help="One of GeoJSON, CSV, GeoJSONSeq")]
+    #[arg(short = 'f', long, help = "One of GeoJSON, CSV, GeoJSONSeq")]
     output_format: OutputFormat,
 
     /// Specify where the result should be saved
-    #[arg(short='o',long, help="Output file to place the results")]
+    #[arg(short = 'o', long, help = "Output file to place the results")]
     output_file: String,
 
     /// Specify the years we should get the result for
-    #[arg(short='y', long, help="Specify the year ranges for which you are interested in the metrics")]
-    years: Option<Vec<String>>
+    #[arg(
+        short = 'y',
+        long,
+        help = "Specify the year ranges for which you are interested in the metrics"
+    )]
+    years: Option<Vec<String>>,
 }
 
-
-impl DataCommand{
-    pub fn gather_metric_requests(&self)->Vec<MetricId>{
+impl DataCommand {
+    pub fn gather_metric_requests(&self) -> Vec<MetricId> {
         let mut metric_ids: Vec<MetricId> = vec![];
 
-        if let Some(ids) = &self.id{
-            for id in ids{
+        if let Some(ids) = &self.id {
+            for id in ids {
                 metric_ids.push(MetricId::Id(id.clone()));
             }
-        } 
+        }
 
-        if let Some(hxls) = &self.hxl{
-            for hxl in hxls{
+        if let Some(hxls) = &self.hxl {
+            for hxl in hxls {
                 metric_ids.push(MetricId::Hxl(hxl.clone()));
             }
-        } 
+        }
 
-        if let Some(names) = &self.name{
-            for name in names{
+        if let Some(names) = &self.name {
+            for name in names {
                 metric_ids.push(MetricId::CommonName(name.clone()));
             }
-        } 
+        }
 
         metric_ids
     }
 }
 
-impl From<&OutputFormat> for OutputFormatter{
+impl From<&OutputFormat> for OutputFormatter {
     fn from(value: &OutputFormat) -> Self {
-        match value{
-            OutputFormat::GeoJSON=>{
-                OutputFormatter::GeoJSON(GeoJSONFormatter)
-            },
-            OutputFormat::Csv=>{
-                OutputFormatter::Csv(CSVFormatter::default())
-            },
-            OutputFormat::GeoJSONSeq=>{
-                OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter)
-            },
-            _=>todo!("output format not implemented")
+        match value {
+            OutputFormat::GeoJSON => OutputFormatter::GeoJSON(GeoJSONFormatter),
+            OutputFormat::Csv => OutputFormatter::Csv(CSVFormatter::default()),
+            OutputFormat::GeoJSONSeq => OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter),
+            _ => todo!("output format not implemented"),
         }
     }
 }
 
-impl From<OutputFormat> for OutputFormatter{
+impl From<OutputFormat> for OutputFormatter {
     fn from(value: OutputFormat) -> Self {
         Self::from(&value)
     }
@@ -128,7 +145,7 @@ impl RunCommand for DataCommand {
         debug!("{results:#?}");
         let mut f = File::create(&self.output_file)?;
         let formatter: OutputFormatter = (&self.output_format).into();
-        formatter.save(&mut f,&mut results)?;
+        formatter.save(&mut f, &mut results)?;
 
         Ok(())
     }
@@ -142,16 +159,17 @@ impl From<&DataCommand> for DataRequestSpec {
             vec![]
         };
 
-        let metrics = value.gather_metric_requests()
-                           .into_iter()
-                           .map(MetricSpec::Metric)
-                           .collect();
+        let metrics = value
+            .gather_metric_requests()
+            .into_iter()
+            .map(MetricSpec::Metric)
+            .collect();
 
         DataRequestSpec {
-            geometry: GeometrySpec::default(), 
-            region, 
+            geometry: GeometrySpec::default(),
+            region,
             metrics,
-            years: None, 
+            years: None,
         }
     }
 }
@@ -163,21 +181,24 @@ pub struct MetricsCommand {
     #[arg(
         short,
         long,
-        value_name="min_lat,min_lng,max_lat,max_lng",
-        help="Bounding box in which to get the results")
-    ]
+        value_name = "min_lat,min_lng,max_lat,max_lng",
+        help = "Bounding box in which to get the results"
+    )]
     bbox: Option<BBox>,
-    #[arg(short, long, help="Filter by year")]
+    #[arg(short, long, help = "Filter by year")]
     year: Option<Vec<String>>,
-    #[arg(short, long, help="Filter by geometry level")]
+    #[arg(short, long, help = "Filter by geometry level")]
     geometry_level: Option<Vec<String>>,
-    #[arg(short, long, help="Filter by source data release name")]
+    #[arg(short, long, help = "Filter by source data release name")]
     source_data_release: Option<Vec<String>>,
-    #[arg(short, long, help="Filter by data publisher name")]
+    #[arg(short, long, help = "Filter by data publisher name")]
     publisher: Option<Vec<String>>,
-    #[arg(short, long, help="Filter by country")]
+    #[arg(short, long, help = "Filter by country")]
     country: Option<Vec<String>>,
-    #[arg(long, help="Filter by source metric ID (i.e. the name of the table in the original data release)")]
+    #[arg(
+        long,
+        help = "Filter by source metric ID (i.e. the name of the table in the original data release)"
+    )]
     source_metric_id: Option<Vec<String>>,
     // Filters for text
     #[arg(long, help="Filter by HXL tag", num_args=0..)]
@@ -189,7 +210,11 @@ pub struct MetricsCommand {
     #[arg(short, long, help="Filter by HXL tag, name, or description", num_args=0..)]
     text: Vec<String>,
     // Output options
-    #[arg(short, long, help="Show all metrics even if there are a large number")]
+    #[arg(
+        short,
+        long,
+        help = "Show all metrics even if there are a large number"
+    )]
     full: bool,
 }
 
@@ -199,18 +224,22 @@ impl RunCommand for MetricsCommand {
         debug!("{:#?}", self);
 
         let mut all_text_searches: Vec<SearchText> = vec![];
-        all_text_searches.extend(self.hxl.iter()
-            .map(|t| SearchText { text: t.clone(), context: vec![SearchContext::Hxl] })
-        );
-        all_text_searches.extend(self.name.iter()
-            .map(|t| SearchText { text: t.clone(), context: vec![SearchContext::HumanReadableName] })
-        );
-        all_text_searches.extend(self.description.iter()
-            .map(|t| SearchText { text: t.clone(), context: vec![SearchContext::Description] })
-        );
-        all_text_searches.extend(self.text.iter()
-            .map(|t| SearchText { text: t.clone(), context: SearchContext::all() })
-        );
+        all_text_searches.extend(self.hxl.iter().map(|t| SearchText {
+            text: t.clone(),
+            context: vec![SearchContext::Hxl],
+        }));
+        all_text_searches.extend(self.name.iter().map(|t| SearchText {
+            text: t.clone(),
+            context: vec![SearchContext::HumanReadableName],
+        }));
+        all_text_searches.extend(self.description.iter().map(|t| SearchText {
+            text: t.clone(),
+            context: vec![SearchContext::Description],
+        }));
+        all_text_searches.extend(self.text.iter().map(|t| SearchText {
+            text: t.clone(),
+            context: SearchContext::all(),
+        }));
 
         let search_request = SearchRequest {
             text: all_text_searches,
@@ -230,7 +259,10 @@ impl RunCommand for MetricsCommand {
 
         if len_requests > 50 && !self.full {
             display_search_results(search_results, Some(50));
-            println!("{} more results not shown. Use --full to show all results.", len_requests - 50);
+            println!(
+                "{} more results not shown. Use --full to show all results.",
+                len_requests - 50
+            );
         } else {
             display_search_results(search_results, None);
         }
@@ -264,18 +296,18 @@ impl RunCommand for SurveysCommand {
 
 /// The Recipe command loads a recipy file and generates the output data requested
 #[derive(Args, Debug)]
-pub struct RecipeCommand{
-    #[arg(index=1)]
+pub struct RecipeCommand {
+    #[arg(index = 1)]
     recipe_file: String,
 
-    #[arg(short='f', long)]
+    #[arg(short = 'f', long)]
     output_format: OutputFormat,
 
-    #[arg(short='o',long)]
-    output_file: String
+    #[arg(short = 'o', long)]
+    output_file: String,
 }
 
-impl RunCommand for RecipeCommand{
+impl RunCommand for RecipeCommand {
     async fn run(&self, config: Config) -> Result<()> {
         let popgetter = Popgetter::new_with_config(config).await?;
         let config = fs::read_to_string(&self.recipe_file)?;
@@ -284,7 +316,7 @@ impl RunCommand for RecipeCommand{
         println!("{results}");
         let formatter: OutputFormatter = (&self.output_format).into();
         let mut f = File::create(&self.output_file)?;
-        formatter.save(&mut f,&mut results)?;
+        formatter.save(&mut f, &mut results)?;
         Ok(())
     }
 }
@@ -313,9 +345,8 @@ pub enum Commands {
     /// Surveys
     Surveys(SurveysCommand),
     /// From recipe
-    Recipe(RecipeCommand)
+    Recipe(RecipeCommand),
 }
-
 
 #[cfg(test)]
 mod tests {
