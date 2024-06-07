@@ -1,4 +1,4 @@
-use flatgeobuf::{ FeatureProperties, HttpFgbReader, geozero};
+use flatgeobuf::{FeatureProperties, HttpFgbReader, geozero};
 use geozero::ToWkt;
 use anyhow::{Context, Result};
 use polars::{frame::DataFrame, prelude::NamedFrom, series::Series};

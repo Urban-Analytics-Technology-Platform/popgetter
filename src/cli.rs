@@ -3,6 +3,7 @@
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
+use log::{debug, info};
 use popgetter::{
     data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, metadata::MetricId, Popgetter
 };
@@ -118,14 +119,14 @@ impl From<OutputFormat> for OutputFormatter{
 
 impl RunCommand for DataCommand {
     async fn run(&self) -> Result<()> {
-        let popgetter = Popgetter::new()?;
+        let popgetter = Popgetter::new().await?;
         let data_request = DataRequestSpec::from(self);
         let mut results = popgetter.get_data_request(&data_request).await?;
 
-        println!("{results:#?}");
+        debug!("{results:#?}");
         let mut f = File::create(&self.output_file)?;
         let formatter: OutputFormatter = (&self.output_format).into();
-        formatter.save(&mut f,&mut results)?;
+        formatter.save(&mut f, &mut results)?;
 
         Ok(())
     }
@@ -141,7 +142,7 @@ impl From<&DataCommand> for DataRequestSpec {
 
         let metrics = value.gather_metric_requests()
                            .into_iter()
-                           .map(|metric_id| MetricSpec::Metric(metric_id))
+                           .map(MetricSpec::Metric)
                            .collect();
 
         DataRequestSpec {
@@ -167,7 +168,7 @@ pub struct MetricsCommand {
 
 impl RunCommand for MetricsCommand {
     async fn run(&self) -> Result<()> {
-        println!("Running Metrics Command");
+        info!("Running `metrics` subcommand");
         Ok(())
     }
 }
@@ -179,7 +180,7 @@ pub struct CountriesCommand;
 
 impl RunCommand for CountriesCommand {
     async fn run(&self) -> Result<()> {
-        println!("Running Countries Command");
+        let _popgetter = Popgetter::new().await?;
         Ok(())
     }
 }
@@ -191,7 +192,7 @@ pub struct SurveysCommand;
 
 impl RunCommand for SurveysCommand {
     async fn run(&self) -> Result<()> {
-        println!("Running Surveys Command");
+        info!("Running `surveys` subcommand");
         Ok(())
     }
 }
@@ -211,7 +212,7 @@ pub struct RecipeCommand{
 
 impl RunCommand for RecipeCommand{
     async fn run(&self) -> Result<()> {
-        let popgetter = Popgetter::new()?;
+        let popgetter = Popgetter::new().await?;
         let config = fs::read_to_string(&self.recipe_file)?;
         let data_request: DataRequestSpec = serde_json::from_str(&config)?;
         let mut results = popgetter.get_data_request(&data_request).await?;
