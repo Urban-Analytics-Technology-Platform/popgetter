@@ -4,13 +4,13 @@ mod display;
 use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, RunCommand};
-use popgetter::config::Config;
 use log::debug;
+use popgetter::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     pretty_env_logger::init_timed();
-    
+
     let args = Cli::parse();
     debug!("args: {args:?}");
     let config: Config = read_config_from_toml();
@@ -21,7 +21,6 @@ async fn main() -> Result<()> {
     }
     Ok(())
 }
-
 
 fn read_config_from_toml() -> Config {
     // macOS: ~/.config/popgetter/config.toml

@@ -1,6 +1,6 @@
-use popgetter::search::SearchResults;
+use comfy_table::{presets::NOTHING, *};
 use itertools::izip;
-use comfy_table::{*, presets::NOTHING};
+use popgetter::search::SearchResults;
 
 pub fn display_search_results(results: SearchResults, max_results: Option<usize>) {
     let df_to_show = match max_results {

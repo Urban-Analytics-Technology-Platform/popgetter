@@ -1,5 +1,8 @@
+use crate::{config::Config, data_request_spec::GeometrySpec, parquet::MetricRequest};
 use anyhow::{anyhow, Result};
 use futures::future::join_all;
+use futures::try_join;
+use log::debug;
 use log::info;
 use polars::{
     chunked_array::ops::SortMultipleOptions,
@@ -12,10 +15,7 @@ use polars::{
     series::Series,
 };
 use serde::{Deserialize, Serialize};
-use futures::try_join;
-use log::debug;
 use std::{collections::HashMap, default::Default, fmt::Display};
-use crate::{config::Config, data_request_spec::GeometrySpec, parquet::MetricRequest};
 
 /// This struct contains the base url and names of
 /// the files that contain the metadata. It has a
@@ -293,12 +293,14 @@ impl Metadata {
 
     /// Generate a Lazy DataFrame which joins the metrics, source and geometry metadata
     pub fn combined_metric_source_geometry(&self) -> ExpandedMetadataTable {
-        let df: LazyFrame = self.metrics
+        let df: LazyFrame = self
+            .metrics
             .clone()
             .lazy()
             // Rename these first because they will cause clashes when merging
-            .rename(["id", "description", "hxl_tag"],
-                ["metric_id", "metric_description", "metric_hxl_tag"]
+            .rename(
+                ["id", "description", "hxl_tag"],
+                ["metric_id", "metric_description", "metric_hxl_tag"],
             )
             // Join source data releases
             .join(
@@ -308,13 +310,28 @@ impl Metadata {
                 JoinArgs::new(JoinType::Inner),
             )
             .rename(
-                ["url", "description", "name", "date_published", "reference_period_start",
-                    "reference_period_end", "collection_period_start", "collection_period_end",
-                    "expect_next_update"],
-                ["release_url", "release_description", "release_name",
-                    "release_date_published", "release_reference_period_start",
-                    "release_reference_period_end", "release_collection_period_start",
-                    "release_collection_period_end", "release_expect_next_update"]
+                [
+                    "url",
+                    "description",
+                    "name",
+                    "date_published",
+                    "reference_period_start",
+                    "reference_period_end",
+                    "collection_period_start",
+                    "collection_period_end",
+                    "expect_next_update",
+                ],
+                [
+                    "release_url",
+                    "release_description",
+                    "release_name",
+                    "release_date_published",
+                    "release_reference_period_start",
+                    "release_reference_period_end",
+                    "release_collection_period_start",
+                    "release_collection_period_end",
+                    "release_expect_next_update",
+                ],
             )
             // Join geometry metadata
             .join(
@@ -324,8 +341,20 @@ impl Metadata {
                 JoinArgs::new(JoinType::Inner),
             )
             .rename(
-                ["validity_period_start", "validity_period_end", "level", "hxl_tag", "filename_stem"],
-                ["geometry_validity_period_start", "geometry_validity_period_end", "geometry_level", "geometry_hxl_tag", "geometry_filename_stem"]
+                [
+                    "validity_period_start",
+                    "validity_period_end",
+                    "level",
+                    "hxl_tag",
+                    "filename_stem",
+                ],
+                [
+                    "geometry_validity_period_start",
+                    "geometry_validity_period_end",
+                    "geometry_level",
+                    "geometry_hxl_tag",
+                    "geometry_filename_stem",
+                ],
             )
             // Join data publishers
             .join(
@@ -336,17 +365,27 @@ impl Metadata {
             )
             .rename(
                 ["url", "description", "name"],
-                ["data_publisher_url", "data_publisher_description", "data_publisher_name"]
+                [
+                    "data_publisher_url",
+                    "data_publisher_description",
+                    "data_publisher_name",
+                ],
             )
             // Get rid of intermediate IDs as we don't need them
-            .drop(["source_data_release_id", "geometry_metadata_id", "data_publisher_id"])
-        ;
+            .drop([
+                "source_data_release_id",
+                "geometry_metadata_id",
+                "data_publisher_id",
+            ]);
         // TODO: Add a country_id column to the metadata, and merge in the countries as well. See
         // https://github.com/Urban-Analytics-Technology-Platform/popgetter/issues/104
 
         // Debug print the column names so that we know what we can access
         let schema = df.schema().unwrap();
-        let column_names = schema.iter_names().map(|s| s.as_str()).collect::<Vec<&str>>();
+        let column_names = schema
+            .iter_names()
+            .map(|s| s.as_str())
+            .collect::<Vec<&str>>();
         debug!("Column names in merged metadata: {:?}", column_names);
 
         ExpandedMetadataTable(df)
@@ -611,8 +650,7 @@ mod tests {
             .load(&config)
             .await
             .unwrap();
-        let expanded_metrics =
-            metadata.expand_regex_metric(&MetricId::Hxl("population-*".into()));
+        let expanded_metrics = metadata.expand_regex_metric(&MetricId::Hxl("population-*".into()));
         assert!(
             expanded_metrics.is_ok(),
             "Should successfully expand metrics"
@@ -689,8 +727,8 @@ mod tests {
             .load(&config)
             .await
             .unwrap();
-        let expanded_metrics = metadata
-            .expand_regex_metric(&MetricId::Hxl(r"#population\+infants\+age0\_4".into()));
+        let expanded_metrics =
+            metadata.expand_regex_metric(&MetricId::Hxl(r"#population\+infants\+age0\_4".into()));
         assert!(
             expanded_metrics.is_ok(),
             "Should successfully expand metrics"
