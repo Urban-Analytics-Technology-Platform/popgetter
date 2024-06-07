@@ -285,6 +285,10 @@ impl std::fmt::Display for SearchResults {
             table
                 .load_preset(NOTHING)
                 .set_content_arrangement(ContentArrangement::Dynamic)
+                .set_style(comfy_table::TableComponent::BottomBorder, '─')
+                .set_style(comfy_table::TableComponent::BottomBorderIntersections, '─')
+                .set_style(comfy_table::TableComponent::TopBorder, '─')
+                .set_style(comfy_table::TableComponent::TopBorderIntersections, '─')
                 .add_row(vec![
                     Cell::new("Metric ID").add_attribute(Attribute::Bold),
                     metric_id.get_str().unwrap().into(), 
