@@ -1,5 +1,4 @@
 use anyhow::Result;
-
 use serde::{Deserialize, Serialize};
 use std::{
     ops::{Index, IndexMut},
@@ -135,12 +134,12 @@ mod tests {
         let bbox = BBox::from_str("0.0,1.0,2.0");
         assert!(
             bbox.is_err(),
-            "A string with fewer than 4 coords should parse"
+            "A string with fewer than 4 coords should not parse"
         );
         let bbox = BBox::from_str("0.0,1.0,2.0,3.0,4.0");
         assert!(
             bbox.is_err(),
-            "A string with fewer than 5 coords should parse"
+            "A string with 5 or more coords should not parse"
         );
         let bbox = BBox::from_str("0.0sdfsd,1.0,2.0");
         assert!(bbox.is_err(), "A string with letters shouldn't parse");
