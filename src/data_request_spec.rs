@@ -1,47 +1,80 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
+
 use serde::{Deserialize, Serialize};
 use std::{
     ops::{Index, IndexMut},
     str::FromStr,
 };
 
-use crate::{metadata::SourceDataRelease, parquet::MetricRequest};
+use crate::{
+    metadata::{Metadata, MetricId},
+    parquet::MetricRequest,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataRequestSpec {
+    pub geometry: GeometrySpec,
     pub region: Vec<RegionSpec>,
     pub metrics: Vec<MetricSpec>,
+    pub years: Option<Vec<String>>,
+}
+
+pub struct MetricRequestResult {
+    pub metrics: Vec<MetricRequest>,
+    pub selected_geometry: String,
+    pub years: Vec<String>,
 }
 
 impl DataRequestSpec {
-    pub fn metric_requests(&self, catalogue: &SourceDataRelease) -> Result<Vec<MetricRequest>> {
-        let mut metric_requests: Vec<MetricRequest> = vec![];
-        println!("Try to get metrics {:#?}", self.metrics);
-        for metric_spec in &self.metrics {
-            match metric_spec {
-                MetricSpec::NamedMetric(name) => {
-                    metric_requests.push(
-                        catalogue
-                            .get_metric_details(name)
-                            .with_context(|| "Failed to find metric")?
-                            .into(),
-                    );
-                }
-                MetricSpec::DataProduct(_) => todo!("unsupported metric spec"),
-            }
-        }
-        Ok(metric_requests)
-    }
+    /// Generates a vector of metric requests from a `DataRequestSpec` and a catalogue.
+    pub fn metric_requests(&self, catalogue: &Metadata) -> Result<MetricRequestResult> {
+        // Find all the metrics which match the requested ones, expanding
+        // any regex matches as we do so
+        let expanded_metric_ids: Vec<MetricId> = self
+            .metrics
+            .iter()
+            .filter_map(|metric_spec| match metric_spec {
+                MetricSpec::Metric(id) => catalogue.expand_regex_metric(id).ok(),
+                MetricSpec::DataProduct(_) => None,
+            })
+            .flatten()
+            .collect::<Vec<_>>();
 
-    pub fn geom_details(&self, catalogue: &SourceDataRelease) -> Result<String> {
-        Ok(catalogue.geography_file.clone())
+        let full_selection_plan =
+            catalogue.generate_selection_plan(&expanded_metric_ids, &self.geometry, &self.years)?;
+
+        println!("Running your query with \n {full_selection_plan}");
+
+        let metric_requests =
+            catalogue.get_metric_requests(full_selection_plan.explicit_metric_ids)?;
+
+        Ok(MetricRequestResult {
+            metrics: metric_requests,
+            selected_geometry: full_selection_plan.geometry,
+            years: full_selection_plan.year,
+        })
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MetricSpec {
-    NamedMetric(String),
+    Metric(MetricId),
     DataProduct(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GeometrySpec {
+    pub geometry_level: Option<String>,
+    pub include_geoms: bool,
+}
+
+impl Default for GeometrySpec {
+    fn default() -> Self {
+        Self {
+            include_geoms: true,
+            geometry_level: None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
