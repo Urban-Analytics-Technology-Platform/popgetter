@@ -4,6 +4,7 @@ repos:
     hooks:
     -   id: check-yaml
     -   id: end-of-file-fixer
+        exclude: schema/.+\.json
     -   id: trailing-whitespace
 -   repo: https://github.com/doublify/pre-commit-rust
     rev: v1.0
