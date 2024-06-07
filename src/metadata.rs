@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use futures::future::join_all;
 use log::info;
 use polars::{
+    chunked_array::ops::SortMultipleOptions,
     frame::DataFrame,
     lazy::{
         dsl::{col, Expr},
@@ -11,11 +12,10 @@ use polars::{
     series::Series,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, default::Default};
 use futures::try_join;
 use log::debug;
-
-use crate::config::Config;
+use std::{collections::HashMap, default::Default, fmt::Display};
+use crate::{config::Config, data_request_spec::GeometrySpec, parquet::MetricRequest};
 
 /// This struct contains the base url and names of
 /// the files that contain the metadata. It has a
@@ -55,9 +55,7 @@ impl MetricId {
     /// Return a string representing the textual content of the ID
     pub fn to_query_string(&self) -> &str {
         match self {
-            MetricId::Hxl(s) => s,
-            MetricId::Id(s) => s,
-            MetricId::CommonName(s) => s,
+            MetricId::CommonName(s) | MetricId::Id(s) | MetricId::Hxl(s) => s,
         }
     }
 
@@ -68,7 +66,7 @@ impl MetricId {
     }
 
     /// Generate a polars Expr that will generate
-    /// a fuzzy search for the content of the Id
+    /// a regex search for the content of the Id
     pub fn to_fuzzy_polars_expr(&self) -> Expr {
         col(&self.to_col_name())
             .str()
@@ -77,8 +75,8 @@ impl MetricId {
 }
 
 impl From<MetricId> for Expr {
-    fn from(val: MetricId) -> Self {
-        val.to_polars_expr()
+    fn from(value: MetricId) -> Self {
+        value.to_polars_expr()
     }
 }
 
@@ -96,17 +94,144 @@ impl Default for CountryMetadataPaths {
 
 /// `CountryMetadataLoader` takes a country iso string
 /// along with a CountryMetadataPaths and provides methods
-/// for fetching and construting a `Metadata` catalouge.
+/// for fetching and constructing a `Metadata` catalogue.
 pub struct CountryMetadataLoader {
     country: String,
     paths: CountryMetadataPaths,
+}
+
+/// A structure that represents a full joined lazy data frame
+/// containing all of the metadata
+pub struct ExpandedMetadataTable(pub LazyFrame);
+
+impl ExpandedMetadataTable {
+    /// Get access to the lazy data frame
+    pub fn as_df(&self) -> LazyFrame {
+        self.0.clone()
+    }
+
+    /// Filter the dataframe by the specified metrics
+    pub fn select_metrics(&self, metrics: &[MetricId]) -> Self {
+        let mut id_collections: HashMap<String, Vec<String>> = HashMap::new();
+
+        for metric in metrics {
+            id_collections
+                .entry(metric.to_col_name())
+                .and_modify(|e| e.push(metric.to_query_string().into()))
+                .or_insert(vec![metric.to_query_string().into()]);
+        }
+
+        let mut filter_expression: Option<Expr> = None;
+        for (col_name, ids) in &id_collections {
+            let filter_series = Series::new("filter", ids.clone());
+            filter_expression = if let Some(expression) = filter_expression {
+                Some(expression.or(col(col_name).is_in(lit(filter_series))))
+            } else {
+                Some(col(col_name).is_in(lit(filter_series)))
+            };
+        }
+
+        ExpandedMetadataTable(self.as_df().filter(filter_expression.unwrap()))
+    }
+
+    /// Convert the metrics in the dataframe to MetricRequests
+    pub fn to_metric_requests(&self) -> Result<Vec<MetricRequest>> {
+        let df = self
+            .as_df()
+            .select([col("parquet_metric_file"), col("parquet_metric_id")])
+            .collect()?;
+
+        let metric_requests: Vec<MetricRequest> = df
+            .column("parquet_metric_id")?
+            .str()?
+            .into_iter()
+            .zip(df.column("parquet_metric_file")?.str()?)
+            .filter_map(|(column, file)| {
+                if let (Some(column), Some(file)) = (column, file) {
+                    Some(MetricRequest {
+                        column: column.to_owned(),
+                        file: file.to_owned(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(metric_requests)
+    }
+
+    /// Select a specific geometry level in the dataframe filtering out all others
+    pub fn select_geometry(&self, geometry: &str) -> Self {
+        ExpandedMetadataTable(self.as_df().filter(col("geometry_level").eq(geometry)))
+    }
+
+    /// Select a specific set of years in the dataframe filtering out all others
+    pub fn select_years<T>(&self, years: &[T]) -> Self
+    where
+        T: AsRef<str>,
+    {
+        let years: Vec<&str> = years.iter().map(std::convert::AsRef::as_ref).collect();
+        let years_series = Series::new("years", years);
+        ExpandedMetadataTable(self.as_df().filter(col("year").is_in(lit(years_series))))
+    }
+
+    /// Return a ranked list of avaliable geometries
+    pub fn avaliable_geometries(&self) -> Result<Vec<String>> {
+        let df = self.as_df();
+        let counts: DataFrame = df
+            .group_by([col("geometry_level")])
+            .agg([col("goemetry_level").count().alias("count")])
+            .sort(
+                ["count"],
+                SortMultipleOptions::new().with_order_descending(true),
+            )
+            .collect()?;
+
+        Ok(counts
+            .column("geometry_level")?
+            .str()?
+            .iter()
+            .filter_map(|geom| geom.map(std::borrow::ToOwned::to_owned))
+            .collect())
+    }
+
+    /// Return a ranked list of avaliable years
+    pub fn avaliable_years(&self) -> Result<Vec<String>> {
+        let df = self.as_df();
+        let counts: DataFrame = df
+            .group_by([col("year")])
+            .agg([col("year").count().alias("count")])
+            .sort(
+                ["count"],
+                SortMultipleOptions::new().with_order_descending(true),
+            )
+            .collect()?;
+
+        Ok(counts
+            .column("year")?
+            .str()?
+            .iter()
+            .filter_map(|geom| geom.map(std::borrow::ToOwned::to_owned))
+            .collect())
+    }
+
+    /// Get fully speced metric ids
+    pub fn get_explicit_metric_ids(&self) -> Result<Vec<MetricId>> {
+        let reamining: DataFrame = self.as_df().select([col("metric_id")]).collect()?;
+        Ok(reamining
+            .column("id")?
+            .str()?
+            .into_iter()
+            .filter_map(|pos_id| pos_id.map(|id| MetricId::Id(id.to_owned())))
+            .collect())
+    }
 }
 
 /// The metadata struct contains the polars `DataFrames` for
 /// the various different metadata tables. Can be constructed
 /// from a single `CountryMetadataLoader` or for all countries.
 /// It also provides the various functions for searching and
-/// getting `MetricRequests` from the catalouge.
+/// getting `MetricRequests` from the catalogue.
 #[derive(Debug)]
 pub struct Metadata {
     pub metrics: DataFrame,
@@ -116,13 +241,37 @@ pub struct Metadata {
     pub countries: DataFrame,
 }
 
+/// Describes a fully specified selection plan. The MetricIds should all
+/// be the ID variant. Geometry and years are backed in now.
+/// Advice specifies and alternative options that the user should
+/// be aware of.
+pub struct FullSelectionPlan {
+    pub explicit_metric_ids: Vec<MetricId>,
+    pub geometry: String,
+    pub year: Vec<String>,
+    pub advice: String,
+}
+
+impl Display for FullSelectionPlan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Getting {} metrics \n, on {} geometries \n , for the years {}",
+            self.explicit_metric_ids.len(),
+            self.geometry,
+            self.year.join(",")
+        )
+    }
+}
+
 impl Metadata {
     /// If our metric_id is a regex, expand it in to a list of explicit `MetricIds`
-    pub fn expand_wildcard_metric(&self, metric_id: &MetricId) -> Result<Vec<MetricId>> {
+    pub fn expand_regex_metric(&self, metric_id: &MetricId) -> Result<Vec<MetricId>> {
         let col_name = metric_id.to_col_name();
-        let catalouge = self.combined_metric_source_geometry();
+        let catalogue = self.combined_metric_source_geometry();
 
-        catalouge
+        catalogue
+            .as_df()
             .filter(metric_id.to_fuzzy_polars_expr())
             .collect()?
             .column(&col_name)?
@@ -143,8 +292,8 @@ impl Metadata {
     }
 
     /// Generate a Lazy DataFrame which joins the metrics, source and geometry metadata
-    pub fn combined_metric_source_geometry(&self) -> LazyFrame {
-        let df = self.metrics
+    pub fn combined_metric_source_geometry(&self) -> ExpandedMetadataTable {
+        let df: LazyFrame = self.metrics
             .clone()
             .lazy()
             // Rename these first because they will cause clashes when merging
@@ -200,40 +349,91 @@ impl Metadata {
         let column_names = schema.iter_names().map(|s| s.as_str()).collect::<Vec<&str>>();
         debug!("Column names in merged metadata: {:?}", column_names);
 
-        df
+        ExpandedMetadataTable(df)
     }
 
-    /// Given a list of metric ids return a Data Frame with the
-    /// list of possible matches across years and geometries
-    pub fn get_possible_metric_details(&self, metrics: &[MetricId]) -> Result<DataFrame> {
-        let mut id_collections: HashMap<String, Vec<String>> = HashMap::new();
+    /// Return a list of MetricRequests for the given metrics_ids
+    pub fn get_metric_requests(&self, metric_ids: Vec<MetricId>) -> Result<Vec<MetricRequest>> {
+        self.combined_metric_source_geometry()
+            .select_metrics(&metric_ids);
+        Ok(vec![])
+    }
 
-        for metric in metrics {
-            id_collections
-                .entry(metric.to_col_name())
-                .and_modify(|e| e.push(metric.to_query_string().into()))
-                .or_insert(vec![metric.to_query_string().into()]);
-        }
-
-        let mut filter_expression: Option<Expr> = None;
-        for (col_name, ids) in &id_collections {
-            let filter_series = Series::new("filter", ids.clone());
-            filter_expression = if let Some(expression) = filter_expression {
-                Some(expression.or(col(col_name).is_in(lit(filter_series))))
-            } else {
-                Some(col(col_name).is_in(lit(filter_series)))
-            };
-        }
-
-        let metrics = self
+    /// Generates a FullSelectionPlan which takes in to account
+    /// what the user has requested with sane fallbacks if geography
+    /// or years have not been specified.
+    pub fn generate_selection_plan(
+        &self,
+        metrics: &[MetricId],
+        geometry: &GeometrySpec,
+        years: &Option<Vec<String>>,
+    ) -> Result<FullSelectionPlan> {
+        let mut advice: Vec<String> = vec![];
+        // Find metadata for all specified metrics over all geoemtries and years
+        let possible_metrics = self
             .combined_metric_source_geometry()
-            .filter(filter_expression.unwrap())
-            .collect()?;
-        Ok(metrics)
+            .select_metrics(metrics);
+
+        // If the user has selected a geometry, we will use it explicitly
+        let selected_geometry = if let Some(geom) = &geometry.geometry_level {
+            geom.clone()
+        }
+        // Otherwise we will get the geometry with the most matches to our
+        // metrics
+        else {
+            // Get a ranked list of geometriesthat are avaliable for these
+            // metrics
+            let avaliable_geometries = possible_metrics.avaliable_geometries()?;
+            if avaliable_geometries.is_empty() {
+                return Err(anyhow!(
+                    "No geometry specifed and non found for these metrics"
+                ));
+            }
+
+            let geom = avaliable_geometries[0].to_owned();
+            if avaliable_geometries.len() > 1 {
+                let rest = avaliable_geometries[1..].join(",");
+                advice.push(format!("We are selecting the geometry level {geom}. The requested metrics are also avaliable at the following levels: {rest}"));
+            }
+            geom
+        };
+
+        // If the user has selected a set of years, we will use them explicity
+        let selected_years = if let Some(years) = years {
+            years.clone()
+        } else {
+            let avaliable_years = possible_metrics
+                .select_geometry(&selected_geometry)
+                .avaliable_years()?;
+
+            if avaliable_years.is_empty() {
+                return Err(anyhow!(
+                    "No year specified and no year matches found given the geometry level {selected_geometry}"
+                ));
+            }
+            let year = avaliable_years[0].to_owned();
+            if avaliable_years.len() > 1 {
+                let rest = avaliable_years[1..].join(",");
+                advice.push(format!("We automatically selected the year {year}. The requested metrics are also avaiable in the follow time spans {rest}"));
+            }
+            vec![year]
+        };
+
+        let metrics = possible_metrics
+            .select_geometry(&selected_geometry)
+            .select_years(&selected_years)
+            .get_explicit_metric_ids()?;
+
+        Ok(FullSelectionPlan {
+            explicit_metric_ids: metrics,
+            geometry: selected_geometry,
+            year: selected_years,
+            advice: advice.join("\n"),
+        })
     }
 
     /// Given a geometry level return the path to the
-    /// geometry file that it corrisponds to
+    /// geometry file that it corresponds to
     pub fn get_geom_details(&self, geom_level: &str) -> Result<String> {
         let matches = self
             .geometries
@@ -329,7 +529,7 @@ pub async fn load_all(config: &Config) -> Result<Metadata> {
 
     // Merge metrics
     let metric_dfs: Vec<LazyFrame> = metadata.iter().map(|m| m.metrics.clone().lazy()).collect();
-    let metrics = polars::prelude::concat(metric_dfs, Default::default())?.collect()?;
+    let metrics = polars::prelude::concat(metric_dfs, UnionArgs::default())?.collect()?;
     info!("Merged metrics with shape: {:?}", metrics.shape());
 
     // Merge geometries
@@ -412,7 +612,7 @@ mod tests {
             .await
             .unwrap();
         let expanded_metrics =
-            metadata.expand_wildcard_metric(&MetricId::Hxl("population-*".into()));
+            metadata.expand_regex_metric(&MetricId::Hxl("population-*".into()));
         assert!(
             expanded_metrics.is_ok(),
             "Should successfully expand metrics"
@@ -427,7 +627,7 @@ mod tests {
 
         let metric_names: Vec<&str> = expanded_metrics
             .iter()
-            .map(|m| m.to_query_string())
+            .map(MetricId::to_query_string)
             .collect();
 
         assert_eq!(
@@ -453,7 +653,7 @@ mod tests {
             .await
             .unwrap();
         let expanded_metrics =
-            metadata.expand_wildcard_metric(&MetricId::CommonName("Children*".into()));
+            metadata.expand_regex_metric(&MetricId::CommonName("Children*".into()));
 
         println!("{:#?}", expanded_metrics);
 
@@ -472,7 +672,7 @@ mod tests {
 
         let metric_names: Vec<&str> = expanded_metrics
             .iter()
-            .map(|m| m.to_query_string())
+            .map(MetricId::to_query_string)
             .collect();
 
         assert_eq!(
@@ -490,7 +690,7 @@ mod tests {
             .await
             .unwrap();
         let expanded_metrics = metadata
-            .expand_wildcard_metric(&MetricId::Hxl(r"#population\+infants\+age0\_4".into()));
+            .expand_regex_metric(&MetricId::Hxl(r"#population\+infants\+age0\_4".into()));
         assert!(
             expanded_metrics.is_ok(),
             "Should successfully expand metrics"
@@ -505,7 +705,7 @@ mod tests {
 
         let metric_names: Vec<&str> = expanded_metrics
             .iter()
-            .map(|m| m.to_query_string())
+            .map(MetricId::to_query_string)
             .collect();
 
         assert_eq!(

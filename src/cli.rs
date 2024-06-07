@@ -8,7 +8,7 @@ use popgetter::{
     config::Config, data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec}, formatters::{CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator}, metadata::MetricId, Popgetter, search::*
 };
 use serde::{Deserialize, Serialize};
-use std::{fs::{self, File}, str::FromStr};
+use std::fs::{self, File};
 use strum_macros::EnumString;
 
 use crate::display::display_search_results;

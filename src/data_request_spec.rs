@@ -1,14 +1,4 @@
-use anyhow::{Context, Result};
-
-use polars::{
-    frame::DataFrame,
-    lazy::{
-        dsl::{col, lit},
-        frame::IntoLazy,
-    },
-    prelude::NamedFrom,
-    series::Series,
-};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{
     ops::{Index, IndexMut},
@@ -28,103 +18,39 @@ pub struct DataRequestSpec {
     pub years: Option<Vec<String>>,
 }
 
-/// This is the respone to requesting a set of metrics
-/// it contains the matched Metric Requests along with
-/// the geometry that was selected we can also potentially
-/// use this to give feedback on other options in the future
 pub struct MetricRequestResult {
     pub metrics: Vec<MetricRequest>,
     pub selected_geometry: String,
+    pub years: Vec<String>,
 }
 
 impl DataRequestSpec {
-    /// Generates a vector of metric requests from a `DataRequestSpec`
-    /// and a catalouge.
+    /// Generates a vector of metric requests from a `DataRequestSpec` and a catalogue.
     pub fn metric_requests(&self, catalogue: &Metadata) -> Result<MetricRequestResult> {
-        let mut possible_metrics: Option<DataFrame> = None;
-
         // Find all the metrics which match the requested ones, expanding
-        // any wildcards as we do so
-        for metric_spec in &self.metrics {
-            match metric_spec {
-                MetricSpec::Metric(metric) => {
-                    let metrics = catalogue.expand_wildcard_metric(metric)?;
-                    let metric_options = catalogue
-                        .get_possible_metric_details(&metrics)
-                        .with_context(|| "Failed to find metric")?;
-                    possible_metrics = if let Some(prev) = possible_metrics {
-                        Some(prev.vstack(&metric_options)?)
-                    } else {
-                        Some(metric_options)
-                    };
-                }
-                MetricSpec::DataProduct(_) => todo!("unsupported metric spec"),
-            }
-        }
+        // any regex matches as we do so
+        let expanded_metric_ids: Vec<MetricId> = self
+            .metrics
+            .iter()
+            .filter_map(|metric_spec| match metric_spec {
+                MetricSpec::Metric(id) => catalogue.expand_regex_metric(id).ok(),
+                MetricSpec::DataProduct(_) => None,
+            })
+            .flatten()
+            .collect::<Vec<_>>();
 
-        // Extract the possible matches for the given metrics
+        let full_selection_plan =
+            catalogue.generate_selection_plan(&expanded_metric_ids, &self.geometry, &self.years)?;
 
-        let possible_metrics = possible_metrics.context("Failed to find matching metrics")?;
+        println!("Running your query with \n {full_selection_plan}");
 
-        // If a geometry level is specified filter out only those metrics with the level
-        let filtered_possible_metrics = if let Some(level) = &self.geometry.geometry_level {
-            possible_metrics
-                .lazy()
-                .filter(col("geometry_level").eq(lit(level.clone())))
-        } else {
-            possible_metrics.lazy()
-        };
-
-        // If a year is specifed, filter out only years that have that level.
-        let filtered_possible_metrics = if let Some(years) = &self.years {
-            let year_series = Series::new("year_filter", years.clone());
-            filtered_possible_metrics.filter(col("year").is_in(lit(year_series)))
-        } else {
-            filtered_possible_metrics
-        };
-
-        let filtered_possible_metrics = filtered_possible_metrics.collect()?;
-
-        let mut metric_requests: Vec<MetricRequest> = vec![];
-
-        // Iterate through the results and generate the metric requests
-
-        let mut column_iter = filtered_possible_metrics
-            .column("parquet_metric_id")?
-            .str()?
-            .into_iter();
-
-        let mut file_iter = filtered_possible_metrics
-            .column("parquet_metric_file")?
-            .str()?
-            .into_iter();
-
-        for _ in 0..filtered_possible_metrics.height() {
-            let column = column_iter
-                .next()
-                .expect("should have as many iterations as rows")
-                .expect("should have a value")
-                .to_owned();
-
-            let file = file_iter
-                .next()
-                .expect("should have as many iterations as rows")
-                .expect("should have a value")
-                .to_owned();
-
-            metric_requests.push(MetricRequest { column, file })
-        }
-
-        let selected_geometry = filtered_possible_metrics
-            .column("geometry_level")?
-            .str()?
-            .get(0)
-            .expect("Should have geometry")
-            .to_owned();
+        let metric_requests =
+            catalogue.get_metric_requests(full_selection_plan.explicit_metric_ids)?;
 
         Ok(MetricRequestResult {
             metrics: metric_requests,
-            selected_geometry,
+            selected_geometry: full_selection_plan.geometry,
+            years: full_selection_plan.year,
         })
     }
 }
@@ -137,8 +63,8 @@ pub enum MetricSpec {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GeometrySpec {
-    geometry_level: Option<String>,
-    include_geoms: bool,
+    pub geometry_level: Option<String>,
+    pub include_geoms: bool,
 }
 
 impl Default for GeometrySpec {

@@ -243,7 +243,7 @@ impl SearchRequest {
     pub fn search_results(self, metadata: &Metadata) -> anyhow::Result<SearchResults> {
         debug!("Searching with request: {:?}", self);
         let expr: Option<Expr> = self.into();
-        let full_results: LazyFrame = metadata.combined_metric_source_geometry();
+        let full_results: LazyFrame = metadata.combined_metric_source_geometry().0;
         let result: DataFrame = match expr {
             Some(expr) => full_results.filter(expr),
             None => full_results,
