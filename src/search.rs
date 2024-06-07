@@ -5,15 +5,6 @@ use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, LazyFrame};
 use serde::{Deserialize, Serialize};
 use log::debug;
-use itertools::izip;
-use comfy_table::{
-    Table,
-    Cell,
-    Attribute,
-    CellAlignment,
-    ContentArrangement,
-    presets::NOTHING
-};
 
 /// Combine multiple queries with OR. If there are no queries in the input list, returns None.
 fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
@@ -270,54 +261,6 @@ impl Default for SearchRequest {
 
 #[derive(Clone, Debug)]
 pub struct SearchResults(pub DataFrame);
-
-impl std::fmt::Display for SearchResults {
-
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (metric_id, hrn, desc, hxl, level) in izip!(
-            self.0.column("metric_id").unwrap().iter(),
-            self.0.column("human_readable_name").unwrap().iter(),
-            self.0.column("metric_description").unwrap().iter(),
-            self.0.column("metric_hxl_tag").unwrap().iter(),
-            self.0.column("geometry_level").unwrap().iter(),
-        ) {
-            let mut table = Table::new();
-            table
-                .load_preset(NOTHING)
-                .set_content_arrangement(ContentArrangement::Dynamic)
-                .set_style(comfy_table::TableComponent::BottomBorder, '─')
-                .set_style(comfy_table::TableComponent::BottomBorderIntersections, '─')
-                .set_style(comfy_table::TableComponent::TopBorder, '─')
-                .set_style(comfy_table::TableComponent::TopBorderIntersections, '─')
-                .add_row(vec![
-                    Cell::new("Metric ID").add_attribute(Attribute::Bold),
-                    metric_id.get_str().unwrap().into(), 
-                ])
-                .add_row(vec![
-                    Cell::new("Human readable name").add_attribute(Attribute::Bold),
-                    hrn.get_str().unwrap().into(),
-                ])
-                .add_row(vec![
-                    Cell::new("Description").add_attribute(Attribute::Bold),
-                    desc.get_str().unwrap().into(),
-                ])
-                .add_row(vec![
-                    Cell::new("HXL tag").add_attribute(Attribute::Bold),
-                    hxl.get_str().unwrap().into(),
-                ])
-                .add_row(vec![
-                    Cell::new("Geometry level").add_attribute(Attribute::Bold),
-                    level.get_str().unwrap().into(),
-                ]);
-
-            let column = table.column_mut(0).unwrap();
-            column.set_cell_alignment(CellAlignment::Right);
-
-            writeln!(f, "\n{}", table)?;
-        }
-        Ok(())
-    }
-}
 
 impl From<SearchRequest> for Option<Expr> {
     fn from(value: SearchRequest) -> Self {

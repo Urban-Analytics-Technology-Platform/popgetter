@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::{fs::{self, File}, str::FromStr};
 use strum_macros::EnumString;
 
+use crate::display::display_search_results;
+
 /// Defines the output formats we are able to produce data in.
 #[derive(Clone, Debug, Deserialize, Serialize, EnumString, PartialEq, Eq)]
 #[strum(ascii_case_insensitive)]
@@ -225,12 +227,12 @@ impl RunCommand for MetricsCommand {
 
         let len_requests = search_results.0.shape().0;
         println!("Found {} metrics.", len_requests);
+
         if len_requests > 50 && !self.full {
-            let truncated_results = SearchResults(search_results.0.head(Some(50)));
-            println!("{}", truncated_results);
+            display_search_results(search_results, Some(50));
             println!("{} more results not shown. Use --full to show all results.", len_requests - 50);
         } else {
-            println!("{}", search_results);
+            display_search_results(search_results, None);
         }
         Ok(())
     }
