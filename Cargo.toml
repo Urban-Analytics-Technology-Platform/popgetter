@@ -33,6 +33,7 @@ futures = "0.3.30"
 toml = "0.8.13"
 xdg = "2.5.2"
 regex = "1.10.4"
+thiserror = "1"
 
 
 [features]
