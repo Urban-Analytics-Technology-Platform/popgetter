@@ -9,5 +9,6 @@ name = "popgetter_py"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.20.0"
+pyo3 = "^0.21.0"
 pyo3-polars="0.14.0"
+popgetter= {path="../popgetter"}
