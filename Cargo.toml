@@ -2,6 +2,7 @@
 members = [
     "popgetter",
     "popgetter_cli",
+    "popgetter_py"
 ]
 
 resolver = "2"
