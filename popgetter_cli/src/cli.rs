@@ -525,7 +525,7 @@ mod tests {
     #[tokio::test]
     async fn test_recipe_command() {
         let recipe_command = RecipeCommand {
-            recipe_file: format!("{}/test_recipe.json", env!("CARGO_MANIFEST_DIR")),
+            recipe_file: format!("{}/../test_recipe.json", env!("CARGO_MANIFEST_DIR")),
             output_format: OutputFormat::GeoJSON,
             output_file: Some(
                 NamedTempFile::new()
