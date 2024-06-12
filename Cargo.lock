@@ -514,9 +514,9 @@ dependencies = [
 
 [[package]]
 name = "brotli"
-version = "3.5.0"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d640d25bc63c50fb1f0b545ffd80207d2e10a4c965530809b40ba3386825c391"
+checksum = "19483b140a7ac7174d34b5a581b406c64f84da5409d3e09cf4fff604f9270e67"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
@@ -525,9 +525,9 @@ dependencies = [
 
 [[package]]
 name = "brotli-decompressor"
-version = "2.5.1"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e2e4afe60d7dd600fdd3de8d0f08c2b7ec039712e3b6137ff98b7004e82de4f"
+checksum = "9a45bd2e4095a8b518033b128020dd4a55aab1c0a381ba4404a472630f4bc362"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
@@ -2306,44 +2306,29 @@ dependencies = [
 
 [[package]]
 name = "polars"
-version = "0.39.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ea21b858b16b9c0e17a12db2800d11aa5b4bd182be6b3022eb537bbfc1f2db5"
-dependencies = [
- "getrandom",
- "polars-arrow 0.39.2",
- "polars-core 0.39.2",
- "polars-error 0.39.2",
- "polars-io",
- "polars-lazy",
- "polars-ops",
- "polars-parquet 0.39.2",
- "polars-sql",
- "polars-time",
- "polars-utils 0.39.2",
- "version_check",
-]
-
-[[package]]
-name = "polars"
 version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e148396dca5496566880fa19374f3f789a29db94e3eb458afac1497b4bac5442"
 dependencies = [
  "getrandom",
- "polars-arrow 0.40.0",
- "polars-core 0.40.0",
- "polars-error 0.40.0",
- "polars-parquet 0.40.0",
- "polars-utils 0.40.0",
+ "polars-arrow",
+ "polars-core",
+ "polars-error",
+ "polars-io",
+ "polars-lazy",
+ "polars-ops",
+ "polars-parquet",
+ "polars-sql",
+ "polars-time",
+ "polars-utils",
  "version_check",
 ]
 
 [[package]]
 name = "polars-arrow"
-version = "0.39.2"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "725b09f2b5ef31279b66e27bbab63c58d49d8f6696b66b1f46c7eaab95e80f75"
+checksum = "1cb5e11cd0752ae022fa6ca3afa50a14b0301b7ce53c0135828fbb0f4fa8303e"
 dependencies = [
  "ahash",
  "atoi",
@@ -2365,8 +2350,8 @@ dependencies = [
  "multiversion",
  "num-traits",
  "polars-arrow-format",
- "polars-error 0.39.2",
- "polars-utils 0.39.2",
+ "polars-error",
+ "polars-utils",
  "ryu",
  "serde",
  "simdutf8",
@@ -2374,36 +2359,6 @@ dependencies = [
  "strength_reduce",
  "version_check",
  "zstd",
-]
-
-[[package]]
-name = "polars-arrow"
-version = "0.40.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cb5e11cd0752ae022fa6ca3afa50a14b0301b7ce53c0135828fbb0f4fa8303e"
-dependencies = [
- "ahash",
- "atoi_simd",
- "bytemuck",
- "chrono",
- "dyn-clone",
- "either",
- "ethnum",
- "fast-float",
- "foreign_vec",
- "getrandom",
- "hashbrown",
- "itoa",
- "multiversion",
- "num-traits",
- "polars-arrow-format",
- "polars-error 0.40.0",
- "polars-utils 0.40.0",
- "ryu",
- "simdutf8",
- "streaming-iterator",
- "strength_reduce",
- "version_check",
 ]
 
 [[package]]
@@ -2418,22 +2373,6 @@ dependencies = [
 
 [[package]]
 name = "polars-compute"
-version = "0.39.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a796945b14b14fbb79b91ef0406e6fddca2be636e889f81ea5d6ee7d36efb4fe"
-dependencies = [
- "bytemuck",
- "either",
- "num-traits",
- "polars-arrow 0.39.2",
- "polars-error 0.39.2",
- "polars-utils 0.39.2",
- "strength_reduce",
- "version_check",
-]
-
-[[package]]
-name = "polars-compute"
 version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89fc4578f826234cdecb782952aa9c479dc49373f81694a7b439c70b6f609ba0"
@@ -2441,18 +2380,18 @@ dependencies = [
  "bytemuck",
  "either",
  "num-traits",
- "polars-arrow 0.40.0",
- "polars-error 0.40.0",
- "polars-utils 0.40.0",
+ "polars-arrow",
+ "polars-error",
+ "polars-utils",
  "strength_reduce",
  "version_check",
 ]
 
 [[package]]
 name = "polars-core"
-version = "0.39.2"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "465f70d3e96b6d0b1a43c358ba451286b8c8bd56696feff020d65702aa33e35c"
+checksum = "e490c6bace1366a558feea33d1846f749a8ca90bd72a6748752bc65bb4710b2a"
 dependencies = [
  "ahash",
  "bitflags 2.5.0",
@@ -2465,11 +2404,11 @@ dependencies = [
  "indexmap",
  "num-traits",
  "once_cell",
- "polars-arrow 0.39.2",
- "polars-compute 0.39.2",
- "polars-error 0.39.2",
- "polars-row 0.39.2",
- "polars-utils 0.39.2",
+ "polars-arrow",
+ "polars-compute",
+ "polars-error",
+ "polars-row",
+ "polars-utils",
  "rand",
  "rand_distr",
  "rayon",
@@ -2482,36 +2421,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "polars-core"
+name = "polars-error"
 version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e490c6bace1366a558feea33d1846f749a8ca90bd72a6748752bc65bb4710b2a"
-dependencies = [
- "ahash",
- "bitflags 2.5.0",
- "bytemuck",
- "either",
- "hashbrown",
- "indexmap",
- "num-traits",
- "once_cell",
- "polars-arrow 0.40.0",
- "polars-compute 0.40.0",
- "polars-error 0.40.0",
- "polars-row 0.40.0",
- "polars-utils 0.40.0",
- "rayon",
- "smartstring",
- "thiserror",
- "version_check",
- "xxhash-rust",
-]
-
-[[package]]
-name = "polars-error"
-version = "0.39.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5224d5d05e6b8a6f78b75951ae1b5f82c8ab1979e11ffaf5fd41941e3d5b0757"
+checksum = "08888f58e61599b00f5ea0c2ccdc796b54b9859559cc0d4582733509451fa01a"
 dependencies = [
  "object_store",
  "polars-arrow-format",
@@ -2521,21 +2434,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "polars-error"
+name = "polars-expr"
 version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08888f58e61599b00f5ea0c2ccdc796b54b9859559cc0d4582733509451fa01a"
+checksum = "4173591920fe56ad55af025f92eb0d08421ca85705c326a640c43856094e3484"
 dependencies = [
- "polars-arrow-format",
- "simdutf8",
- "thiserror",
+ "ahash",
+ "bitflags 2.5.0",
+ "once_cell",
+ "polars-arrow",
+ "polars-core",
+ "polars-io",
+ "polars-ops",
+ "polars-plan",
+ "polars-time",
+ "polars-utils",
+ "rayon",
+ "smartstring",
 ]
 
 [[package]]
 name = "polars-io"
-version = "0.39.2"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2c8589e418cbe4a48228d64b2a8a40284a82ec3c98817c0c2bcc0267701338b"
+checksum = "5842896aea46d975b425d63f156f412aed3cfde4c257b64fb1f43ceea288074e"
 dependencies = [
  "ahash",
  "async-trait",
@@ -2552,12 +2474,12 @@ dependencies = [
  "object_store",
  "once_cell",
  "percent-encoding",
- "polars-arrow 0.39.2",
- "polars-core 0.39.2",
- "polars-error 0.39.2",
- "polars-parquet 0.39.2",
+ "polars-arrow",
+ "polars-core",
+ "polars-error",
+ "polars-parquet",
  "polars-time",
- "polars-utils 0.39.2",
+ "polars-utils",
  "rayon",
  "regex",
  "ryu",
@@ -2572,23 +2494,24 @@ dependencies = [
 
 [[package]]
 name = "polars-lazy"
-version = "0.39.2"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89b2632b1af668e2058d5f8f916d8fbde3cac63d03ae29a705f598e41dcfeb7f"
+checksum = "e805ea2ebbc6b7749b0afb31b7fc5d32b42b57ba29b984549d43d3a16114c4a5"
 dependencies = [
  "ahash",
  "bitflags 2.5.0",
  "futures",
  "glob",
  "once_cell",
- "polars-arrow 0.39.2",
- "polars-core 0.39.2",
+ "polars-arrow",
+ "polars-core",
+ "polars-expr",
  "polars-io",
  "polars-ops",
  "polars-pipe",
  "polars-plan",
  "polars-time",
- "polars-utils 0.39.2",
+ "polars-utils",
  "rayon",
  "smartstring",
  "tokio",
@@ -2597,13 +2520,13 @@ dependencies = [
 
 [[package]]
 name = "polars-ops"
-version = "0.39.2"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efdbdb4d9a92109bc2e0ce8e17af5ae8ab643bb5b7ee9d1d74f0aeffd1fbc95f"
+checksum = "7b0aed7e169c81b98457641cf82b251f52239a668916c2e683abd1f38df00d58"
 dependencies = [
  "ahash",
  "argminmax",
- "base64 0.21.7",
+ "base64 0.22.1",
  "bytemuck",
  "chrono",
  "chrono-tz",
@@ -2613,11 +2536,11 @@ dependencies = [
  "indexmap",
  "memchr",
  "num-traits",
- "polars-arrow 0.39.2",
- "polars-compute 0.39.2",
- "polars-core 0.39.2",
- "polars-error 0.39.2",
- "polars-utils 0.39.2",
+ "polars-arrow",
+ "polars-compute",
+ "polars-core",
+ "polars-error",
+ "polars-utils",
  "rayon",
  "regex",
  "smartstring",
@@ -2627,13 +2550,13 @@ dependencies = [
 
 [[package]]
 name = "polars-parquet"
-version = "0.39.2"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b421d2196f786fdfe162db614c8485f8308fe41575d4de634a39bbe460d1eb6a"
+checksum = "c70670a9e51cac66d0e77fd20b5cc957dbcf9f2660d410633862bb72f846d5b8"
 dependencies = [
  "ahash",
  "async-stream",
- "base64 0.21.7",
+ "base64 0.22.1",
  "brotli",
  "ethnum",
  "flate2",
@@ -2641,9 +2564,9 @@ dependencies = [
  "lz4",
  "num-traits",
  "parquet-format-safe",
- "polars-arrow 0.39.2",
- "polars-error 0.39.2",
- "polars-utils 0.39.2",
+ "polars-arrow",
+ "polars-error",
+ "polars-utils",
  "seq-macro",
  "simdutf8",
  "snap",
@@ -2652,29 +2575,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "polars-parquet"
+name = "polars-pipe"
 version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c70670a9e51cac66d0e77fd20b5cc957dbcf9f2660d410633862bb72f846d5b8"
-dependencies = [
- "ahash",
- "base64 0.22.1",
- "ethnum",
- "num-traits",
- "parquet-format-safe",
- "polars-arrow 0.40.0",
- "polars-error 0.40.0",
- "polars-utils 0.40.0",
- "seq-macro",
- "simdutf8",
- "streaming-decompression",
-]
-
-[[package]]
-name = "polars-pipe"
-version = "0.39.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48700f1d5bd56a15451e581f465c09541492750360f18637b196f995470a015c"
+checksum = "0a40ae1b3c74ee07e2d1f7cbf56c5d6e15969e45d9b6f0903bd2acaf783ba436"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-queue",
@@ -2682,14 +2586,15 @@ dependencies = [
  "futures",
  "hashbrown",
  "num-traits",
- "polars-arrow 0.39.2",
- "polars-compute 0.39.2",
- "polars-core 0.39.2",
+ "polars-arrow",
+ "polars-compute",
+ "polars-core",
+ "polars-expr",
  "polars-io",
  "polars-ops",
  "polars-plan",
- "polars-row 0.39.2",
- "polars-utils 0.39.2",
+ "polars-row",
+ "polars-utils",
  "rayon",
  "smartstring",
  "tokio",
@@ -2699,42 +2604,31 @@ dependencies = [
 
 [[package]]
 name = "polars-plan"
-version = "0.39.2"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fb8e2302e20c44defd5be8cad9c96e75face63c3a5f609aced8c4ec3b3ac97d"
+checksum = "8daa3541ae7e9af311a4389bc2b21f83349c34c723cc67fa524cdefdaa172d90"
 dependencies = [
  "ahash",
  "bytemuck",
  "chrono-tz",
+ "either",
  "futures",
  "hashbrown",
  "once_cell",
  "percent-encoding",
- "polars-arrow 0.39.2",
- "polars-core 0.39.2",
+ "polars-arrow",
+ "polars-core",
  "polars-io",
  "polars-ops",
- "polars-parquet 0.39.2",
+ "polars-parquet",
  "polars-time",
- "polars-utils 0.39.2",
+ "polars-utils",
  "rayon",
  "recursive",
  "regex",
  "smartstring",
- "strum_macros 0.25.3",
+ "strum_macros 0.26.4",
  "version_check",
-]
-
-[[package]]
-name = "polars-row"
-version = "0.39.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a515bdc68c2ae3702e3de70d89601f3b71ca8137e282a226dddb53ee4bacfa2e"
-dependencies = [
- "bytemuck",
- "polars-arrow 0.39.2",
- "polars-error 0.39.2",
- "polars-utils 0.39.2",
 ]
 
 [[package]]
@@ -2744,21 +2638,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "deb285f2f3a65b00dd06bef16bb9f712dbb5478f941dab5cf74f9f016d382e40"
 dependencies = [
  "bytemuck",
- "polars-arrow 0.40.0",
- "polars-error 0.40.0",
- "polars-utils 0.40.0",
+ "polars-arrow",
+ "polars-error",
+ "polars-utils",
 ]
 
 [[package]]
 name = "polars-sql"
-version = "0.39.2"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b4bb7cc1c04c3023d1953b2f1dec50515e8fd8169a5a2bf4967b3b082232db7"
+checksum = "a724f699d194cb02c25124d3832f7d4d77f387f1a89ee42f6b9e88ec561d4ad9"
 dependencies = [
  "hex",
- "polars-arrow 0.39.2",
- "polars-core 0.39.2",
- "polars-error 0.39.2",
+ "once_cell",
+ "polars-arrow",
+ "polars-core",
+ "polars-error",
  "polars-lazy",
  "polars-plan",
  "rand",
@@ -2769,43 +2664,23 @@ dependencies = [
 
 [[package]]
 name = "polars-time"
-version = "0.39.2"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efc18e3ad92eec55db89d88f16c22d436559ba7030cf76f86f6ed7a754b673f1"
+checksum = "87ebec238d8b6200d9f0c3ce411c8441e950bd5a7df7806b8172d06c1d5a4b97"
 dependencies = [
  "atoi",
+ "bytemuck",
  "chrono",
  "chrono-tz",
  "now",
  "once_cell",
- "polars-arrow 0.39.2",
- "polars-core 0.39.2",
- "polars-error 0.39.2",
+ "polars-arrow",
+ "polars-core",
+ "polars-error",
  "polars-ops",
- "polars-utils 0.39.2",
+ "polars-utils",
  "regex",
  "smartstring",
-]
-
-[[package]]
-name = "polars-utils"
-version = "0.39.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c760b6c698cfe2fbbbd93d6cfb408db14ececfe1d92445dae2229ce1b5b21ae8"
-dependencies = [
- "ahash",
- "bytemuck",
- "hashbrown",
- "indexmap",
- "num-traits",
- "once_cell",
- "polars-error 0.39.2",
- "raw-cpuid",
- "rayon",
- "smartstring",
- "stacker",
- "sysinfo",
- "version_check",
 ]
 
 [[package]]
@@ -2820,11 +2695,12 @@ dependencies = [
  "indexmap",
  "num-traits",
  "once_cell",
- "polars-error 0.40.0",
+ "polars-error",
  "raw-cpuid",
  "rayon",
  "smartstring",
  "stacker",
+ "sysinfo",
  "version_check",
 ]
 
@@ -2877,7 +2753,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "nonempty",
- "polars 0.39.2",
+ "polars",
  "pretty_env_logger",
  "regex",
  "reqwest 0.12.4",
@@ -2909,7 +2785,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "nonempty",
- "polars 0.39.2",
+ "polars",
  "popgetter",
  "pretty_env_logger",
  "reqwest 0.12.4",
@@ -2928,9 +2804,12 @@ dependencies = [
 name = "popgetter_py"
 version = "0.1.0"
 dependencies = [
+ "futures",
+ "polars",
  "popgetter",
  "pyo3",
  "pyo3-polars",
+ "tokio",
 ]
 
 [[package]]
@@ -3048,8 +2927,8 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e726fef8618531b0ec1777f430a9225a909f9ffeacaad7bca7b43877fc3cd42"
 dependencies = [
- "polars 0.40.0",
- "polars-core 0.40.0",
+ "polars",
+ "polars-core",
  "pyo3",
  "thiserror",
 ]
@@ -3872,19 +3751,6 @@ dependencies = [
  "quote",
  "rustversion",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "strum_macros"
-version = "0.25.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23dc1fa9ac9c169a78ba62f0b841814b7abae11bdd047b9c58f893439e309ea0"
-dependencies = [
- "heck 0.4.1",
- "proc-macro2",
- "quote",
- "rustversion",
- "syn 2.0.66",
 ]
 
 [[package]]
