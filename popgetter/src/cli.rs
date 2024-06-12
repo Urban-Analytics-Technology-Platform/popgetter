@@ -251,10 +251,10 @@ impl RunCommand for MetricsCommand {
             census_table: self.source_metric_id.clone().map(SourceMetricId),
         };
         let popgetter = Popgetter::new_with_config(config).await?;
-        let metadata = popgetter.metadata;
-        let search_results = search_request.search_results(&metadata)?;
 
+        let search_results = popgetter.search(&search_request).await?;
         let len_requests = search_results.0.shape().0;
+
         println!("Found {} metrics.", len_requests);
 
         if len_requests > 50 && !self.full {
