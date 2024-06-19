@@ -162,7 +162,7 @@ impl ExpandedMetadataTable {
 
     /// Select a specific geometry level in the dataframe filtering out all others
     pub fn select_geometry(&self, geometry: &str) -> Self {
-        ExpandedMetadataTable(self.as_df().filter(col("geometry_level").eq(geometry)))
+        ExpandedMetadataTable(self.as_df().filter(col("geometry_level").eq(lit(geometry))))
     }
 
     /// Select a specific set of years in the dataframe filtering out all others
@@ -443,6 +443,7 @@ impl Metadata {
         } else {
             let avaliable_years = possible_metrics
                 .select_geometry(&selected_geometry)
+                // TODO: this currently expects column "year" and this is not present in metadata df
                 .avaliable_years()?;
 
             if avaliable_years.is_empty() {
