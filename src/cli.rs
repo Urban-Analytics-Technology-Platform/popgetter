@@ -55,11 +55,7 @@ pub struct DataCommand {
     )]
     bbox: Option<BBox>,
     /// Specify a metric by hxl
-    #[arg(
-        short = 'h',
-        long,
-        help = "Specify a metric by Humanitarian Exchange Language tag"
-    )]
+    #[arg(long, help = "Specify a metric by Humanitarian Exchange Language tag")]
     hxl: Option<Vec<String>>,
 
     // Specify a metric by id
