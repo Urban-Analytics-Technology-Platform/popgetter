@@ -180,7 +180,7 @@ impl ExpandedMetadataTable {
         let df = self.as_df();
         let counts: DataFrame = df
             .group_by([col("geometry_level")])
-            .agg([col("goemetry_level").count().alias("count")])
+            .agg([col("geometry_level").count().alias("count")])
             .sort(
                 ["count"],
                 SortMultipleOptions::new().with_order_descending(true),
