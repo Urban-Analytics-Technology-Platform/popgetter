@@ -138,14 +138,14 @@ impl ExpandedMetadataTable {
     pub fn to_metric_requests(&self) -> Result<Vec<MetricRequest>> {
         let df = self
             .as_df()
-            .select([col("parquet_metric_file"), col("parquet_metric_id")])
+            .select([col("metric_parquet_path"), col("parquet_column_name")])
             .collect()?;
-
+        debug!("{}", df);
         let metric_requests: Vec<MetricRequest> = df
-            .column("parquet_metric_id")?
+            .column("parquet_column_name")?
             .str()?
             .into_iter()
-            .zip(df.column("parquet_metric_file")?.str()?)
+            .zip(df.column("metric_parquet_path")?.str()?)
             .filter_map(|(column, file)| {
                 if let (Some(column), Some(file)) = (column, file) {
                     Some(MetricRequest {
@@ -394,8 +394,8 @@ impl Metadata {
     /// Return a list of MetricRequests for the given metrics_ids
     pub fn get_metric_requests(&self, metric_ids: Vec<MetricId>) -> Result<Vec<MetricRequest>> {
         self.combined_metric_source_geometry()
-            .select_metrics(&metric_ids);
-        Ok(vec![])
+            .select_metrics(&metric_ids)
+            .to_metric_requests()
     }
 
     /// Generates a FullSelectionPlan which takes in to account
