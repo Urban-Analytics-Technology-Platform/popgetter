@@ -219,7 +219,7 @@ impl ExpandedMetadataTable {
     pub fn get_explicit_metric_ids(&self) -> Result<Vec<MetricId>> {
         let reamining: DataFrame = self.as_df().select([col("metric_id")]).collect()?;
         Ok(reamining
-            .column("id")?
+            .column("metric_id")?
             .str()?
             .into_iter()
             .filter_map(|pos_id| pos_id.map(|id| MetricId::Id(id.to_owned())))
