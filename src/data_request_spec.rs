@@ -18,6 +18,7 @@ pub struct DataRequestSpec {
     pub years: Option<Vec<String>>,
 }
 
+#[derive(Debug)]
 pub struct MetricRequestResult {
     pub metrics: Vec<MetricRequest>,
     pub selected_geometry: String,
