@@ -44,8 +44,10 @@ impl Popgetter {
         let metric_requests = data_request.metric_requests(&self.metadata)?;
         debug!("{:#?}", metric_requests);
         // Required because polars is blocking
-        let metrics =
-            tokio::task::spawn_blocking(move || get_metrics(&metric_requests.metrics, None));
+        let config_for_task = self.config.clone();
+        let metrics = tokio::task::spawn_blocking(move || {
+            get_metrics(&metric_requests.metrics, None, config_for_task)
+        });
 
         let geom_file = self
             .metadata

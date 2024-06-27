@@ -3,7 +3,7 @@ use log::debug;
 use polars::prelude::*;
 use std::collections::HashSet;
 
-use crate::GEO_ID_COL_NAME;
+use crate::{config::Config, GEO_ID_COL_NAME};
 
 #[derive(Debug)]
 pub struct MetricRequest {
@@ -41,7 +41,11 @@ fn get_metrics_from_file(
 /// Given a set of metrics and optional `geo_ids`, this function will
 /// retrive all the required metrics from the cloud blob storage
 ///
-pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Result<DataFrame> {
+pub fn get_metrics(
+    metrics: &[MetricRequest],
+    geo_ids: Option<&[&str]>,
+    config: Config,
+) -> Result<DataFrame> {
     let file_list: HashSet<String> = metrics.iter().map(|m| m.file.clone()).collect();
     debug!("{:#?}", file_list);
     // TODO Can we do this async so we can be downloading results from each file together?
@@ -58,7 +62,12 @@ pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Resul
                     }
                 })
                 .collect();
-            get_metrics_from_file(file_url, &file_cols, geo_ids)
+
+            get_metrics_from_file(
+                &format!("{}/{file_url}", config.base_path),
+                &file_cols,
+                geo_ids,
+            )
         })
         .collect();
 
@@ -86,6 +95,12 @@ pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Resul
 mod tests {
     use super::*;
 
+    fn get_config() -> Config {
+        Config {
+            base_path: "https://popgetter.blob.core.windows.net/popgetter-cli-test/".to_string(),
+        }
+    }
+
     #[test]
     fn test_fetching_metrics() {
         let metrics  = [
@@ -93,7 +108,7 @@ mod tests {
                 file:"https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
                 column:"B17021_E006".into()
             }];
-        let df = get_metrics(&metrics, None);
+        let df = get_metrics(&metrics, None, get_config());
         assert!(df.is_ok(), "We should get back a result");
         let df = df.unwrap();
         assert_eq!(
@@ -126,6 +141,7 @@ mod tests {
         let df = get_metrics(
             &metrics,
             Some(&["1400000US01001020100", "1400000US01001020300"]),
+            get_config(),
         );
 
         assert!(df.is_ok(), "We should get back a result");

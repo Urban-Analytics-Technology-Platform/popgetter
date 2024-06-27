@@ -306,8 +306,8 @@ pub struct RecipeCommand {
 impl RunCommand for RecipeCommand {
     async fn run(&self, config: Config) -> Result<()> {
         let popgetter = Popgetter::new_with_config(config).await?;
-        let config = fs::read_to_string(&self.recipe_file)?;
-        let data_request: DataRequestSpec = serde_json::from_str(&config)?;
+        let recipe = fs::read_to_string(&self.recipe_file)?;
+        let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
         let mut results = popgetter.get_data_request(&data_request).await?;
         println!("{results}");
         let formatter: OutputFormatter = (&self.output_format).into();
