@@ -244,7 +244,13 @@ fn parse_year_range(value: &str) -> Result<YearRange, &'static str> {
         [Some(a)] => Ok(YearRange::Between(*a, *a)),
         [None, Some(a)] => Ok(YearRange::Before(*a)),
         [Some(a), None] => Ok(YearRange::After(*a)),
-        [Some(a), Some(b)] => Ok(YearRange::Between(*a, *b)),
+        [Some(a), Some(b)] => {
+            if a > b {
+                Err("Invalid year range")
+            } else {
+                Ok(YearRange::Between(*a, *b))
+            }
+        }
         _ => Err("Invalid year range"),
     }
 }
