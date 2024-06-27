@@ -1,12 +1,10 @@
-use crate::config;
-use crate::{config::Config, data_request_spec::GeometrySpec, parquet::MetricRequest};
+use std::{collections::HashMap, default::Default, fmt::Display};
+
 use anyhow::{anyhow, Result};
 use futures::future::join_all;
 use futures::try_join;
 use log::debug;
 use log::info;
-use polars::prelude::StringNameSpaceImpl;
-use polars::series::IntoSeries;
 use polars::{
     chunked_array::ops::SortMultipleOptions,
     frame::DataFrame,
@@ -18,7 +16,8 @@ use polars::{
     series::Series,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, default::Default, fmt::Display};
+
+use crate::{config::Config, data_request_spec::GeometrySpec, parquet::MetricRequest};
 
 /// This struct contains the base url and names of
 /// the files that contain the metadata. It has a

@@ -284,7 +284,7 @@ impl RunCommand for CountriesCommand {
 pub struct SurveysCommand;
 
 impl RunCommand for SurveysCommand {
-    async fn run(&self, config: Config) -> Result<()> {
+    async fn run(&self, _config: Config) -> Result<()> {
         info!("Running `surveys` subcommand");
         Ok(())
     }
