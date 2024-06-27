@@ -188,8 +188,8 @@ pub struct MetricsCommand {
     #[arg(
         short,
         long,
-        help = "Filter by year ranges",
-        value_name = "YEAR|START..|..END|START..END",
+        help = "Filter by year ranges. All ranges are inclusive.",
+        value_name = "YEAR|START...|...END|START...END",
         value_parser = parse_year_range,
     )]
     year_range: Vec<YearRange>,
@@ -237,7 +237,7 @@ fn parse_year_range(value: &str) -> Result<YearRange, &'static str> {
         }
     }
     let parts: Vec<Option<i32>> = value
-        .split("..")
+        .split("...")
         .map(str_to_option_i32)
         .collect::<Result<Vec<Option<i32>>, &'static str>>()?;
     match parts.as_slice() {
@@ -388,10 +388,10 @@ mod tests {
     #[test]
     fn test_parse_year_range() {
         assert_eq!(parse_year_range("2000"), Ok(YearRange::Between(2000, 2000)));
-        assert_eq!(parse_year_range("2000.."), Ok(YearRange::After(2000)));
-        assert_eq!(parse_year_range("..2000"), Ok(YearRange::Before(2000)));
+        assert_eq!(parse_year_range("2000..."), Ok(YearRange::After(2000)));
+        assert_eq!(parse_year_range("...2000"), Ok(YearRange::Before(2000)));
         assert_eq!(
-            parse_year_range("2000..2001"),
+            parse_year_range("2000...2001"),
             Ok(YearRange::Between(2000, 2001))
         );
     }
