@@ -10,6 +10,7 @@ use crate::{
     config::Config,
     metadata::{Metadata, MetricId},
     parquet::MetricRequest,
+    search::YearRange,
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -17,14 +18,14 @@ pub struct DataRequestSpec {
     pub geometry: GeometrySpec,
     pub region: Vec<RegionSpec>,
     pub metrics: Vec<MetricSpec>,
-    pub years: Option<Vec<String>>,
+    pub year_ranges: Vec<YearRange>,
 }
 
 #[derive(Debug)]
 pub struct MetricRequestResult {
     pub metrics: Vec<MetricRequest>,
     pub selected_geometry: String,
-    pub years: Vec<String>,
+    pub year_ranges: Vec<YearRange>,
 }
 
 impl DataRequestSpec {
@@ -46,8 +47,11 @@ impl DataRequestSpec {
             .flatten()
             .collect::<Vec<_>>();
 
-        let full_selection_plan =
-            catalogue.generate_selection_plan(&expanded_metric_ids, &self.geometry, &self.years)?;
+        let full_selection_plan = catalogue.generate_selection_plan(
+            &expanded_metric_ids,
+            &self.geometry,
+            &self.year_ranges,
+        )?;
 
         info!("Running your query with \n {full_selection_plan}");
 
@@ -57,7 +61,7 @@ impl DataRequestSpec {
         Ok(MetricRequestResult {
             metrics: metric_requests,
             selected_geometry: full_selection_plan.geometry,
-            years: full_selection_plan.year,
+            year_ranges: full_selection_plan.year_ranges,
         })
     }
 }

@@ -46,45 +46,41 @@ pub trait RunCommand {
 /// by the core library.
 #[derive(Args, Debug)]
 pub struct DataCommand {
-    /// Only get data in  bounding box ([min_lat,min_lng,max_lat,max_lng])
     #[arg(
         short,
         long,
-        allow_hyphen_values(true),
-        help = "Bounding box in which to get the results. Format is: min_lon, min_lat, max_lon, max_lat "
+        value_name = "MIN_LAT,MIN_LNG,MAX_LAT,MAX_LNG",
+        help = "Bounding box in which to get the results"
     )]
     bbox: Option<BBox>,
-    /// Specify a metric by hxl
     #[arg(long, help = "Specify a metric by Humanitarian Exchange Language tag")]
     hxl: Option<Vec<String>>,
-
-    // Specify a metric by id
     #[arg(
         short = 'i',
         long,
-        help = "Specify a metric by uuid, can be a partial uuid"
+        help = "Specify a metric by (possibly partial) uuid"
     )]
     id: Option<Vec<String>>,
-
-    // Specify a metric by name
-    #[arg(short = 'n', long, help = "Specify a metric by Human readable name")]
+    #[arg(short = 'n', long, help = "Specify a metric by human readable name")]
     name: Option<Vec<String>>,
-
-    /// Specify output format
-    #[arg(short = 'f', long, help = "One of GeoJSON, CSV, GeoJSONSeq")]
-    output_format: OutputFormat,
-
-    /// Specify where the result should be saved
-    #[arg(short = 'o', long, help = "Output file to place the results")]
-    output_file: String,
-
-    /// Specify the years we should get the result for
     #[arg(
-        short = 'y',
+        short = 'f',
         long,
-        help = "Specify the year ranges for which you are interested in the metrics"
+        value_name = "geojson|geojsonseq|csv",
+        help = "Output file format"
     )]
-    years: Option<Vec<String>>,
+    output_format: OutputFormat,
+    /// Specify where the result should be saved
+    #[arg(short = 'o', long, help = "Output file name")]
+    output_file: String,
+    #[arg(
+        short,
+        long,
+        help = "Filter by year ranges. All ranges are inclusive.",
+        value_name = "YEAR|START...|...END|START...END",
+        value_parser = parse_year_range,
+    )]
+    year_range: Vec<YearRange>,
 }
 
 impl DataCommand {
@@ -165,7 +161,7 @@ impl From<&DataCommand> for DataRequestSpec {
             geometry: GeometrySpec::default(),
             region,
             metrics,
-            years: None,
+            year_ranges: value.year_range.clone(),
         }
     }
 }

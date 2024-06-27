@@ -8,7 +8,7 @@ use polars::prelude::{DataFrame, LazyFrame};
 use serde::{Deserialize, Serialize};
 
 /// Combine multiple queries with OR. If there are no queries in the input list, returns None.
-fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
+pub fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
     let mut query: Option<Expr> = None;
     for expr in exprs {
         query = if let Some(partial_query) = query {
@@ -21,7 +21,7 @@ fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
 }
 
 /// Combine multiple queries with AND. If there are no queries in the input list, returns None.
-fn combine_exprs_with_and(exprs: Vec<Expr>) -> Option<Expr> {
+pub fn combine_exprs_with_and(exprs: Vec<Expr>) -> Option<Expr> {
     let mut query: Option<Expr> = None;
     for expr in exprs {
         query = if let Some(partial_query) = query {
@@ -179,11 +179,27 @@ impl Default for SearchText {
 }
 
 /// Note: year ranges are inclusive of end points.
-#[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Deserialize, Serialize)]
 pub enum YearRange {
     Before(u16),
     After(u16),
     Between(u16, u16),
+}
+
+impl std::fmt::Display for YearRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            YearRange::Before(year) => write!(f, "...{}", year),
+            YearRange::After(year) => write!(f, "{}...", year),
+            YearRange::Between(start, end) => {
+                if start == end {
+                    write!(f, "{}", start)
+                } else {
+                    write!(f, "{}...{}", start, end)
+                }
+            }
+        }
+    }
 }
 
 /// To allow search over multiple years

@@ -7,6 +7,7 @@ use log::debug;
 use log::info;
 use polars::{
     chunked_array::ops::SortMultipleOptions,
+    prelude::chunkedarray::DateMethods,
     frame::DataFrame,
     lazy::{
         dsl::{col, Expr},
@@ -17,7 +18,12 @@ use polars::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{config::Config, data_request_spec::GeometrySpec, parquet::MetricRequest};
+use crate::{
+    config::Config,
+    data_request_spec::GeometrySpec,
+    parquet::MetricRequest,
+    search::{combine_exprs_with_or, YearRange},
+};
 
 /// This struct contains the base url and names of
 /// the files that contain the metadata. It has a
@@ -171,19 +177,17 @@ impl ExpandedMetadataTable {
     }
 
     /// Select a specific set of years in the dataframe filtering out all others
-    pub fn select_years<T>(&self, years: &[T]) -> Self
-    where
-        T: AsRef<str>,
-    {
-        let years: Vec<&str> = years.iter().map(std::convert::AsRef::as_ref).collect();
-        let years_series = Series::new("years", years);
-        // TODO: uncomment when years impl
-        ExpandedMetadataTable(self.as_df())
-        // ExpandedMetadataTable(self.as_df().filter(col("year").is_in(lit(years_series))))
+    pub fn select_years(&self, year_ranges: &[YearRange]) -> Self {
+        let option_expr =
+            combine_exprs_with_or(year_ranges.iter().map(|y| y.clone().into()).collect());
+        match option_expr {
+            Some(expr) => ExpandedMetadataTable(self.as_df().filter(expr)),
+            None => ExpandedMetadataTable(self.as_df()),
+        }
     }
 
     /// Return a ranked list of avaliable geometries
-    pub fn avaliable_geometries(&self) -> Result<Vec<String>> {
+    pub fn get_available_geometries(&self) -> Result<Vec<String>> {
         let df = self.as_df();
         let counts: DataFrame = df
             .group_by([col("geometry_level")])
@@ -202,24 +206,31 @@ impl ExpandedMetadataTable {
             .collect())
     }
 
-    /// Return a ranked list of avaliable years
-    pub fn avaliable_years(&self) -> Result<Vec<String>> {
-        let df = self.as_df();
-        let counts: DataFrame = df
-            .group_by([col("year")])
-            .agg([col("year").count().alias("count")])
-            .sort(
-                ["count"],
-                SortMultipleOptions::new().with_order_descending(true),
+    /// Return a list of available year ranges
+    pub fn get_available_year_ranges(&self) -> Vec<YearRange> {
+        let df: DataFrame = self.as_df().collect().unwrap();
+        let mut year_ranges: Vec<YearRange> = df
+            .column("release_reference_period_start")
+            .unwrap()
+            .date()
+            .unwrap()
+            .year()
+            .clone()
+            .into_no_null_iter()
+            .zip(
+                df.column("release_reference_period_end")
+                    .unwrap()
+                    .date()
+                    .unwrap()
+                    .year()
+                    .clone()
+                    .into_no_null_iter(),
             )
-            .collect()?;
-
-        Ok(counts
-            .column("year")?
-            .str()?
-            .iter()
-            .filter_map(|geom| geom.map(std::borrow::ToOwned::to_owned))
-            .collect())
+            .map(|(start, end)| YearRange::Between(start.try_into().unwrap(), end.try_into().unwrap()))
+            .collect::<Vec<_>>();
+        year_ranges.sort();
+        year_ranges.dedup();
+        year_ranges
     }
 
     /// Get fully speced metric ids
@@ -256,7 +267,7 @@ pub struct Metadata {
 pub struct FullSelectionPlan {
     pub explicit_metric_ids: Vec<MetricId>,
     pub geometry: String,
-    pub year: Vec<String>,
+    pub year_ranges: Vec<YearRange>,
     pub advice: String,
 }
 
@@ -267,7 +278,12 @@ impl Display for FullSelectionPlan {
             "Getting {} metrics \n, on {} geometries \n , for the years {}",
             self.explicit_metric_ids.len(),
             self.geometry,
-            self.year.join(",")
+            self.year_ranges
+                .clone()
+                .into_iter()
+                .map(|y| format!("{}", y))
+                .collect::<Vec<_>>()
+                .join(",")
         )
     }
 }
@@ -417,7 +433,7 @@ impl Metadata {
         &self,
         metrics: &[MetricId],
         geometry: &GeometrySpec,
-        years: &Option<Vec<String>>,
+        year_ranges: &[YearRange],
     ) -> Result<FullSelectionPlan> {
         let mut advice: Vec<String> = vec![];
         // Find metadata for all specified metrics over all geoemtries and years
@@ -432,58 +448,56 @@ impl Metadata {
         // Otherwise we will get the geometry with the most matches to our
         // metrics
         else {
-            // Get a ranked list of geometriesthat are avaliable for these
+            // Get a ranked list of geometries that are avaliable for these
             // metrics
-            let avaliable_geometries = possible_metrics.avaliable_geometries()?;
-            if avaliable_geometries.is_empty() {
+            let available_geometries = possible_metrics.get_available_geometries()?;
+            if available_geometries.is_empty() {
                 return Err(anyhow!(
                     "No geometry specifed and non found for these metrics"
                 ));
             }
 
-            let geom = avaliable_geometries[0].to_owned();
-            if avaliable_geometries.len() > 1 {
-                let rest = avaliable_geometries[1..].join(",");
-                advice.push(format!("We are selecting the geometry level {geom}. The requested metrics are also avaliable at the following levels: {rest}"));
+            let geom = available_geometries[0].to_owned();
+            if available_geometries.len() > 1 {
+                let rest = available_geometries[1..].join(",");
+                advice.push(format!("We are selecting the geometry level {geom}. The requested metrics are also available at the following levels: {rest}"));
             }
             geom
         };
 
-        // TODO: uncomment when years impl
-        // If the user has selected a set of years, we will use them explicity
-        // let selected_years = if let Some(years) = years {
-        //     years.clone()
-        // } else {
-        //     let avaliable_years = possible_metrics
-        //         .select_geometry(&selected_geometry)
-        //         // TODO: this currently expects column "year" and this is not present in metadata df
-        //         .avaliable_years()?;
-
-        //     if avaliable_years.is_empty() {
-        //         return Err(anyhow!(
-        //             "No year specified and no year matches found given the geometry level {selected_geometry}"
-        //         ));
-        //     }
-        //     let year = avaliable_years[0].to_owned();
-        //     if avaliable_years.len() > 1 {
-        //         let rest = avaliable_years[1..].join(",");
-        //         advice.push(format!("We automatically selected the year {year}. The requested metrics are also avaiable in the follow time spans {rest}"));
-        //     }
-        //     vec![year]
-        // };
-
+        // If the user has selected a set of years, we will pass this selection on. Otherwise we
+        // select all possible years
+        let selected_years = if year_ranges.is_empty() {
+            let available_years = possible_metrics
+                .select_geometry(&selected_geometry)
+                .get_available_year_ranges();
+            if available_years.is_empty() {
+                return Err(anyhow!(
+                    "No year specified and no year matches found given the geometry level {selected_geometry}"
+                ));
+            } else {
+                let available_years_str = available_years
+                    .clone()
+                    .into_iter()
+                    .map(|y| format!("{}", y))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                advice.push(format!("The years {available_years_str} are available for the selected geometry level {selected_geometry}. Returning all available years."));
+                available_years
+            }
+        } else {
+            year_ranges.to_vec()
+        };
+        
         let metrics = possible_metrics
             .select_geometry(&selected_geometry)
-            // TODO: uncomment when years impl
-            // .select_years(&selected_years)
+            .select_years(&selected_years)
             .get_explicit_metric_ids()?;
 
         Ok(FullSelectionPlan {
             explicit_metric_ids: metrics,
             geometry: selected_geometry,
-            // TODO: uncomment when years impl
-            // year: selected_years,
-            year: vec!["2021".to_string()],
+            year_ranges: selected_years,
             advice: advice.join("\n"),
         })
     }
