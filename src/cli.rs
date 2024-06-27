@@ -181,12 +181,18 @@ pub struct MetricsCommand {
     #[arg(
         short,
         long,
-        value_name = "min_lat,min_lng,max_lat,max_lng",
+        value_name = "MIN_LAT,MIN_LNG,MAX_LAT,MAX_LNG",
         help = "Bounding box in which to get the results"
     )]
     bbox: Option<BBox>,
-    #[arg(short, long, help = "Filter by year")]
-    year: Option<Vec<String>>,
+    #[arg(
+        short,
+        long,
+        help = "Filter by year ranges",
+        value_name = "YEAR|START..|..END|START..END",
+        value_parser = parse_year_range,
+    )]
+    year_range: Vec<YearRange>,
     #[arg(short, long, help = "Filter by geometry level")]
     geometry_level: Option<Vec<String>>,
     #[arg(short, long, help = "Filter by source data release name")]
@@ -218,6 +224,31 @@ pub struct MetricsCommand {
     full: bool,
 }
 
+/// Expected behaviour:
+/// N.. -> After(N); ..N -> Before(N); M..N -> Between(M, N); N -> Between(N, N)
+fn parse_year_range(value: &str) -> Result<YearRange, &'static str> {
+    fn str_to_option_u32(value: &str) -> Result<Option<u32>, &'static str> {
+        if value.is_empty() {
+            return Ok(None);
+        }
+        match value.parse::<u32>() {
+            Ok(value) => Ok(Some(value)),
+            Err(_) => Err("Invalid year range"),
+        }
+    }
+    let parts: Vec<Option<u32>> = value
+        .split("..")
+        .map(str_to_option_u32)
+        .collect::<Result<Vec<Option<u32>>, &'static str>>()?;
+    match parts.as_slice() {
+        [Some(a)] => Ok(YearRange::Between(*a, *a)),
+        [None, Some(a)] => Ok(YearRange::Before(*a)),
+        [Some(a), None] => Ok(YearRange::After(*a)),
+        [Some(a), Some(b)] => Ok(YearRange::Between(*a, *b)),
+        _ => Err("Invalid year range"),
+    }
+}
+
 impl RunCommand for MetricsCommand {
     async fn run(&self, config: Config) -> Result<()> {
         info!("Running `metrics` subcommand");
@@ -243,7 +274,7 @@ impl RunCommand for MetricsCommand {
 
         let search_request = SearchRequest {
             text: all_text_searches,
-            year: self.year.clone().map(Year),
+            year_range: self.year_range.clone(),
             geometry_level: self.geometry_level.clone().map(GeometryLevel),
             source_data_release: self.source_data_release.clone().map(SourceDataRelease),
             data_publisher: self.publisher.clone().map(DataPublisher),
@@ -353,6 +384,17 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
+
+    #[test]
+    fn test_parse_year_range() {
+        assert_eq!(parse_year_range("2000"), Ok(YearRange::Between(2000, 2000)));
+        assert_eq!(parse_year_range("2000.."), Ok(YearRange::After(2000)));
+        assert_eq!(parse_year_range("..2000"), Ok(YearRange::Before(2000)));
+        assert_eq!(
+            parse_year_range("2000..2001"),
+            Ok(YearRange::Between(2000, 2001))
+        );
+    }
 
     #[test]
     fn output_type_should_deserialize_properly() {

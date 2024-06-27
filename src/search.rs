@@ -72,16 +72,15 @@ impl From<SearchText> for Option<Expr> {
     }
 }
 
-impl From<Year> for Option<Expr> {
-    fn from(value: Year) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .into_iter()
-                // TODO
-                .map(|val| col("year").eq(lit(val)))
-                .collect(),
-        )
+impl From<YearRange> for Expr {
+    fn from(value: YearRange) -> Self {
+        match value {
+            YearRange::Before(year) => col("year").lt_eq(lit(year)),
+            YearRange::After(year) => col("year").gt_eq(lit(year)),
+            YearRange::Between(start, end) => col("year")
+                .gt_eq(lit(start))
+                .and(col("year").lt_eq(lit(end))),
+        }
     }
 }
 
@@ -160,10 +159,14 @@ impl Default for SearchText {
     }
 }
 
-// Whether year is string or int has implications with how it's encoded in the dfs
-// TODO: open ticket to capture how to progress this
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Year(pub Vec<String>);
+/// Note: year ranges are inclusive of end points. u32 seems a bit excessive for years but polars
+/// needs it to create literals :shrug:
+#[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
+pub enum YearRange {
+    Before(u32),
+    After(u32),
+    Between(u32, u32),
+}
 
 /// To allow search over multiple years
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -188,7 +191,7 @@ pub struct SourceMetricId(pub Vec<String>);
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchRequest {
     pub text: Vec<SearchText>,
-    pub year: Option<Year>,
+    pub year_range: Vec<YearRange>,
     pub geometry_level: Option<GeometryLevel>,
     pub source_data_release: Option<SourceDataRelease>,
     pub data_publisher: Option<DataPublisher>,
@@ -200,7 +203,7 @@ impl SearchRequest {
     pub fn new() -> Self {
         Self {
             text: vec![],
-            year: None,
+            year_range: vec![],
             geometry_level: None,
             source_data_release: None,
             data_publisher: None,
@@ -224,8 +227,8 @@ impl SearchRequest {
         self
     }
 
-    pub fn with_year(mut self, year: &str) -> Self {
-        self.year = Some(Year(vec![year.to_string()]));
+    pub fn with_year_range(mut self, year_range: YearRange) -> Self {
+        self.year_range = vec![year_range];
         self
     }
 
@@ -265,8 +268,8 @@ impl From<SearchRequest> for Option<Expr> {
     fn from(value: SearchRequest) -> Self {
         let mut subexprs: Vec<Option<Expr>> =
             value.text.into_iter().map(|text| text.into()).collect();
+        subexprs.extend(value.year_range.into_iter().map(|v| Some(v.into())));
         let other_subexprs: Vec<Option<Expr>> = vec![
-            value.year.and_then(|v| v.into()),
             value.geometry_level.and_then(|v| v.into()),
             value.source_data_release.and_then(|v| v.into()),
             value.data_publisher.and_then(|v| v.into()),
