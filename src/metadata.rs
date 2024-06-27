@@ -1,4 +1,5 @@
-use crate::{config::Config, data_request_spec::GeometrySpec, parquet::MetricRequest};
+use std::{collections::HashMap, default::Default, fmt::Display};
+
 use anyhow::{anyhow, Result};
 use futures::future::join_all;
 use futures::try_join;
@@ -15,7 +16,8 @@ use polars::{
     series::Series,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, default::Default, fmt::Display};
+
+use crate::{config::Config, data_request_spec::GeometrySpec, parquet::MetricRequest};
 
 /// This struct contains the base url and names of
 /// the files that contain the metadata. It has a
@@ -112,6 +114,7 @@ impl ExpandedMetadataTable {
 
     /// Filter the dataframe by the specified metrics
     pub fn select_metrics(&self, metrics: &[MetricId]) -> Self {
+        debug!("{:#?}", metrics);
         let mut id_collections: HashMap<String, Vec<String>> = HashMap::new();
 
         for metric in metrics {
@@ -122,35 +125,37 @@ impl ExpandedMetadataTable {
         }
 
         let mut filter_expression: Option<Expr> = None;
+        debug!("{:#?}", id_collections);
         for (col_name, ids) in &id_collections {
             let filter_series = Series::new("filter", ids.clone());
+            debug!("{:#?}", filter_series);
             filter_expression = if let Some(expression) = filter_expression {
                 Some(expression.or(col(col_name).is_in(lit(filter_series))))
             } else {
                 Some(col(col_name).is_in(lit(filter_series)))
             };
         }
-
+        debug!("{:#?}", filter_expression);
         ExpandedMetadataTable(self.as_df().filter(filter_expression.unwrap()))
     }
 
     /// Convert the metrics in the dataframe to MetricRequests
-    pub fn to_metric_requests(&self) -> Result<Vec<MetricRequest>> {
+    pub fn to_metric_requests(&self, config: &Config) -> Result<Vec<MetricRequest>> {
         let df = self
             .as_df()
-            .select([col("parquet_metric_file"), col("parquet_metric_id")])
+            .select([col("metric_parquet_path"), col("parquet_column_name")])
             .collect()?;
-
+        debug!("{}", df);
         let metric_requests: Vec<MetricRequest> = df
-            .column("parquet_metric_id")?
+            .column("parquet_column_name")?
             .str()?
             .into_iter()
-            .zip(df.column("parquet_metric_file")?.str()?)
+            .zip(df.column("metric_parquet_path")?.str()?)
             .filter_map(|(column, file)| {
                 if let (Some(column), Some(file)) = (column, file) {
                     Some(MetricRequest {
                         column: column.to_owned(),
-                        file: file.to_owned(),
+                        file: format!("{}/{file}", config.base_path),
                     })
                 } else {
                     None
@@ -162,7 +167,7 @@ impl ExpandedMetadataTable {
 
     /// Select a specific geometry level in the dataframe filtering out all others
     pub fn select_geometry(&self, geometry: &str) -> Self {
-        ExpandedMetadataTable(self.as_df().filter(col("geometry_level").eq(geometry)))
+        ExpandedMetadataTable(self.as_df().filter(col("geometry_level").eq(lit(geometry))))
     }
 
     /// Select a specific set of years in the dataframe filtering out all others
@@ -172,7 +177,9 @@ impl ExpandedMetadataTable {
     {
         let years: Vec<&str> = years.iter().map(std::convert::AsRef::as_ref).collect();
         let years_series = Series::new("years", years);
-        ExpandedMetadataTable(self.as_df().filter(col("year").is_in(lit(years_series))))
+        // TODO: uncomment when years impl
+        ExpandedMetadataTable(self.as_df())
+        // ExpandedMetadataTable(self.as_df().filter(col("year").is_in(lit(years_series))))
     }
 
     /// Return a ranked list of avaliable geometries
@@ -180,7 +187,7 @@ impl ExpandedMetadataTable {
         let df = self.as_df();
         let counts: DataFrame = df
             .group_by([col("geometry_level")])
-            .agg([col("goemetry_level").count().alias("count")])
+            .agg([col("geometry_level").count().alias("count")])
             .sort(
                 ["count"],
                 SortMultipleOptions::new().with_order_descending(true),
@@ -217,9 +224,10 @@ impl ExpandedMetadataTable {
 
     /// Get fully speced metric ids
     pub fn get_explicit_metric_ids(&self) -> Result<Vec<MetricId>> {
+        debug!("{}", self.as_df().collect()?);
         let reamining: DataFrame = self.as_df().select([col("metric_id")]).collect()?;
         Ok(reamining
-            .column("id")?
+            .column("metric_id")?
             .str()?
             .into_iter()
             .filter_map(|pos_id| pos_id.map(|id| MetricId::Id(id.to_owned())))
@@ -392,10 +400,14 @@ impl Metadata {
     }
 
     /// Return a list of MetricRequests for the given metrics_ids
-    pub fn get_metric_requests(&self, metric_ids: Vec<MetricId>) -> Result<Vec<MetricRequest>> {
+    pub fn get_metric_requests(
+        &self,
+        metric_ids: Vec<MetricId>,
+        config: &Config,
+    ) -> Result<Vec<MetricRequest>> {
         self.combined_metric_source_geometry()
-            .select_metrics(&metric_ids);
-        Ok(vec![])
+            .select_metrics(&metric_ids)
+            .to_metric_requests(config)
     }
 
     /// Generates a FullSelectionPlan which takes in to account
@@ -437,43 +449,48 @@ impl Metadata {
             geom
         };
 
+        // TODO: uncomment when years impl
         // If the user has selected a set of years, we will use them explicity
-        let selected_years = if let Some(years) = years {
-            years.clone()
-        } else {
-            let avaliable_years = possible_metrics
-                .select_geometry(&selected_geometry)
-                .avaliable_years()?;
+        // let selected_years = if let Some(years) = years {
+        //     years.clone()
+        // } else {
+        //     let avaliable_years = possible_metrics
+        //         .select_geometry(&selected_geometry)
+        //         // TODO: this currently expects column "year" and this is not present in metadata df
+        //         .avaliable_years()?;
 
-            if avaliable_years.is_empty() {
-                return Err(anyhow!(
-                    "No year specified and no year matches found given the geometry level {selected_geometry}"
-                ));
-            }
-            let year = avaliable_years[0].to_owned();
-            if avaliable_years.len() > 1 {
-                let rest = avaliable_years[1..].join(",");
-                advice.push(format!("We automatically selected the year {year}. The requested metrics are also avaiable in the follow time spans {rest}"));
-            }
-            vec![year]
-        };
+        //     if avaliable_years.is_empty() {
+        //         return Err(anyhow!(
+        //             "No year specified and no year matches found given the geometry level {selected_geometry}"
+        //         ));
+        //     }
+        //     let year = avaliable_years[0].to_owned();
+        //     if avaliable_years.len() > 1 {
+        //         let rest = avaliable_years[1..].join(",");
+        //         advice.push(format!("We automatically selected the year {year}. The requested metrics are also avaiable in the follow time spans {rest}"));
+        //     }
+        //     vec![year]
+        // };
 
         let metrics = possible_metrics
             .select_geometry(&selected_geometry)
-            .select_years(&selected_years)
+            // TODO: uncomment when years impl
+            // .select_years(&selected_years)
             .get_explicit_metric_ids()?;
 
         Ok(FullSelectionPlan {
             explicit_metric_ids: metrics,
             geometry: selected_geometry,
-            year: selected_years,
+            // TODO: uncomment when years impl
+            // year: selected_years,
+            year: vec!["2021".to_string()],
             advice: advice.join("\n"),
         })
     }
 
     /// Given a geometry level return the path to the
     /// geometry file that it corresponds to
-    pub fn get_geom_details(&self, geom_level: &str) -> Result<String> {
+    pub fn get_geom_details(&self, geom_level: &str, config: &Config) -> Result<String> {
         let matches = self
             .geometries
             .clone()
@@ -481,14 +498,15 @@ impl Metadata {
             .filter(col("level").eq(lit(geom_level)))
             .collect()?;
 
-        let file = matches
+        let file: String = matches
             .column("filename_stem")?
             .str()?
             .get(0)
             .unwrap()
             .into();
 
-        Ok(file)
+        let file_with_base_path = format!("{}/{}.fgb", config.base_path, file);
+        Ok(file_with_base_path)
     }
 }
 

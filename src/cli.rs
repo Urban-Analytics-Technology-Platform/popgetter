@@ -55,11 +55,7 @@ pub struct DataCommand {
     )]
     bbox: Option<BBox>,
     /// Specify a metric by hxl
-    #[arg(
-        short = 'h',
-        long,
-        help = "Specify a metric by Humanitarian Exchange Language tag"
-    )]
+    #[arg(long, help = "Specify a metric by Humanitarian Exchange Language tag")]
     hxl: Option<Vec<String>>,
 
     // Specify a metric by id
@@ -325,7 +321,7 @@ impl RunCommand for CountriesCommand {
 pub struct SurveysCommand;
 
 impl RunCommand for SurveysCommand {
-    async fn run(&self, config: Config) -> Result<()> {
+    async fn run(&self, _config: Config) -> Result<()> {
         info!("Running `surveys` subcommand");
         Ok(())
     }
@@ -347,8 +343,8 @@ pub struct RecipeCommand {
 impl RunCommand for RecipeCommand {
     async fn run(&self, config: Config) -> Result<()> {
         let popgetter = Popgetter::new_with_config(config).await?;
-        let config = fs::read_to_string(&self.recipe_file)?;
-        let data_request: DataRequestSpec = serde_json::from_str(&config)?;
+        let recipe = fs::read_to_string(&self.recipe_file)?;
+        let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
         let mut results = popgetter.get_data_request(&data_request).await?;
         println!("{results}");
         let formatter: OutputFormatter = (&self.output_format).into();

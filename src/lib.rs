@@ -15,6 +15,8 @@ pub mod metadata;
 pub mod parquet;
 pub mod search;
 
+pub(crate) const GEO_ID_COL_NAME: &str = "GEO_ID";
+
 #[cfg(feature = "formatters")]
 pub mod formatters;
 
@@ -39,15 +41,15 @@ impl Popgetter {
     // Given a Data Request Spec
     // Return a DataFrame of the selected dataset
     pub async fn get_data_request(&self, data_request: &DataRequestSpec) -> Result<DataFrame> {
-        let metric_requests = data_request.metric_requests(&self.metadata)?;
-
+        let metric_requests = data_request.metric_requests(&self.metadata, &self.config)?;
+        debug!("{:#?}", metric_requests);
         // Required because polars is blocking
         let metrics =
             tokio::task::spawn_blocking(move || get_metrics(&metric_requests.metrics, None));
 
         let geom_file = self
             .metadata
-            .get_geom_details(&metric_requests.selected_geometry)?;
+            .get_geom_details(&metric_requests.selected_geometry, &self.config)?;
         let geoms = get_geometries(&geom_file, None, None);
 
         // try_join requires us to have the errors from all futures be the same.
@@ -59,7 +61,7 @@ impl Popgetter {
         debug!("geoms: {geoms:#?}");
         debug!("metrics: {metrics:#?}");
 
-        let result = geoms.inner_join(&metrics?, ["GEOID"], ["GEO_ID"])?;
+        let result = geoms.inner_join(&metrics?, [GEO_ID_COL_NAME], ["GEO_ID"])?;
         Ok(result)
     }
 }
