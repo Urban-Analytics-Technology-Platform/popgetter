@@ -180,7 +180,6 @@ impl Default for SearchText {
 
 /// Note: year ranges are inclusive of end points. i32 seems a bit excessive for years but it saves
 /// us having to write needless into's for polars and chrono
-/// m
 #[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
 pub enum YearRange {
     Before(i32),
