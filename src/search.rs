@@ -1,6 +1,7 @@
 //! Search
 
 use crate::metadata::Metadata;
+use chrono::NaiveDate;
 use log::debug;
 use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, LazyFrame};
@@ -72,16 +73,33 @@ impl From<SearchText> for Option<Expr> {
     }
 }
 
-impl From<Year> for Option<Expr> {
-    fn from(value: Year) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .into_iter()
-                // TODO
-                .map(|val| col("year").eq(lit(val)))
-                .collect(),
-        )
+impl From<YearRange> for Expr {
+    fn from(value: YearRange) -> Self {
+        match value {
+            YearRange::Before(year) => col("release_reference_period_start")
+                .lt_eq(lit(NaiveDate::from_ymd_opt(year.into(), 12, 31).unwrap())),
+            YearRange::After(year) => col("release_reference_period_end")
+                .gt_eq(lit(NaiveDate::from_ymd_opt(year.into(), 1, 1).unwrap())),
+            YearRange::Between(start, end) => {
+                let start_col = col("release_reference_period_start");
+                let end_col = col("release_reference_period_end");
+                let start_date = lit(NaiveDate::from_ymd_opt(start.into(), 1, 1).unwrap());
+                let end_date = lit(NaiveDate::from_ymd_opt(end.into(), 12, 31).unwrap());
+                // (start_col <= start_date AND end_col >= start_date)
+                // OR (start_col <= end_date AND end_col >= end_date)
+                // OR (start_col >= start_date AND end_col <= end_date)
+                let case1 = start_col
+                    .clone()
+                    .lt_eq(start_date.clone())
+                    .and(end_col.clone().gt_eq(start_date.clone()));
+                let case2 = start_col
+                    .clone()
+                    .lt_eq(end_date.clone())
+                    .and(end_col.clone().gt_eq(end_date.clone()));
+                let case3 = start_col.gt_eq(start_date).and(end_col.lt_eq(end_date));
+                case1.or(case2).or(case3)
+            }
+        }
     }
 }
 
@@ -160,10 +178,13 @@ impl Default for SearchText {
     }
 }
 
-// Whether year is string or int has implications with how it's encoded in the dfs
-// TODO: open ticket to capture how to progress this
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Year(pub Vec<String>);
+/// Note: year ranges are inclusive of end points.
+#[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
+pub enum YearRange {
+    Before(u16),
+    After(u16),
+    Between(u16, u16),
+}
 
 /// To allow search over multiple years
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -188,7 +209,7 @@ pub struct SourceMetricId(pub Vec<String>);
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchRequest {
     pub text: Vec<SearchText>,
-    pub year: Option<Year>,
+    pub year_range: Vec<YearRange>,
     pub geometry_level: Option<GeometryLevel>,
     pub source_data_release: Option<SourceDataRelease>,
     pub data_publisher: Option<DataPublisher>,
@@ -200,7 +221,7 @@ impl SearchRequest {
     pub fn new() -> Self {
         Self {
             text: vec![],
-            year: None,
+            year_range: vec![],
             geometry_level: None,
             source_data_release: None,
             data_publisher: None,
@@ -224,8 +245,8 @@ impl SearchRequest {
         self
     }
 
-    pub fn with_year(mut self, year: &str) -> Self {
-        self.year = Some(Year(vec![year.to_string()]));
+    pub fn with_year_range(mut self, year_range: YearRange) -> Self {
+        self.year_range = vec![year_range];
         self
     }
 
@@ -265,8 +286,8 @@ impl From<SearchRequest> for Option<Expr> {
     fn from(value: SearchRequest) -> Self {
         let mut subexprs: Vec<Option<Expr>> =
             value.text.into_iter().map(|text| text.into()).collect();
+        subexprs.extend(value.year_range.into_iter().map(|v| Some(v.into())));
         let other_subexprs: Vec<Option<Expr>> = vec![
-            value.year.and_then(|v| v.into()),
             value.geometry_level.and_then(|v| v.into()),
             value.source_data_release.and_then(|v| v.into()),
             value.data_publisher.and_then(|v| v.into()),
