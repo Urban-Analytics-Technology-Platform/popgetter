@@ -1,6 +1,7 @@
 //! Search
 
 use crate::metadata::Metadata;
+use chrono::NaiveDate;
 use log::debug;
 use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, LazyFrame};
@@ -75,11 +76,29 @@ impl From<SearchText> for Option<Expr> {
 impl From<YearRange> for Expr {
     fn from(value: YearRange) -> Self {
         match value {
-            YearRange::Before(year) => col("year").lt_eq(lit(year)),
-            YearRange::After(year) => col("year").gt_eq(lit(year)),
-            YearRange::Between(start, end) => col("year")
-                .gt_eq(lit(start))
-                .and(col("year").lt_eq(lit(end))),
+            YearRange::Before(year) => col("release_reference_period_start")
+                .lt_eq(lit(NaiveDate::from_ymd_opt(year, 12, 31).unwrap())),
+            YearRange::After(year) => col("release_reference_period_end")
+                .gt_eq(lit(NaiveDate::from_ymd_opt(year, 1, 1).unwrap())),
+            YearRange::Between(start, end) => {
+                let start_col = col("release_reference_period_start");
+                let end_col = col("release_reference_period_end");
+                let start_date = lit(NaiveDate::from_ymd_opt(start, 1, 1).unwrap());
+                let end_date = lit(NaiveDate::from_ymd_opt(end, 12, 31).unwrap());
+                // (start_col <= start_date AND end_col >= start_date)
+                // OR (start_col <= end_date AND end_col >= end_date)
+                // OR (start_col >= start_date AND end_col <= end_date)
+                let case1 = start_col
+                    .clone()
+                    .lt_eq(start_date.clone())
+                    .and(end_col.clone().gt_eq(start_date.clone()));
+                let case2 = start_col
+                    .clone()
+                    .lt_eq(end_date.clone())
+                    .and(end_col.clone().gt_eq(end_date.clone()));
+                let case3 = start_col.gt_eq(start_date).and(end_col.lt_eq(end_date));
+                case1.or(case2).or(case3)
+            }
         }
     }
 }
@@ -159,13 +178,14 @@ impl Default for SearchText {
     }
 }
 
-/// Note: year ranges are inclusive of end points. u32 seems a bit excessive for years but polars
-/// needs it to create literals :shrug:
+/// Note: year ranges are inclusive of end points. i32 seems a bit excessive for years but it saves
+/// us having to write needless into's for polars and chrono
+/// m
 #[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
 pub enum YearRange {
-    Before(u32),
-    After(u32),
-    Between(u32, u32),
+    Before(i32),
+    After(i32),
+    Between(i32, i32),
 }
 
 /// To allow search over multiple years

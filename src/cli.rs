@@ -227,19 +227,19 @@ pub struct MetricsCommand {
 /// Expected behaviour:
 /// N.. -> After(N); ..N -> Before(N); M..N -> Between(M, N); N -> Between(N, N)
 fn parse_year_range(value: &str) -> Result<YearRange, &'static str> {
-    fn str_to_option_u32(value: &str) -> Result<Option<u32>, &'static str> {
+    fn str_to_option_i32(value: &str) -> Result<Option<i32>, &'static str> {
         if value.is_empty() {
             return Ok(None);
         }
-        match value.parse::<u32>() {
+        match value.parse::<i32>() {
             Ok(value) => Ok(Some(value)),
             Err(_) => Err("Invalid year range"),
         }
     }
-    let parts: Vec<Option<u32>> = value
+    let parts: Vec<Option<i32>> = value
         .split("..")
-        .map(str_to_option_u32)
-        .collect::<Result<Vec<Option<u32>>, &'static str>>()?;
+        .map(str_to_option_i32)
+        .collect::<Result<Vec<Option<i32>>, &'static str>>()?;
     match parts.as_slice() {
         [Some(a)] => Ok(YearRange::Between(*a, *a)),
         [None, Some(a)] => Ok(YearRange::Before(*a)),
