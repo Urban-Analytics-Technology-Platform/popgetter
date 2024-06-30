@@ -9,7 +9,7 @@ use polars::prelude::{DataFrame, LazyFrame};
 use serde::{Deserialize, Serialize};
 
 /// Combine multiple queries with OR. If there are no queries in the input list, returns None.
-fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
+fn _combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
     let mut query: Option<Expr> = None;
     for expr in exprs {
         query = if let Some(partial_query) = query {
@@ -46,7 +46,7 @@ fn combine_exprs_with_and(exprs: Vec<Expr>) -> Option<Expr> {
 
 /// Same as `combine_exprs_with_and`, but takes a NonEmpty list instead of a Vec, and doesn't
 /// return an Option.
-fn combine_exprs_with_and1(exprs: NonEmpty<Expr>) -> Expr {
+fn _combine_exprs_with_and1(exprs: NonEmpty<Expr>) -> Expr {
     let mut query: Expr = exprs.head;
     for expr in exprs.tail.into_iter() {
         query = query.and(expr);
@@ -122,63 +122,33 @@ impl From<YearRange> for Expr {
     }
 }
 
-impl From<DataPublisher> for Option<Expr> {
+impl From<DataPublisher> for Expr {
     fn from(value: DataPublisher) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .iter()
-                .map(|val| case_insensitive_contains(COL::PUBLISHER_NAME, val))
-                .collect(),
-        )
+        case_insensitive_contains(COL::PUBLISHER_NAME, &value.0)
     }
 }
 
-impl From<SourceDataRelease> for Option<Expr> {
+impl From<SourceDataRelease> for Expr {
     fn from(value: SourceDataRelease) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .iter()
-                .map(|val| case_insensitive_contains(COL::SOURCE_NAME, val))
-                .collect(),
-        )
+        case_insensitive_contains(COL::SOURCE_NAME, &value.0)
     }
 }
 
-impl From<GeometryLevel> for Option<Expr> {
+impl From<GeometryLevel> for Expr {
     fn from(value: GeometryLevel) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .iter()
-                .map(|val| case_insensitive_contains(COL::GEOMETRY_LEVEL, val))
-                .collect(),
-        )
+        case_insensitive_contains(COL::GEOMETRY_LEVEL, &value.0)
     }
 }
 
-impl From<Country> for Option<Expr> {
+impl From<Country> for Expr {
     fn from(value: Country) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .iter()
-                .map(|val| case_insensitive_contains(COL::COUNTRY_NAME_SHORT_EN, val))
-                .collect(),
-        )
+        case_insensitive_contains(COL::COUNTRY_NAME_SHORT_EN, &value.0)
     }
 }
 
-impl From<SourceMetricId> for Option<Expr> {
+impl From<SourceMetricId> for Expr {
     fn from(value: SourceMetricId) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .iter()
-                .map(|val| case_insensitive_contains(COL::METRIC_SOURCE_METRIC_ID, val))
-                .collect(),
-        )
+        case_insensitive_contains(COL::METRIC_SOURCE_METRIC_ID, &value.0)
     }
 }
 
@@ -197,7 +167,7 @@ impl Default for SearchText {
     }
 }
 
-/// Note: year ranges are inclusive of end points.
+/// Search over years
 #[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
 pub enum YearRange {
     Before(u16),
@@ -205,25 +175,25 @@ pub enum YearRange {
     Between(u16, u16),
 }
 
-/// To allow search over multiple years
+/// Search over geometry levels
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct GeometryLevel(pub Vec<String>);
+pub struct GeometryLevel(pub String);
 
-/// Source data release: set of strings that will search over this
+/// Search over source data release names
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SourceDataRelease(pub Vec<String>);
+pub struct SourceDataRelease(pub String);
 
-/// Data publisher: set of strings that will search over this
+/// Search over data publisher names
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DataPublisher(pub Vec<String>);
+pub struct DataPublisher(pub String);
 
-/// Countries: set of countries to be included in the search
+/// Search over country (short English names)
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Country(pub Vec<String>);
+pub struct Country(pub String);
 
-/// Census tables: set of census tables to be included in the search
+/// Search over source metric IDs in the original census table
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SourceMetricId(pub Vec<String>);
+pub struct SourceMetricId(pub String);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchRequest {
@@ -250,17 +220,17 @@ impl SearchRequest {
     }
 
     pub fn with_country(mut self, country: &str) -> Self {
-        self.country = Some(Country(vec![country.to_string()]));
+        self.country = Some(Country(country.to_string()));
         self
     }
 
     pub fn with_data_publisher(mut self, data_publisher: &str) -> Self {
-        self.data_publisher = Some(DataPublisher(vec![data_publisher.to_string()]));
+        self.data_publisher = Some(DataPublisher(data_publisher.to_string()));
         self
     }
 
     pub fn with_source_data_release(mut self, source_data_release: &str) -> Self {
-        self.source_data_release = Some(SourceDataRelease(vec![source_data_release.to_string()]));
+        self.source_data_release = Some(SourceDataRelease(source_data_release.to_string()));
         self
     }
 
@@ -270,12 +240,12 @@ impl SearchRequest {
     }
 
     pub fn with_geometry_level(mut self, geometry_level: &str) -> Self {
-        self.geometry_level = Some(GeometryLevel(vec![geometry_level.to_string()]));
+        self.geometry_level = Some(GeometryLevel(geometry_level.to_string()));
         self
     }
 
     pub fn with_census_table(mut self, census_table: &str) -> Self {
-        self.census_table = Some(SourceMetricId(vec![census_table.to_string()]));
+        self.census_table = Some(SourceMetricId(census_table.to_string()));
         self
     }
 
@@ -310,11 +280,11 @@ impl From<SearchRequest> for Option<Expr> {
             .collect();
         subexprs.extend(value.year_range.into_iter().map(|v| Some(v.into())));
         let other_subexprs: Vec<Option<Expr>> = vec![
-            value.geometry_level.and_then(|v| v.into()),
-            value.source_data_release.and_then(|v| v.into()),
-            value.data_publisher.and_then(|v| v.into()),
-            value.country.and_then(|v| v.into()),
-            value.census_table.and_then(|v| v.into()),
+            value.geometry_level.map(|v| v.into()),
+            value.source_data_release.map(|v| v.into()),
+            value.data_publisher.map(|v| v.into()),
+            value.country.map(|v| v.into()),
+            value.census_table.map(|v| v.into()),
         ];
         subexprs.extend(other_subexprs);
         // Remove the Nones and unwrap the Somes

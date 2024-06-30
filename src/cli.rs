@@ -182,27 +182,31 @@ pub struct MetricsCommand {
         help = "Bounding box in which to get the results"
     )]
     bbox: Option<BBox>,
+    // Note: using `std::vec::Vec` rather than just `Vec`, to enforce that multiple year ranges are
+    // passed in a single argument e.g. `-y 2014...2016,2018...2019` rather than multiple arguments
+    // e.g. `-y 2014...2016 -y 2018...2019`. See https://github.com/clap-rs/clap/issues/4626 and
+    // https://docs.rs/clap/latest/clap/_derive/index.html#arg-types
     #[arg(
         short,
         long,
-        help = "Filter by year ranges. All ranges are inclusive.",
+        help = "Filter by year ranges. All ranges are inclusive; multiple ranges can be comma-separated.",
         value_name = "YEAR|START...|...END|START...END",
         value_parser = parse_year_range,
     )]
-    year_range: Vec<YearRange>,
+    year_range: std::vec::Vec<YearRange>,
     #[arg(short, long, help = "Filter by geometry level")]
-    geometry_level: Option<Vec<String>>,
+    geometry_level: Option<String>,
     #[arg(short, long, help = "Filter by source data release name")]
-    source_data_release: Option<Vec<String>>,
+    source_data_release: Option<String>,
     #[arg(short, long, help = "Filter by data publisher name")]
-    publisher: Option<Vec<String>>,
+    publisher: Option<String>,
     #[arg(short, long, help = "Filter by country")]
-    country: Option<Vec<String>>,
+    country: Option<String>,
     #[arg(
         long,
         help = "Filter by source metric ID (i.e. the name of the table in the original data release)"
     )]
-    source_metric_id: Option<Vec<String>>,
+    source_metric_id: Option<String>,
     // Filters for text
     #[arg(long, help="Filter by HXL tag", num_args=0..)]
     hxl: Vec<String>,
@@ -223,33 +227,40 @@ pub struct MetricsCommand {
 
 /// Expected behaviour:
 /// N.. -> After(N); ..N -> Before(N); M..N -> Between(M, N); N -> Between(N, N)
-fn parse_year_range(value: &str) -> Result<YearRange, &'static str> {
-    fn str_to_option_u16(value: &str) -> Result<Option<u16>, &'static str> {
-        if value.is_empty() {
-            return Ok(None);
-        }
-        match value.parse::<u16>() {
-            Ok(value) => Ok(Some(value)),
-            Err(_) => Err("Invalid year range"),
-        }
-    }
-    let parts: Vec<Option<u16>> = value
-        .split("...")
-        .map(str_to_option_u16)
-        .collect::<Result<Vec<Option<u16>>, &'static str>>()?;
-    match parts.as_slice() {
-        [Some(a)] => Ok(YearRange::Between(*a, *a)),
-        [None, Some(a)] => Ok(YearRange::Before(*a)),
-        [Some(a), None] => Ok(YearRange::After(*a)),
-        [Some(a), Some(b)] => {
-            if a > b {
-                Err("Invalid year range")
-            } else {
-                Ok(YearRange::Between(*a, *b))
+/// Year ranges can be comma-separated
+fn parse_year_range(value: &str) -> Result<Vec<YearRange>, &'static str> {
+    fn parse_single_year_range(value: &str) -> Result<YearRange, &'static str> {
+        fn str_to_option_u16(value: &str) -> Result<Option<u16>, &'static str> {
+            if value.is_empty() {
+                return Ok(None);
+            }
+            match value.parse::<u16>() {
+                Ok(value) => Ok(Some(value)),
+                Err(_) => Err("Invalid year range"),
             }
         }
-        _ => Err("Invalid year range"),
+        let parts: Vec<Option<u16>> = value
+            .split("...")
+            .map(str_to_option_u16)
+            .collect::<Result<Vec<Option<u16>>, &'static str>>()?;
+        match parts.as_slice() {
+            [Some(a)] => Ok(YearRange::Between(*a, *a)),
+            [None, Some(a)] => Ok(YearRange::Before(*a)),
+            [Some(a), None] => Ok(YearRange::After(*a)),
+            [Some(a), Some(b)] => {
+                if a > b {
+                    Err("Invalid year range")
+                } else {
+                    Ok(YearRange::Between(*a, *b))
+                }
+            }
+            _ => Err("Invalid year range"),
+        }
     }
+    value
+        .split(',')
+        .map(parse_single_year_range)
+        .collect::<Result<Vec<YearRange>, &'static str>>()
 }
 
 impl RunCommand for MetricsCommand {
@@ -390,12 +401,33 @@ mod tests {
 
     #[test]
     fn test_parse_year_range() {
-        assert_eq!(parse_year_range("2000"), Ok(YearRange::Between(2000, 2000)));
-        assert_eq!(parse_year_range("2000..."), Ok(YearRange::After(2000)));
-        assert_eq!(parse_year_range("...2000"), Ok(YearRange::Before(2000)));
+        assert_eq!(
+            parse_year_range("2000"),
+            Ok(vec![YearRange::Between(2000, 2000)])
+        );
+        assert_eq!(
+            parse_year_range("2000..."),
+            Ok(vec![YearRange::After(2000)])
+        );
+        assert_eq!(
+            parse_year_range("...2000"),
+            Ok(vec![YearRange::Before(2000)])
+        );
         assert_eq!(
             parse_year_range("2000...2001"),
-            Ok(YearRange::Between(2000, 2001))
+            Ok(vec![YearRange::Between(2000, 2001)])
+        );
+        assert_eq!(
+            parse_year_range("2000...2001,2005..."),
+            Ok(vec![YearRange::Between(2000, 2001), YearRange::After(2005)])
+        );
+        assert_eq!(
+            parse_year_range("...2001,2005,2009"),
+            Ok(vec![
+                YearRange::Before(2001),
+                YearRange::Between(2005, 2005),
+                YearRange::Between(2009, 2009)
+            ])
         );
     }
 
