@@ -1,8 +1,9 @@
-//! Search
+//! Types and functions to perform filtering on the fully joined metadata catalogue
 
 use crate::{metadata::Metadata, COL};
 use chrono::NaiveDate;
 use log::debug;
+use nonempty::{nonempty, NonEmpty};
 use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, LazyFrame};
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,16 @@ fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
     query
 }
 
+/// Same as `combine_exprs_with_or`, but takes a NonEmpty list instead of a Vec, and doesn't
+/// return an Option.
+fn combine_exprs_with_or1(exprs: NonEmpty<Expr>) -> Expr {
+    let mut query: Expr = exprs.head;
+    for expr in exprs.tail.into_iter() {
+        query = query.or(expr);
+    }
+    query
+}
+
 /// Combine multiple queries with AND. If there are no queries in the input list, returns None.
 fn combine_exprs_with_and(exprs: Vec<Expr>) -> Option<Expr> {
     let mut query: Option<Expr> = None;
@@ -33,12 +44,24 @@ fn combine_exprs_with_and(exprs: Vec<Expr>) -> Option<Expr> {
     query
 }
 
+/// Same as `combine_exprs_with_and`, but takes a NonEmpty list instead of a Vec, and doesn't
+/// return an Option.
+fn combine_exprs_with_and1(exprs: NonEmpty<Expr>) -> Expr {
+    let mut query: Expr = exprs.head;
+    for expr in exprs.tail.into_iter() {
+        query = query.and(expr);
+    }
+    query
+}
+
 /// Search in a column case-insensitively for a string literal (i.e. not a regex!)
 fn case_insensitive_contains(column: &str, value: &str) -> Expr {
     let regex = format!("(?i){}", regex::escape(value));
     col(column).str().contains(lit(regex), false)
 }
 
+/// Where we want to search for a text string in. Pass multiple search contexts to search in all of
+/// them.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SearchContext {
     Hxl,
@@ -47,29 +70,25 @@ pub enum SearchContext {
 }
 
 impl SearchContext {
-    pub fn all() -> Vec<Self> {
-        vec![Self::Hxl, Self::HumanReadableName, Self::Description]
+    pub fn all() -> NonEmpty<Self> {
+        nonempty![Self::Hxl, Self::HumanReadableName, Self::Description]
     }
 }
 
 /// Implementing conversion from `SearchText` to a polars expression enables a
 /// `SearchText` to be passed to polars dataframe for filtering results.
-impl From<SearchText> for Option<Expr> {
+impl From<SearchText> for Expr {
     fn from(val: SearchText) -> Self {
-        let queries = val
-            .context
-            .iter()
-            .map(|field| match field {
-                SearchContext::Hxl => case_insensitive_contains(COL::METRIC_HXL_TAG, &val.text),
-                SearchContext::HumanReadableName => {
-                    case_insensitive_contains(COL::METRIC_HUMAN_READABLE_NAME, &val.text)
-                }
-                SearchContext::Description => {
-                    case_insensitive_contains(COL::METRIC_DESCRIPTION, &val.text)
-                }
-            })
-            .collect();
-        combine_exprs_with_or(queries)
+        let queries: NonEmpty<Expr> = val.context.map(|field| match field {
+            SearchContext::Hxl => case_insensitive_contains(COL::METRIC_HXL_TAG, &val.text),
+            SearchContext::HumanReadableName => {
+                case_insensitive_contains(COL::METRIC_HUMAN_READABLE_NAME, &val.text)
+            }
+            SearchContext::Description => {
+                case_insensitive_contains(COL::METRIC_DESCRIPTION, &val.text)
+            }
+        });
+        combine_exprs_with_or1(queries)
     }
 }
 
@@ -166,7 +185,7 @@ impl From<SourceMetricId> for Option<Expr> {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchText {
     pub text: String,
-    pub context: Vec<SearchContext>,
+    pub context: NonEmpty<SearchContext>,
 }
 
 impl Default for SearchText {
@@ -284,8 +303,11 @@ pub struct SearchResults(pub DataFrame);
 
 impl From<SearchRequest> for Option<Expr> {
     fn from(value: SearchRequest) -> Self {
-        let mut subexprs: Vec<Option<Expr>> =
-            value.text.into_iter().map(|text| text.into()).collect();
+        let mut subexprs: Vec<Option<Expr>> = value
+            .text
+            .into_iter()
+            .map(|text| Some(text.into()))
+            .collect();
         subexprs.extend(value.year_range.into_iter().map(|v| Some(v.into())));
         let other_subexprs: Vec<Option<Expr>> = vec![
             value.geometry_level.and_then(|v| v.into()),

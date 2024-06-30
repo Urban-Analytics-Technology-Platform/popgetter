@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use log::{debug, info};
+use nonempty::nonempty;
 use popgetter::{
     config::Config,
     data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec},
@@ -259,15 +260,15 @@ impl RunCommand for MetricsCommand {
         let mut all_text_searches: Vec<SearchText> = vec![];
         all_text_searches.extend(self.hxl.iter().map(|t| SearchText {
             text: t.clone(),
-            context: vec![SearchContext::Hxl],
+            context: nonempty![SearchContext::Hxl],
         }));
         all_text_searches.extend(self.name.iter().map(|t| SearchText {
             text: t.clone(),
-            context: vec![SearchContext::HumanReadableName],
+            context: nonempty![SearchContext::HumanReadableName],
         }));
         all_text_searches.extend(self.description.iter().map(|t| SearchText {
             text: t.clone(),
-            context: vec![SearchContext::Description],
+            context: nonempty![SearchContext::Description],
         }));
         all_text_searches.extend(self.text.iter().map(|t| SearchText {
             text: t.clone(),
