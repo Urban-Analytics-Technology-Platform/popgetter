@@ -34,7 +34,8 @@ impl COL {
     pub const PUBLISHER_NAME: &'static str = "data_publisher_name";
     pub const PUBLISHER_URL: &'static str = "data_publisher_url";
     pub const PUBLISHER_DESCRIPTION: &'static str = "data_publisher_description";
-    pub const PUBLISHER_COUNTRIES_OF_INTEREST: &'static str = "data_publisher_countries_of_interest";
+    pub const PUBLISHER_COUNTRIES_OF_INTEREST: &'static str =
+        "data_publisher_countries_of_interest";
 
     pub const GEOMETRY_ID: &'static str = "geometry_id";
     pub const GEOMETRY_FILENAME_STEM: &'static str = "geometry_filename_stem";
@@ -63,8 +64,10 @@ impl COL {
     pub const METRIC_HXL_TAG: &'static str = "metric_hxl_tag";
     pub const METRIC_PARQUET_PATH: &'static str = "metric_parquet_path";
     pub const METRIC_PARQUET_COLUMN_NAME: &'static str = "metric_parquet_column_name";
-    pub const METRIC_PARQUET_MARGIN_OF_ERROR_COLUMN: &'static str = "metric_parquet_margin_of_error_column";
-    pub const METRIC_PARQUET_MARGIN_OF_ERROR_FILE: &'static str = "metric_parquet_margin_of_error_file";
+    pub const METRIC_PARQUET_MARGIN_OF_ERROR_COLUMN: &'static str =
+        "metric_parquet_margin_of_error_column";
+    pub const METRIC_PARQUET_MARGIN_OF_ERROR_FILE: &'static str =
+        "metric_parquet_margin_of_error_file";
     pub const METRIC_POTENTIAL_DENOMINATOR_IDS: &'static str = "metric_potential_denominator_ids";
     pub const METRIC_PARENT_METRIC_ID: &'static str = "metric_parent_id";
     pub const METRIC_SOURCE_DATA_RELEASE_ID: &'static str = "metric_source_data_release_id";
@@ -72,7 +75,6 @@ impl COL {
     pub const METRIC_SOURCE_ARCHIVE_FILE_PATH: &'static str = "metric_source_archive_file_path";
     pub const METRIC_SOURCE_DOCUMENTATION_URL: &'static str = "metric_source_documentation_url";
 }
-
 
 #[cfg(feature = "formatters")]
 pub mod formatters;

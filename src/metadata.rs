@@ -17,7 +17,7 @@ use polars::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{COL, config::Config, data_request_spec::GeometrySpec, parquet::MetricRequest};
+use crate::{config::Config, data_request_spec::GeometrySpec, parquet::MetricRequest, COL};
 
 /// This struct contains the base url and names of
 /// the files that contain the metadata. It has a
@@ -143,7 +143,10 @@ impl ExpandedMetadataTable {
     pub fn to_metric_requests(&self, config: &Config) -> Result<Vec<MetricRequest>> {
         let df = self
             .as_df()
-            .select([col(COL::METRIC_PARQUET_PATH), col(COL::METRIC_PARQUET_COLUMN_NAME)])
+            .select([
+                col(COL::METRIC_PARQUET_PATH),
+                col(COL::METRIC_PARQUET_COLUMN_NAME),
+            ])
             .collect()?;
         debug!("{}", df);
         let metric_requests: Vec<MetricRequest> = df
@@ -167,7 +170,10 @@ impl ExpandedMetadataTable {
 
     /// Select a specific geometry level in the dataframe filtering out all others
     pub fn select_geometry(&self, geometry: &str) -> Self {
-        ExpandedMetadataTable(self.as_df().filter(col(COL::GEOMETRY_LEVEL).eq(lit(geometry))))
+        ExpandedMetadataTable(
+            self.as_df()
+                .filter(col(COL::GEOMETRY_LEVEL).eq(lit(geometry))),
+        )
     }
 
     /// Select a specific set of years in the dataframe filtering out all others
@@ -176,7 +182,7 @@ impl ExpandedMetadataTable {
         T: AsRef<str>,
     {
         let years: Vec<&str> = years.iter().map(std::convert::AsRef::as_ref).collect();
-        let years_series = Series::new("years", years);
+        let _years_series = Series::new("years", years);
         // TODO: uncomment when years impl
         ExpandedMetadataTable(self.as_df())
         // ExpandedMetadataTable(self.as_df().filter(col("year").is_in(lit(years_series))))
@@ -358,7 +364,7 @@ impl Metadata {
         &self,
         metrics: &[MetricId],
         geometry: &GeometrySpec,
-        years: &Option<Vec<String>>,
+        _years: &Option<Vec<String>>,
     ) -> Result<FullSelectionPlan> {
         let mut advice: Vec<String> = vec![];
         // Find metadata for all specified metrics over all geoemtries and years

@@ -6,6 +6,7 @@ use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value;
+use std::fmt::Write as FmtWrite;
 use std::io::Cursor;
 use std::io::Write;
 use wkb::geom_to_wkb;
@@ -38,7 +39,12 @@ fn convert_wkt_to_wkb_string(s: &Series) -> PolarsResult<Option<Series>> {
 
     let wkb_string_series: Vec<String> = wkb_series
         .into_iter()
-        .map(|v| v.iter().map(|v| format!("{v}")).collect::<String>())
+        .map(|v| {
+            v.iter().fold(String::new(), |mut acc, s| {
+                let _ = write!(acc, "{s}");
+                acc
+            })
+        })
         .collect();
     Ok(Some(Series::new("geometry", wkb_string_series)))
 }
