@@ -94,8 +94,9 @@ mod tests {
     fn test_fetching_metrics() {
         let metrics  = [
             MetricRequest{
-                metric_file:"https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
-                column:"B17021_E006".into()
+                metric_file: "https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
+                column: "B17021_E006".into(),
+                geom_file: "Not needed for this test".into(),
             }];
         let df = get_metrics(&metrics, None);
         assert!(df.is_ok(), "We should get back a result");
@@ -124,8 +125,9 @@ mod tests {
     fn test_fetching_metrics_with_geo_filter() {
         let metrics  = [
             MetricRequest{
-                metric_file:"https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
-                column:"B17021_E006".into()
+                metric_file: "https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
+                column: "B17021_E006".into(),
+                geom_file: "Not needed for this test".into(),
             }];
         let df = get_metrics(
             &metrics,

@@ -204,7 +204,7 @@ mod tests {
         let server = mock_fgb_server();
 
         // Get the geometries
-        let geoms = get_geometries(&server.url("/fgb_example.fgb"), None, None).await;
+        let geoms = get_geometries(&server.url("/fgb_example.fgb"), None).await;
         println!("{geoms:#?}");
         assert!(geoms.is_ok(), "The geometry call should not error");
         let geoms = geoms.unwrap();
@@ -235,7 +235,7 @@ mod tests {
             -1.373_095_490_899_146_4,
             53.026_908_220_355_35,
         ]);
-        let geoms = get_geometries(&server.url("/fgb_example.fgb"), Some(&bbox), None).await;
+        let geoms = get_geometries(&server.url("/fgb_example.fgb"), Some(&bbox)).await;
 
         assert!(geoms.is_ok(), "The geometry call should not error");
         let geoms = geoms.unwrap();
