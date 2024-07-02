@@ -77,7 +77,7 @@ impl COL {
     pub const METRIC_PARQUET_MARGIN_OF_ERROR_FILE: &'static str =
         "metric_parquet_margin_of_error_file";
     pub const METRIC_POTENTIAL_DENOMINATOR_IDS: &'static str = "metric_potential_denominator_ids";
-    pub const METRIC_PARENT_METRIC_ID: &'static str = "metric_parent_id";
+    pub const METRIC_PARENT_METRIC_ID: &'static str = "metric_parent_metric_id";
     pub const METRIC_SOURCE_DATA_RELEASE_ID: &'static str = "metric_source_data_release_id";
     pub const METRIC_SOURCE_DOWNLOAD_URL: &'static str = "metric_source_download_url";
     pub const METRIC_SOURCE_ARCHIVE_FILE_PATH: &'static str = "metric_source_archive_file_path";
