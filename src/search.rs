@@ -111,13 +111,13 @@ impl From<SearchText> for Expr {
 impl From<YearRange> for Expr {
     fn from(value: YearRange) -> Self {
         match value {
-            YearRange::Before(year) => col(COL::SOURCE_REFERENCE_PERIOD_START)
+            YearRange::Before(year) => col(COL::SOURCE_DATA_RELEASE_REFERENCE_PERIOD_START)
                 .lt_eq(lit(NaiveDate::from_ymd_opt(year.into(), 12, 31).unwrap())),
-            YearRange::After(year) => col(COL::SOURCE_REFERENCE_PERIOD_END)
+            YearRange::After(year) => col(COL::SOURCE_DATA_RELEASE_REFERENCE_PERIOD_END)
                 .gt_eq(lit(NaiveDate::from_ymd_opt(year.into(), 1, 1).unwrap())),
             YearRange::Between(start, end) => {
-                let start_col = col(COL::SOURCE_REFERENCE_PERIOD_START);
-                let end_col = col(COL::SOURCE_REFERENCE_PERIOD_END);
+                let start_col = col(COL::SOURCE_DATA_RELEASE_REFERENCE_PERIOD_START);
+                let end_col = col(COL::SOURCE_DATA_RELEASE_REFERENCE_PERIOD_END);
                 let start_date = lit(NaiveDate::from_ymd_opt(start.into(), 1, 1).unwrap());
                 let end_date = lit(NaiveDate::from_ymd_opt(end.into(), 12, 31).unwrap());
                 // (start_col <= start_date AND end_col >= start_date)
@@ -140,13 +140,13 @@ impl From<YearRange> for Expr {
 
 impl From<DataPublisher> for Expr {
     fn from(value: DataPublisher) -> Self {
-        case_insensitive_contains(COL::PUBLISHER_NAME, &value.0)
+        case_insensitive_contains(COL::DATA_PUBLISHER_NAME, &value.0)
     }
 }
 
 impl From<SourceDataRelease> for Expr {
     fn from(value: SourceDataRelease) -> Self {
-        case_insensitive_contains(COL::SOURCE_NAME, &value.0)
+        case_insensitive_contains(COL::SOURCE_DATA_RELEASE_NAME, &value.0)
     }
 }
 
@@ -293,7 +293,7 @@ impl SearchResults {
             .select([
                 col(COL::METRIC_PARQUET_PATH),
                 col(COL::METRIC_PARQUET_COLUMN_NAME),
-                col(COL::GEOMETRY_FILENAME_STEM),
+                col(COL::GEOMETRY_FILEPATH_STEM),
             ])
             .collect()
             .unwrap();
@@ -310,7 +310,7 @@ impl SearchResults {
                     .into_no_null_iter(),
             )
             .zip(
-                df.column(COL::GEOMETRY_FILENAME_STEM)
+                df.column(COL::GEOMETRY_FILEPATH_STEM)
                     .unwrap()
                     .str()
                     .unwrap()

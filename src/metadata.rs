@@ -93,21 +93,21 @@ impl Metadata {
             .join(
                 self.source_data_releases.clone().lazy(),
                 [col(COL::METRIC_SOURCE_DATA_RELEASE_ID)],
-                [col(COL::SOURCE_ID)],
+                [col(COL::SOURCE_DATA_RELEASE_ID)],
                 JoinArgs::new(JoinType::Inner),
             )
             // Join geometry metadata
             .join(
                 self.geometries.clone().lazy(),
-                [col(COL::SOURCE_GEOMETRY_METADATA_ID)],
+                [col(COL::SOURCE_DATA_RELEASE_GEOMETRY_METADATA_ID)],
                 [col(COL::GEOMETRY_ID)],
                 JoinArgs::new(JoinType::Inner),
             )
             // Join data publishers
             .join(
                 self.data_publishers.clone().lazy(),
-                [col(COL::SOURCE_DATA_PUBLISHER_ID)],
-                [col(COL::PUBLISHER_ID)],
+                [col(COL::SOURCE_DATA_RELEASE_DATA_PUBLISHER_ID)],
+                [col(COL::DATA_PUBLISHER_ID)],
                 JoinArgs::new(JoinType::Inner),
             );
         // TODO: Add a country_id column to the metadata, and merge in the countries as well. See
@@ -255,7 +255,7 @@ mod tests {
     #[tokio::test]
     async fn country_metadata_should_load() {
         let config = Config::default();
-        let metadata = CountryMetadataLoader::new("be").load(&config).await;
+        let metadata = CountryMetadataLoader::new("bel").load(&config).await;
         println!("{metadata:#?}");
         assert!(metadata.is_ok(), "Data should have loaded ok");
     }
