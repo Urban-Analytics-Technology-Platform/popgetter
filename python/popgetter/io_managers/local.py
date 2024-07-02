@@ -7,7 +7,7 @@ import pandas as pd
 from dagster import OutputContext
 from upath import UPath
 
-from . import GeoIOManager, MetadataIOManager, MetricsIOManager
+from . import CountriesTextIOManager, GeoIOManager, MetadataIOManager, MetricsIOManager
 
 
 class LocalMixin:
@@ -49,3 +49,10 @@ class LocalGeoIOManager(LocalMixin, GeoIOManager):
 
 class LocalMetricsIOManager(LocalMixin, MetricsIOManager):
     pass
+
+
+class LocalCountriesTextIOManager(LocalMixin, CountriesTextIOManager):
+    def handle_text(self, _context: OutputContext, text: str, full_path: UPath) -> None:
+        self.make_parent_dirs(full_path)
+        with full_path.open("w") as f:
+            f.write(text)
