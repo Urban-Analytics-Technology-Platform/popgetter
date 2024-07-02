@@ -595,7 +595,7 @@ mod tests {
     #[tokio::test]
     async fn country_metadata_should_load() {
         let config = Config::default();
-        let metadata = CountryMetadataLoader::new("be").load(&config).await;
+        let metadata = CountryMetadataLoader::new("bel").load(&config).await;
         println!("{metadata:#?}");
         assert!(metadata.is_ok(), "Data should have loaded ok");
     }
@@ -611,89 +611,13 @@ mod tests {
     #[tokio::test]
     async fn metric_ids_should_expand_properly() {
         let config = Config::default();
-        let metadata = CountryMetadataLoader::new("be")
+        let metadata = CountryMetadataLoader::new("bel")
             .load(&config)
             .await
             .unwrap();
-        let expanded_metrics = metadata.expand_regex_metric(&MetricId::Hxl("population-*".into()));
-        assert!(
-            expanded_metrics.is_ok(),
-            "Should successfully expand metrics"
+        let expanded_metrics = metadata.expand_regex_metric(
+            &MetricId::Hxl(r"population\+adm5".into())
         );
-        let expanded_metrics = expanded_metrics.unwrap();
-
-        assert_eq!(
-            expanded_metrics.len(),
-            7,
-            "should return the correct number of metrics"
-        );
-
-        let metric_names: Vec<&str> = expanded_metrics
-            .iter()
-            .map(MetricId::to_query_string)
-            .collect();
-
-        assert_eq!(
-            metric_names,
-            vec![
-                "#population+children+age5_17",
-                "#population+infants+age0_4",
-                "#population+children+age0_17",
-                "#population+adults+f",
-                "#population+adults+m",
-                "#population+adults",
-                "#population+ind"
-            ],
-            "should get the correct metrics"
-        );
-    }
-
-    #[tokio::test]
-    async fn human_readable_metric_ids_should_expand_properly() {
-        let config = Config::default();
-        let metadata = CountryMetadataLoader::new("be")
-            .load(&config)
-            .await
-            .unwrap();
-        let expanded_metrics =
-            metadata.expand_regex_metric(&MetricId::CommonName("Children*".into()));
-
-        println!("{:#?}", expanded_metrics);
-
-        assert!(
-            expanded_metrics.is_ok(),
-            "Should successfully expand metrics"
-        );
-
-        let expanded_metrics = expanded_metrics.unwrap();
-
-        assert_eq!(
-            expanded_metrics.len(),
-            2,
-            "should return the correct number of metrics"
-        );
-
-        let metric_names: Vec<&str> = expanded_metrics
-            .iter()
-            .map(MetricId::to_query_string)
-            .collect();
-
-        assert_eq!(
-            metric_names,
-            vec!["Children aged 5 to 17", "Children aged 0 to 17"],
-            "should get the correct metrics"
-        );
-    }
-
-    #[tokio::test]
-    async fn fully_defined_metric_ids_should_expand_to_itself() {
-        let config = Config::default();
-        let metadata = CountryMetadataLoader::new("be")
-            .load(&config)
-            .await
-            .unwrap();
-        let expanded_metrics =
-            metadata.expand_regex_metric(&MetricId::Hxl(r"#population\+infants\+age0\_4".into()));
         assert!(
             expanded_metrics.is_ok(),
             "Should successfully expand metrics"
@@ -713,7 +637,79 @@ mod tests {
 
         assert_eq!(
             metric_names,
-            vec!["#population+infants+age0_4",],
+            vec![
+                "#population+adm5+total+2023",
+            ],
+            "should get the correct metrics"
+        );
+    }
+
+    #[tokio::test]
+    async fn human_readable_metric_ids_should_expand_properly() {
+        let config = Config::default();
+        let metadata = CountryMetadataLoader::new("bel")
+            .load(&config)
+            .await
+            .unwrap();
+        let expanded_metrics =
+            metadata.expand_regex_metric(&MetricId::CommonName("Population, total".into()));
+
+        println!("{:#?}", expanded_metrics);
+
+        assert!(
+            expanded_metrics.is_ok(),
+            "Should successfully expand metrics"
+        );
+
+        let expanded_metrics = expanded_metrics.unwrap();
+
+        assert_eq!(
+            expanded_metrics.len(),
+            1,
+            "should return the correct number of metrics"
+        );
+
+        let metric_names: Vec<&str> = expanded_metrics
+            .iter()
+            .map(MetricId::to_query_string)
+            .collect();
+
+        assert_eq!(
+            metric_names,
+            vec!["Population, total, 2023"],
+            "should get the correct metrics"
+        );
+    }
+
+    #[tokio::test]
+    async fn fully_defined_metric_ids_should_expand_to_itself() {
+        let config = Config::default();
+        let metadata = CountryMetadataLoader::new("bel")
+            .load(&config)
+            .await
+            .unwrap();
+        let expanded_metrics =
+            metadata.expand_regex_metric(&MetricId::Hxl(r"#population\+adm5\+total\+2023".into()));
+        assert!(
+            expanded_metrics.is_ok(),
+            "Should successfully expand metrics"
+        );
+        let expanded_metrics = expanded_metrics.unwrap();
+
+        assert_eq!(
+            expanded_metrics.len(),
+            1,
+            "should return the correct number of metrics"
+        );
+
+        let metric_names: Vec<&str> = expanded_metrics
+            .iter()
+            .map(MetricId::to_query_string)
+            .collect();
+
+        assert_eq!(
+            metric_names,
+            vec!["#population+adm5+total+2023"],
             "should get the correct metrics"
         );
 
