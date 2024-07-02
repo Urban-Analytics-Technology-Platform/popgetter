@@ -1,6 +1,6 @@
 use comfy_table::{presets::NOTHING, *};
 use itertools::izip;
-use popgetter::search::SearchResults;
+use popgetter::{COL, search::SearchResults};
 
 pub fn display_search_results(results: SearchResults, max_results: Option<usize>) {
     let df_to_show = match max_results {
@@ -9,11 +9,11 @@ pub fn display_search_results(results: SearchResults, max_results: Option<usize>
     };
 
     for (metric_id, hrn, desc, hxl, level) in izip!(
-        df_to_show.column("metric_id").unwrap().iter(),
-        df_to_show.column("human_readable_name").unwrap().iter(),
-        df_to_show.column("metric_description").unwrap().iter(),
-        df_to_show.column("metric_hxl_tag").unwrap().iter(),
-        df_to_show.column("geometry_level").unwrap().iter(),
+        df_to_show.column(COL::METRIC_ID).unwrap().iter(),
+        df_to_show.column(COL::METRIC_HUMAN_READABLE_NAME).unwrap().iter(),
+        df_to_show.column(COL::METRIC_DESCRIPTION).unwrap().iter(),
+        df_to_show.column(COL::METRIC_HXL_TAG).unwrap().iter(),
+        df_to_show.column(COL::GEOMETRY_LEVEL).unwrap().iter(),
     ) {
         let mut table = Table::new();
         table
