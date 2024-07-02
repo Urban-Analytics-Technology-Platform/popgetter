@@ -615,9 +615,8 @@ mod tests {
             .load(&config)
             .await
             .unwrap();
-        let expanded_metrics = metadata.expand_regex_metric(
-            &MetricId::Hxl(r"population\+adm5".into())
-        );
+        let expanded_metrics =
+            metadata.expand_regex_metric(&MetricId::Hxl(r"population\+adm5".into()));
         assert!(
             expanded_metrics.is_ok(),
             "Should successfully expand metrics"
@@ -637,9 +636,7 @@ mod tests {
 
         assert_eq!(
             metric_names,
-            vec![
-                "#population+adm5+total+2023",
-            ],
+            vec!["#population+adm5+total+2023",],
             "should get the correct metrics"
         );
     }
