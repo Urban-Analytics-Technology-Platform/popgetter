@@ -30,11 +30,11 @@ impl COL {
     pub const COUNTRY_ISO2: &'static str = "country_iso2";
     pub const COUNTRY_ISO3166_2: &'static str = "country_iso3166_2";
 
-    pub const PUBLISHER_ID: &'static str = "data_publisher_id";
-    pub const PUBLISHER_NAME: &'static str = "data_publisher_name";
-    pub const PUBLISHER_URL: &'static str = "data_publisher_url";
-    pub const PUBLISHER_DESCRIPTION: &'static str = "data_publisher_description";
-    pub const PUBLISHER_COUNTRIES_OF_INTEREST: &'static str =
+    pub const DATA_PUBLISHER_ID: &'static str = "data_publisher_id";
+    pub const DATA_PUBLISHER_NAME: &'static str = "data_publisher_name";
+    pub const DATA_PUBLISHER_URL: &'static str = "data_publisher_url";
+    pub const DATA_PUBLISHER_DESCRIPTION: &'static str = "data_publisher_description";
+    pub const DATA_PUBLISHER_COUNTRIES_OF_INTEREST: &'static str =
         "data_publisher_countries_of_interest";
 
     pub const GEOMETRY_ID: &'static str = "geometry_id";
@@ -44,18 +44,26 @@ impl COL {
     pub const GEOMETRY_LEVEL: &'static str = "geometry_level";
     pub const GEOMETRY_HXL_TAG: &'static str = "geometry_hxl_tag";
 
-    pub const SOURCE_ID: &'static str = "source_id";
-    pub const SOURCE_NAME: &'static str = "source_name";
-    pub const SOURCE_DATE_PUBLISHED: &'static str = "source_date_published";
-    pub const SOURCE_REFERENCE_PERIOD_START: &'static str = "source_reference_period_start";
-    pub const SOURCE_REFERENCE_PERIOD_END: &'static str = "source_reference_period_end";
-    pub const SOURCE_COLLECTION_PERIOD_START: &'static str = "source_collection_period_start";
-    pub const SOURCE_COLLECTION_PERIOD_END: &'static str = "source_collection_period_end";
-    pub const SOURCE_EXPECT_NEXT_UPDATE: &'static str = "source_expect_next_update";
-    pub const SOURCE_URL: &'static str = "source_url";
-    pub const SOURCE_DATA_PUBLISHER_ID: &'static str = "source_data_publisher_id";
-    pub const SOURCE_DESCRIPTION: &'static str = "source_description";
-    pub const SOURCE_GEOMETRY_METADATA_ID: &'static str = "source_geometry_metadata_id";
+    pub const SOURCE_DATA_RELEASE_ID: &'static str = "source_data_release_id";
+    pub const SOURCE_DATA_RELEASE_NAME: &'static str = "source_data_release_name";
+    pub const SOURCE_DATA_RELEASE_DATE_PUBLISHED: &'static str =
+        "source_data_release_date_published";
+    pub const SOURCE_DATA_RELEASE_REFERENCE_PERIOD_START: &'static str =
+        "source_data_release_reference_period_start";
+    pub const SOURCE_DATA_RELEASE_REFERENCE_PERIOD_END: &'static str =
+        "source_data_release_reference_period_end";
+    pub const SOURCE_DATA_RELEASE_COLLECTION_PERIOD_START: &'static str =
+        "source_data_release_collection_period_start";
+    pub const SOURCE_DATA_RELEASE_COLLECTION_PERIOD_END: &'static str =
+        "source_data_release_collection_period_end";
+    pub const SOURCE_DATA_RELEASE_EXPECT_NEXT_UPDATE: &'static str =
+        "source_data_release_expect_next_update";
+    pub const SOURCE_DATA_RELEASE_URL: &'static str = "source_data_release_url";
+    pub const SOURCE_DATA_RELEASE_DATA_PUBLISHER_ID: &'static str =
+        "source_data_release_data_publisher_id";
+    pub const SOURCE_DATA_RELEASE_DESCRIPTION: &'static str = "source_data_release_description";
+    pub const SOURCE_DATA_RELEASE_GEOMETRY_METADATA_ID: &'static str =
+        "source_data_release_geometry_metadata_id";
 
     pub const METRIC_ID: &'static str = "metric_id";
     pub const METRIC_HUMAN_READABLE_NAME: &'static str = "metric_human_readable_name";

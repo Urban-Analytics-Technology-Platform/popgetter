@@ -76,13 +76,13 @@ impl From<SearchText> for Option<Expr> {
 impl From<YearRange> for Expr {
     fn from(value: YearRange) -> Self {
         match value {
-            YearRange::Before(year) => col(COL::SOURCE_REFERENCE_PERIOD_START)
+            YearRange::Before(year) => col(COL::SOURCE_DATA_RELEASE_REFERENCE_PERIOD_START)
                 .lt_eq(lit(NaiveDate::from_ymd_opt(year.into(), 12, 31).unwrap())),
-            YearRange::After(year) => col(COL::SOURCE_REFERENCE_PERIOD_END)
+            YearRange::After(year) => col(COL::SOURCE_DATA_RELEASE_REFERENCE_PERIOD_END)
                 .gt_eq(lit(NaiveDate::from_ymd_opt(year.into(), 1, 1).unwrap())),
             YearRange::Between(start, end) => {
-                let start_col = col(COL::SOURCE_REFERENCE_PERIOD_START);
-                let end_col = col(COL::SOURCE_REFERENCE_PERIOD_END);
+                let start_col = col(COL::SOURCE_DATA_RELEASE_REFERENCE_PERIOD_START);
+                let end_col = col(COL::SOURCE_DATA_RELEASE_REFERENCE_PERIOD_END);
                 let start_date = lit(NaiveDate::from_ymd_opt(start.into(), 1, 1).unwrap());
                 let end_date = lit(NaiveDate::from_ymd_opt(end.into(), 12, 31).unwrap());
                 // (start_col <= start_date AND end_col >= start_date)
@@ -109,7 +109,7 @@ impl From<DataPublisher> for Option<Expr> {
             value
                 .0
                 .iter()
-                .map(|val| case_insensitive_contains(COL::PUBLISHER_NAME, val))
+                .map(|val| case_insensitive_contains(COL::DATA_PUBLISHER_NAME, val))
                 .collect(),
         )
     }
@@ -121,7 +121,7 @@ impl From<SourceDataRelease> for Option<Expr> {
             value
                 .0
                 .iter()
-                .map(|val| case_insensitive_contains(COL::SOURCE_NAME, val))
+                .map(|val| case_insensitive_contains(COL::SOURCE_DATA_RELEASE_NAME, val))
                 .collect(),
         )
     }
