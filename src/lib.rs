@@ -38,7 +38,7 @@ impl COL {
         "data_publisher_countries_of_interest";
 
     pub const GEOMETRY_ID: &'static str = "geometry_id";
-    pub const GEOMETRY_FILENAME_STEM: &'static str = "geometry_filename_stem";
+    pub const GEOMETRY_FILEPATH_STEM: &'static str = "geometry_filepath_stem";
     pub const GEOMETRY_VALIDITY_PERIOD_START: &'static str = "geometry_validity_period_start";
     pub const GEOMETRY_VALIDITY_PERIOD_END: &'static str = "geometry_validity_period_end";
     pub const GEOMETRY_LEVEL: &'static str = "geometry_level";
