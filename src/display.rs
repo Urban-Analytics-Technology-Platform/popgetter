@@ -1,5 +1,6 @@
 use comfy_table::{presets::NOTHING, *};
 use itertools::izip;
+use log::debug;
 use popgetter::{search::SearchResults, COL};
 
 pub fn display_search_results(results: SearchResults, max_results: Option<usize>) {
@@ -8,7 +9,7 @@ pub fn display_search_results(results: SearchResults, max_results: Option<usize>
         None => results.0,
     };
 
-    for (metric_id, hrn, desc, hxl, level) in izip!(
+    for (metric_id, hrn, desc, hxl, date, country, level) in izip!(
         df_to_show.column(COL::METRIC_ID).unwrap().iter(),
         df_to_show
             .column(COL::METRIC_HUMAN_READABLE_NAME)
@@ -16,9 +17,18 @@ pub fn display_search_results(results: SearchResults, max_results: Option<usize>
             .iter(),
         df_to_show.column(COL::METRIC_DESCRIPTION).unwrap().iter(),
         df_to_show.column(COL::METRIC_HXL_TAG).unwrap().iter(),
+        df_to_show
+            .column(COL::SOURCE_DATA_RELEASE_COLLECTION_PERIOD_START)
+            .unwrap()
+            .iter(),
+        df_to_show
+            .column(COL::COUNTRY_NAME_SHORT_EN)
+            .unwrap()
+            .iter(),
         df_to_show.column(COL::GEOMETRY_LEVEL).unwrap().iter(),
     ) {
         let mut table = Table::new();
+        debug!("{:#?}", country);
         table
             .load_preset(NOTHING)
             .set_content_arrangement(ContentArrangement::Dynamic)
@@ -41,6 +51,14 @@ pub fn display_search_results(results: SearchResults, max_results: Option<usize>
             .add_row(vec![
                 Cell::new("HXL tag").add_attribute(Attribute::Bold),
                 hxl.get_str().unwrap().into(),
+            ])
+            .add_row(vec![
+                Cell::new("Collection date").add_attribute(Attribute::Bold),
+                format!("{date}").into(),
+            ])
+            .add_row(vec![
+                Cell::new("Country").add_attribute(Attribute::Bold),
+                country.get_str().unwrap().into(),
             ])
             .add_row(vec![
                 Cell::new("Geometry level").add_attribute(Attribute::Bold),
