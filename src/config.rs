@@ -9,8 +9,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            base_path: "https://popgetter.blob.core.windows.net/popgetter-dagster-test/test_2"
-                .into(),
+            base_path:
+                "https://popgetter.blob.core.windows.net/popgetter-dagster-test/test_v2_release"
+                    .into(),
         }
     }
 }
