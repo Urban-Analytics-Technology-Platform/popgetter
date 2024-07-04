@@ -37,15 +37,16 @@ fn convert_wkt_to_wkb_string(s: &Series) -> PolarsResult<Option<Series>> {
         })
         .collect::<Result<Vec<Vec<u8>>, _>>()?;
 
-    let wkb_string_series: Vec<String> = wkb_series
+    let wkb_string_series = wkb_series
         .into_iter()
-        .map(|v| {
-            v.iter().fold(String::new(), |mut acc, s| {
-                let _ = write!(acc, "{s}");
-                acc
-            })
-        })
-        .collect();
+        .map(String::from_utf8)
+        .collect::<Result<Vec<String>, _>>()
+        .map_err(|err| {
+            // TODO: refactor with a more specific popgetter error type.
+            PolarsError::ComputeError(
+                format!("Bytes could not be converted to UTF-8 with error: {}", err).into(),
+            )
+        })?;
     Ok(Some(Series::new("geometry", wkb_string_series)))
 }
 
