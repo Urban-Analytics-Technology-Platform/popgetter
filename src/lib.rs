@@ -15,7 +15,7 @@ pub mod metadata;
 pub mod parquet;
 pub mod search;
 
-/// This class stores the eventual column names of all the metadata classes, which are used when
+/// This struct stores the eventual column names of all the metadata classes, which are used when
 /// serialising the metadata to a dataframe. Note that this must be synchronised with column names
 /// defined in the upstream metadata classes!
 pub struct COL;
