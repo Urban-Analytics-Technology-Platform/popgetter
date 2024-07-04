@@ -7,18 +7,21 @@ use polars::{frame::DataFrame, prelude::DataFrameJoinOps};
 use tokio::try_join;
 
 use crate::{config::Config, geo::get_geometries};
+
+// Re-exports
+pub use column_names as COL;
+
+// Modules
+pub mod column_names;
 pub mod config;
 pub mod data_request_spec;
 pub mod error;
+#[cfg(feature = "formatters")]
+pub mod formatters;
 pub mod geo;
 pub mod metadata;
 pub mod parquet;
 pub mod search;
-
-pub(crate) const GEO_ID_COL_NAME: &str = "GEO_ID";
-
-#[cfg(feature = "formatters")]
-pub mod formatters;
 
 pub struct Popgetter {
     pub metadata: Metadata,
@@ -61,7 +64,7 @@ impl Popgetter {
         debug!("geoms: {geoms:#?}");
         debug!("metrics: {metrics:#?}");
 
-        let result = geoms.inner_join(&metrics?, [GEO_ID_COL_NAME], ["GEO_ID"])?;
+        let result = geoms.inner_join(&metrics?, [COL::GEO_ID], [COL::GEO_ID])?;
         Ok(result)
     }
 }
