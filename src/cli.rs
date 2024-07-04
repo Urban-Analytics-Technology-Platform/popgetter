@@ -32,6 +32,7 @@ pub enum OutputFormat {
     Csv,
     GeoParquet,
     FlatGeobuf,
+    Stdout,
 }
 
 /// Trait that defines what to run when a given subcommand is invoked.
@@ -58,7 +59,7 @@ pub struct DataCommand {
     )]
     output_format: OutputFormat,
     #[arg(short = 'o', long, help = "Output file to place the results")]
-    output_file: String,
+    output_file: Option<String>,
     #[command(flatten)]
     search_params_args: SearchParamsArgs,
 }
@@ -69,6 +70,7 @@ impl From<&OutputFormat> for OutputFormatter {
             OutputFormat::GeoJSON => OutputFormatter::GeoJSON(GeoJSONFormatter),
             OutputFormat::Csv => OutputFormatter::Csv(CSVFormatter::default()),
             OutputFormat::GeoJSONSeq => OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter),
+            OutputFormat::Stdout => OutputFormatter::Csv(CSVFormatter::default()),
             _ => todo!("output format not implemented"),
         }
     }
@@ -91,10 +93,16 @@ impl RunCommand for DataCommand {
         let mut data = search_results.download(&popgetter.config).await?;
 
         debug!("{data:#?}");
-        let mut f = File::create(&self.output_file)?;
-        let formatter: OutputFormatter = (&self.output_format).into();
-        formatter.save(&mut f, &mut data)?;
 
+        let formatter: OutputFormatter = (&self.output_format).into();
+        if let Some(output_file) = &self.output_file {
+            let mut f = File::open(output_file)?;
+            formatter.save(&mut f, &mut data)?;
+        } else {
+            let stdout = std::io::stdout();
+            let mut stdout_lock = stdout.lock();
+            formatter.save(&mut stdout_lock, &mut data)?;
+        };
         Ok(())
     }
 }
