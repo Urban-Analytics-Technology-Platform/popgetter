@@ -135,7 +135,7 @@ struct SearchParamsArgs {
         value_name = "YEAR|START...|...END|START...END",
         value_parser = parse_year_range,
     )]
-    year_range: std::vec::Vec<YearRange>,
+    year_range: Option<std::vec::Vec<YearRange>>,
     #[arg(short, long, help = "Filter by geometry level")]
     geometry_level: Option<String>,
     #[arg(short, long, help = "Filter by source data release name")]

@@ -233,7 +233,7 @@ pub struct SourceMetricId(pub String);
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchParams {
     pub text: Vec<SearchText>,
-    pub year_range: Vec<YearRange>,
+    pub year_range: Option<Vec<YearRange>>,
     pub metric_id: Vec<MetricId>,
     pub geometry_level: Option<GeometryLevel>,
     pub source_data_release: Option<SourceDataRelease>,
@@ -262,8 +262,10 @@ impl From<SearchParams> for Option<Expr> {
             .into_iter()
             .map(|text| Some(text.into()))
             .collect();
-        subexprs.extend(value.year_range.into_iter().map(|v| Some(v.into())));
         subexprs.extend(value.metric_id.into_iter().map(|v| Some(v.into())));
+        if let Some(year_range) = value.year_range {
+            subexprs.extend(year_range.into_iter().map(|v| Some(v.into())));
+        }
         let other_subexprs: Vec<Option<Expr>> = vec![
             value.geometry_level.map(|v| v.into()),
             value.source_data_release.map(|v| v.into()),
