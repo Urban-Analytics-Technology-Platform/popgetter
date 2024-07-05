@@ -16,8 +16,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tokio::try_join;
 
+// TODO: add trait/struct for combine_exprs
+
 /// Combine multiple queries with OR. If there are no queries in the input list, returns None.
-fn _combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
+fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
     let mut query: Option<Expr> = None;
     for expr in exprs {
         query = if let Some(partial_query) = query {
@@ -255,6 +257,17 @@ impl SearchParams {
     }
 }
 
+fn to_queries_then_or<T: Into<Expr>>(queries: Vec<T>) -> Option<Expr> {
+    let queries: Vec<Expr> = queries.into_iter().map(|q| q.into()).collect();
+    combine_exprs_with_or(queries)
+}
+
+fn _to_optqueries_then_or<T: Into<Option<Expr>>>(queries: Vec<T>) -> Option<Expr> {
+    let query_options: Vec<Option<Expr>> = queries.into_iter().map(|q| q.into()).collect();
+    let queries: Vec<Expr> = query_options.into_iter().flatten().collect();
+    combine_exprs_with_or(queries)
+}
+
 impl From<SearchParams> for Option<Expr> {
     fn from(value: SearchParams) -> Self {
         let mut subexprs: Vec<Option<Expr>> = value
@@ -262,9 +275,9 @@ impl From<SearchParams> for Option<Expr> {
             .into_iter()
             .map(|text| Some(text.into()))
             .collect();
-        subexprs.extend(value.metric_id.into_iter().map(|v| Some(v.into())));
+        subexprs.extend([to_queries_then_or(value.metric_id)]);
         if let Some(year_range) = value.year_range {
-            subexprs.extend(year_range.into_iter().map(|v| Some(v.into())));
+            subexprs.extend([to_queries_then_or(year_range)]);
         }
         let other_subexprs: Vec<Option<Expr>> = vec![
             value.geometry_level.map(|v| v.into()),
@@ -338,8 +351,8 @@ impl SearchResults {
         // Required because polars is blocking
         let metrics = tokio::task::spawn_blocking(move || get_metrics(&metric_requests, None));
 
-        // TODO Handle multiple geometries
-        if all_geom_files.len() != 1 {
+        // TODO Handle multiple responses
+        if all_geom_files.len() > 1 {
             panic!("Multiple geometries not yet supported");
         }
         // TODO Pass in the bbox as the second argument here
@@ -361,6 +374,7 @@ impl SearchResults {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     // #[test]
     // fn test_search_request() {

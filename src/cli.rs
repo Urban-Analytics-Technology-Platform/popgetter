@@ -97,7 +97,7 @@ impl RunCommand for DataCommand {
 
         let formatter: OutputFormatter = (&self.output_format).into();
         if let Some(output_file) = &self.output_file {
-            let mut f = File::open(output_file)?;
+            let mut f = File::create(output_file)?;
             formatter.save(&mut f, &mut data)?;
         } else {
             let stdout = std::io::stdout();
