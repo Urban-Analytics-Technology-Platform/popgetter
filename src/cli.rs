@@ -24,6 +24,8 @@ use strum_macros::EnumString;
 
 use crate::display::display_search_results;
 
+const DEFAULT_PROGRESS_SPINNER: Spinners = Spinners::Dots9;
+
 /// Defines the output formats we are able to produce data in.
 #[derive(Clone, Debug, Deserialize, Serialize, EnumString, PartialEq, Eq)]
 #[strum(ascii_case_insensitive)]
@@ -88,7 +90,7 @@ impl RunCommand for DataCommand {
         info!("Running `data` subcommand");
 
         let mut sp = Spinner::new(
-            Spinners::Dots9,
+            DEFAULT_PROGRESS_SPINNER,
             "Downloading and searching metadata from Azure".into(),
         );
         let popgetter = Popgetter::new_with_config(config).await?;
@@ -96,7 +98,7 @@ impl RunCommand for DataCommand {
 
         sp.stop();
 
-        let mut sp = Spinner::new(Spinners::Dots9, "Download Parquet files".into());
+        let mut sp = Spinner::new(DEFAULT_PROGRESS_SPINNER, "Download Parquet files".into());
         let mut data = search_results.download(&popgetter.config).await?;
         sp.stop();
 
@@ -266,7 +268,10 @@ impl RunCommand for MetricsCommand {
         info!("Running `metrics` subcommand");
         debug!("{:#?}", self);
 
-        let mut sp = Spinner::new(Spinners::Dots9, "Downloading metadata from Azure".into());
+        let mut sp = Spinner::new(
+            DEFAULT_PROGRESS_SPINNER,
+            "Downloading metadata from Azure".into(),
+        );
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
         sp.stop();
