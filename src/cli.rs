@@ -86,11 +86,12 @@ impl RunCommand for DataCommand {
     async fn run(&self, config: Config) -> Result<()> {
         info!("Running `data` subcommand");
 
-        let search_params: SearchParams = self.search_params_args.clone().into();
         let popgetter = Popgetter::new_with_config(config).await?;
-        let search_results =
-            search_params.search(&popgetter.metadata.combined_metric_source_geometry());
-        let mut data = search_results.download(&popgetter.config).await?;
+
+        let mut data = popgetter
+            .search(self.search_params_args.clone().into())
+            .download(&popgetter.config)
+            .await?;
 
         debug!("{data:#?}");
 
@@ -258,10 +259,8 @@ impl RunCommand for MetricsCommand {
         info!("Running `metrics` subcommand");
         debug!("{:#?}", self);
 
-        let search_params: SearchParams = self.search_params_args.clone().into();
         let popgetter = Popgetter::new_with_config(config).await?;
-        let search_results =
-            search_params.search(&popgetter.metadata.combined_metric_source_geometry());
+        let search_results = popgetter.search(self.search_params_args.clone().into());
 
         let len_requests = search_results.0.shape().0;
         println!("Found {} metrics.", len_requests);

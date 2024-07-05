@@ -1,6 +1,7 @@
 use anyhow::Result;
 use log::debug;
 use metadata::Metadata;
+use search::{SearchParams, SearchResults};
 
 use crate::config::Config;
 
@@ -34,5 +35,10 @@ impl Popgetter {
         debug!("config: {config:?}");
         let metadata = metadata::load_all(&config).await?;
         Ok(Self { metadata, config })
+    }
+
+    /// Generates `SearchResults` using popgetter given `SearchParams`
+    pub fn search(&self, search_params: SearchParams) -> SearchResults {
+        search_params.search(&self.metadata.combined_metric_source_geometry())
     }
 }
