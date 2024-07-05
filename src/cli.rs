@@ -18,6 +18,7 @@ use popgetter::{
     Popgetter,
 };
 use serde::{Deserialize, Serialize};
+use spinners::{Spinner, Spinners};
 use std::fs::File;
 use strum_macros::EnumString;
 
@@ -86,12 +87,18 @@ impl RunCommand for DataCommand {
     async fn run(&self, config: Config) -> Result<()> {
         info!("Running `data` subcommand");
 
+        let mut sp = Spinner::new(
+            Spinners::Dots9,
+            "Downloading and searching metadata from Azure".into(),
+        );
         let popgetter = Popgetter::new_with_config(config).await?;
+        let search_results = popgetter.search(self.search_params_args.clone().into());
 
-        let mut data = popgetter
-            .search(self.search_params_args.clone().into())
-            .download(&popgetter.config)
-            .await?;
+        sp.stop();
+
+        let mut sp = Spinner::new(Spinners::Dots9, "Download Parquet files".into());
+        let mut data = search_results.download(&popgetter.config).await?;
+        sp.stop();
 
         debug!("{data:#?}");
 
@@ -259,8 +266,10 @@ impl RunCommand for MetricsCommand {
         info!("Running `metrics` subcommand");
         debug!("{:#?}", self);
 
+        let mut sp = Spinner::new(Spinners::Dots9, "Downloading metadata from Azure".into());
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
+        sp.stop();
 
         let len_requests = search_results.0.shape().0;
         println!("Found {} metrics.", len_requests);
