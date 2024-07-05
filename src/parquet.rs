@@ -8,7 +8,8 @@ use crate::COL;
 #[derive(Debug)]
 pub struct MetricRequest {
     pub column: String,
-    pub file: String,
+    pub metric_file: String,
+    pub geom_file: String,
 }
 
 /// Given a `file_url` and a list of `columns`, return a `Result<DataFrame>`
@@ -42,7 +43,7 @@ fn get_metrics_from_file(
 /// retrive all the required metrics from the cloud blob storage
 ///
 pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Result<DataFrame> {
-    let file_list: HashSet<String> = metrics.iter().map(|m| m.file.clone()).collect();
+    let file_list: HashSet<String> = metrics.iter().map(|m| m.metric_file.clone()).collect();
     debug!("{:#?}", file_list);
     // TODO Can we do this async so we can be downloading results from each file together?
     let dfs: Result<Vec<DataFrame>> = file_list
@@ -51,7 +52,7 @@ pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Resul
             let file_cols: Vec<String> = metrics
                 .iter()
                 .filter_map(|m| {
-                    if m.file == file_url.clone() {
+                    if m.metric_file == file_url.clone() {
                         Some(m.column.clone())
                     } else {
                         None
@@ -63,6 +64,8 @@ pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Resul
         })
         .collect();
 
+    // TODO: The following assumes that we requested metrics for the same geo_ids. This is not
+    // generally true
     let mut joined_df: Option<DataFrame> = None;
 
     // Merge the dataframes from each remove file in to a single
@@ -91,8 +94,9 @@ mod tests {
     fn test_fetching_metrics() {
         let metrics  = [
             MetricRequest{
-                file:"https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
-                column:"B17021_E006".into()
+                metric_file: "https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
+                column: "B17021_E006".into(),
+                geom_file: "Not needed for this test".into(),
             }];
         let df = get_metrics(&metrics, None);
         assert!(df.is_ok(), "We should get back a result");
@@ -121,8 +125,9 @@ mod tests {
     fn test_fetching_metrics_with_geo_filter() {
         let metrics  = [
             MetricRequest{
-                file:"https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
-                column:"B17021_E006".into()
+                metric_file: "https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
+                column: "B17021_E006".into(),
+                geom_file: "Not needed for this test".into(),
             }];
         let df = get_metrics(
             &metrics,

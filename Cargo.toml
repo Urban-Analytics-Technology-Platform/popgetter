@@ -36,6 +36,7 @@ regex = "1.10.4"
 itertools = "0.13.0"
 comfy-table = "7.1.1"
 thiserror = "1"
+nonempty = { version = "0.10.0", features = ["serialize"] }
 
 
 [features]

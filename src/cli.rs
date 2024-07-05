@@ -4,18 +4,21 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use log::{debug, info};
+use nonempty::nonempty;
 use popgetter::{
     config::Config,
-    data_request_spec::{BBox, DataRequestSpec, GeometrySpec, MetricSpec, RegionSpec},
     formatters::{
         CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
     },
-    metadata::MetricId,
-    search::*,
+    geo::BBox,
+    search::{
+        Country, DataPublisher, GeometryLevel, MetricId, SearchContext, SearchParams, SearchText,
+        SourceDataRelease, SourceMetricId, YearRange,
+    },
     Popgetter,
 };
 use serde::{Deserialize, Serialize};
-use std::fs::{self, File};
+use std::fs::File;
 use strum_macros::EnumString;
 
 use crate::display::display_search_results;
@@ -29,6 +32,7 @@ pub enum OutputFormat {
     Csv,
     GeoParquet,
     FlatGeobuf,
+    Stdout,
 }
 
 /// Trait that defines what to run when a given subcommand is invoked.
@@ -37,80 +41,27 @@ pub trait RunCommand {
     async fn run(&self, config: Config) -> Result<()>;
 }
 
-/// The Data command is the one we invoke to get a set of metrics and geometry
-/// for some given region and set of metrics. Currently it takes two arguments
-/// - bbox: A Bounding box
-/// - metrics: A comma seperated list of metrics to retrive.
-///
-/// The Data command can be converted into a `DataRequestSpec` which is the processed
-/// by the core library.
+/// The `data` command downloads and outputs metrics for a given region in a given format.
 #[derive(Args, Debug)]
 pub struct DataCommand {
-    /// Only get data in  bounding box ([min_lat,min_lng,max_lat,max_lng])
     #[arg(
         short,
         long,
-        allow_hyphen_values(true),
-        help = "Bounding box in which to get the results. Format is: min_lon, min_lat, max_lon, max_lat "
+        value_name = "MIN_LAT,MIN_LNG,MAX_LAT,MAX_LNG",
+        help = "Bounding box in which to get the results"
     )]
     bbox: Option<BBox>,
-    /// Specify a metric by hxl
-    #[arg(long, help = "Specify a metric by Humanitarian Exchange Language tag")]
-    hxl: Option<Vec<String>>,
-
-    // Specify a metric by id
     #[arg(
-        short = 'i',
+        short = 'f',
         long,
-        help = "Specify a metric by uuid, can be a partial uuid"
+        value_name = "geojson|geojsonseq|csv",
+        help = "Output format for the results"
     )]
-    id: Option<Vec<String>>,
-
-    // Specify a metric by name
-    #[arg(short = 'n', long, help = "Specify a metric by Human readable name")]
-    name: Option<Vec<String>>,
-
-    /// Specify output format
-    #[arg(short = 'f', long, help = "One of GeoJSON, CSV, GeoJSONSeq")]
     output_format: OutputFormat,
-
-    /// Specify where the result should be saved
     #[arg(short = 'o', long, help = "Output file to place the results")]
-    output_file: String,
-
-    /// Specify the years we should get the result for
-    #[arg(
-        short = 'y',
-        long,
-        help = "Specify the year ranges for which you are interested in the metrics"
-    )]
-    years: Option<Vec<String>>,
-}
-
-impl DataCommand {
-    pub fn gather_metric_requests(&self) -> Vec<MetricId> {
-        let mut metric_ids: Vec<MetricId> = vec![];
-
-        if let Some(ids) = &self.id {
-            for id in ids {
-                metric_ids.push(MetricId::Id(id.clone()));
-            }
-        }
-
-        if let Some(hxls) = &self.hxl {
-            for hxl in hxls {
-                metric_ids.push(MetricId::Hxl(hxl.clone()));
-            }
-        }
-
-        if let Some(names) = &self.name {
-            for name in names {
-                metric_ids.push(MetricId::CommonName(name.clone()));
-            }
-        }
-
-        metric_ids
-    }
+    output_file: Option<String>,
+    #[command(flatten)]
+    search_params_args: SearchParamsArgs,
 }
 
 impl From<&OutputFormat> for OutputFormatter {
@@ -119,6 +70,7 @@ impl From<&OutputFormat> for OutputFormatter {
             OutputFormat::GeoJSON => OutputFormatter::GeoJSON(GeoJSONFormatter),
             OutputFormat::Csv => OutputFormatter::Csv(CSVFormatter::default()),
             OutputFormat::GeoJSONSeq => OutputFormatter::GeoJSONSeq(GeoJSONSeqFormatter),
+            OutputFormat::Stdout => OutputFormatter::Csv(CSVFormatter::default()),
             _ => todo!("output format not implemented"),
         }
     }
@@ -135,38 +87,24 @@ impl RunCommand for DataCommand {
         info!("Running `data` subcommand");
 
         let popgetter = Popgetter::new_with_config(config).await?;
-        let data_request = DataRequestSpec::from(self);
-        let mut results = popgetter.get_data_request(&data_request).await?;
 
-        debug!("{results:#?}");
-        let mut f = File::create(&self.output_file)?;
+        let mut data = popgetter
+            .search(self.search_params_args.clone().into())
+            .download(&popgetter.config)
+            .await?;
+
+        debug!("{data:#?}");
+
         let formatter: OutputFormatter = (&self.output_format).into();
-        formatter.save(&mut f, &mut results)?;
-
-        Ok(())
-    }
-}
-
-impl From<&DataCommand> for DataRequestSpec {
-    fn from(value: &DataCommand) -> Self {
-        let region = if let Some(bbox) = value.bbox.clone() {
-            vec![RegionSpec::BoundingBox(bbox)]
+        if let Some(output_file) = &self.output_file {
+            let mut f = File::create(output_file)?;
+            formatter.save(&mut f, &mut data)?;
         } else {
-            vec![]
+            let stdout = std::io::stdout();
+            let mut stdout_lock = stdout.lock();
+            formatter.save(&mut stdout_lock, &mut data)?;
         };
-
-        let metrics = value
-            .gather_metric_requests()
-            .into_iter()
-            .map(MetricSpec::Metric)
-            .collect();
-
-        DataRequestSpec {
-            geometry: GeometrySpec::default(),
-            region,
-            metrics,
-            years: None,
-        }
+        Ok(())
     }
 }
 
@@ -184,24 +122,48 @@ pub struct MetricsCommand {
     #[arg(
         short,
         long,
-        help = "Filter by year ranges. All ranges are inclusive.",
+        help = "Show all metrics even if there are a large number"
+    )]
+    full: bool,
+    #[command(flatten)]
+    search_params_args: SearchParamsArgs,
+}
+
+/// These are the command-line arguments that can be parsed into a SearchParams. The type is
+/// slightly different because of the way we allow people to search in text fields.
+#[derive(Args, Debug, Clone)]
+struct SearchParamsArgs {
+    // Note: using `std::vec::Vec` rather than just `Vec`, to enforce that multiple year ranges are
+    // passed in a single argument e.g. `-y 2014...2016,2018...2019` rather than multiple arguments
+    // e.g. `-y 2014...2016 -y 2018...2019`. See https://github.com/clap-rs/clap/issues/4626 and
+    // https://docs.rs/clap/latest/clap/_derive/index.html#arg-types
+    #[arg(
+        short,
+        long,
+        help = "Filter by year ranges. All ranges are inclusive; multiple ranges can be comma-separated.",
         value_name = "YEAR|START...|...END|START...END",
         value_parser = parse_year_range,
     )]
-    year_range: Vec<YearRange>,
+    year_range: Option<std::vec::Vec<YearRange>>,
     #[arg(short, long, help = "Filter by geometry level")]
-    geometry_level: Option<Vec<String>>,
+    geometry_level: Option<String>,
     #[arg(short, long, help = "Filter by source data release name")]
-    source_data_release: Option<Vec<String>>,
+    source_data_release: Option<String>,
     #[arg(short, long, help = "Filter by data publisher name")]
-    publisher: Option<Vec<String>>,
+    publisher: Option<String>,
     #[arg(short, long, help = "Filter by country")]
-    country: Option<Vec<String>>,
+    country: Option<String>,
     #[arg(
         long,
         help = "Filter by source metric ID (i.e. the name of the table in the original data release)"
     )]
-    source_metric_id: Option<Vec<String>>,
+    source_metric_id: Option<String>,
+    #[arg(
+        short = 'i',
+        long,
+        help = "Specify a metric by its popgetter ID (or a prefix thereof)"
+    )]
+    id: Vec<String>,
     // Filters for text
     #[arg(long, help="Filter by HXL tag", num_args=0..)]
     hxl: Vec<String>,
@@ -211,43 +173,84 @@ pub struct MetricsCommand {
     description: Vec<String>,
     #[arg(short, long, help="Filter by HXL tag, name, or description", num_args=0..)]
     text: Vec<String>,
-    // Output options
-    #[arg(
-        short,
-        long,
-        help = "Show all metrics even if there are a large number"
-    )]
-    full: bool,
 }
 
 /// Expected behaviour:
 /// N.. -> After(N); ..N -> Before(N); M..N -> Between(M, N); N -> Between(N, N)
-fn parse_year_range(value: &str) -> Result<YearRange, &'static str> {
-    fn str_to_option_u16(value: &str) -> Result<Option<u16>, &'static str> {
-        if value.is_empty() {
-            return Ok(None);
-        }
-        match value.parse::<u16>() {
-            Ok(value) => Ok(Some(value)),
-            Err(_) => Err("Invalid year range"),
-        }
-    }
-    let parts: Vec<Option<u16>> = value
-        .split("...")
-        .map(str_to_option_u16)
-        .collect::<Result<Vec<Option<u16>>, &'static str>>()?;
-    match parts.as_slice() {
-        [Some(a)] => Ok(YearRange::Between(*a, *a)),
-        [None, Some(a)] => Ok(YearRange::Before(*a)),
-        [Some(a), None] => Ok(YearRange::After(*a)),
-        [Some(a), Some(b)] => {
-            if a > b {
-                Err("Invalid year range")
-            } else {
-                Ok(YearRange::Between(*a, *b))
+/// Year ranges can be comma-separated
+fn parse_year_range(value: &str) -> Result<Vec<YearRange>, &'static str> {
+    fn parse_single_year_range(value: &str) -> Result<YearRange, &'static str> {
+        fn str_to_option_u16(value: &str) -> Result<Option<u16>, &'static str> {
+            if value.is_empty() {
+                return Ok(None);
+            }
+            match value.parse::<u16>() {
+                Ok(value) => Ok(Some(value)),
+                Err(_) => Err("Invalid year range"),
             }
         }
-        _ => Err("Invalid year range"),
+        let parts: Vec<Option<u16>> = value
+            .split("...")
+            .map(str_to_option_u16)
+            .collect::<Result<Vec<Option<u16>>, &'static str>>()?;
+        match parts.as_slice() {
+            [Some(a)] => Ok(YearRange::Between(*a, *a)),
+            [None, Some(a)] => Ok(YearRange::Before(*a)),
+            [Some(a), None] => Ok(YearRange::After(*a)),
+            [Some(a), Some(b)] => {
+                if a > b {
+                    Err("Invalid year range")
+                } else {
+                    Ok(YearRange::Between(*a, *b))
+                }
+            }
+            _ => Err("Invalid year range"),
+        }
+    }
+    value
+        .split(',')
+        .map(parse_single_year_range)
+        .collect::<Result<Vec<YearRange>, &'static str>>()
+}
+
+fn text_searches_from_args(
+    hxl: Vec<String>,
+    name: Vec<String>,
+    description: Vec<String>,
+    text: Vec<String>,
+) -> Vec<SearchText> {
+    let mut all_text_searches: Vec<SearchText> = vec![];
+    all_text_searches.extend(hxl.iter().map(|t| SearchText {
+        text: t.clone(),
+        context: nonempty![SearchContext::Hxl],
+    }));
+    all_text_searches.extend(name.iter().map(|t| SearchText {
+        text: t.clone(),
+        context: nonempty![SearchContext::HumanReadableName],
+    }));
+    all_text_searches.extend(description.iter().map(|t| SearchText {
+        text: t.clone(),
+        context: nonempty![SearchContext::Description],
+    }));
+    all_text_searches.extend(text.iter().map(|t| SearchText {
+        text: t.clone(),
+        context: SearchContext::all(),
+    }));
+    all_text_searches
+}
+
+impl From<SearchParamsArgs> for SearchParams {
+    fn from(args: SearchParamsArgs) -> Self {
+        SearchParams {
+            text: text_searches_from_args(args.hxl, args.name, args.description, args.text),
+            year_range: args.year_range.clone(),
+            geometry_level: args.geometry_level.clone().map(GeometryLevel),
+            source_data_release: args.source_data_release.clone().map(SourceDataRelease),
+            data_publisher: args.publisher.clone().map(DataPublisher),
+            country: args.country.clone().map(Country),
+            source_metric_id: args.source_metric_id.clone().map(SourceMetricId),
+            metric_id: args.id.clone().into_iter().map(MetricId).collect(),
+        }
     }
 }
 
@@ -256,36 +259,8 @@ impl RunCommand for MetricsCommand {
         info!("Running `metrics` subcommand");
         debug!("{:#?}", self);
 
-        let mut all_text_searches: Vec<SearchText> = vec![];
-        all_text_searches.extend(self.hxl.iter().map(|t| SearchText {
-            text: t.clone(),
-            context: vec![SearchContext::Hxl],
-        }));
-        all_text_searches.extend(self.name.iter().map(|t| SearchText {
-            text: t.clone(),
-            context: vec![SearchContext::HumanReadableName],
-        }));
-        all_text_searches.extend(self.description.iter().map(|t| SearchText {
-            text: t.clone(),
-            context: vec![SearchContext::Description],
-        }));
-        all_text_searches.extend(self.text.iter().map(|t| SearchText {
-            text: t.clone(),
-            context: SearchContext::all(),
-        }));
-
-        let search_request = SearchRequest {
-            text: all_text_searches,
-            year_range: self.year_range.clone(),
-            geometry_level: self.geometry_level.clone().map(GeometryLevel),
-            source_data_release: self.source_data_release.clone().map(SourceDataRelease),
-            data_publisher: self.publisher.clone().map(DataPublisher),
-            country: self.country.clone().map(Country),
-            census_table: self.source_metric_id.clone().map(SourceMetricId),
-        };
         let popgetter = Popgetter::new_with_config(config).await?;
-        let metadata = popgetter.metadata;
-        let search_results = search_request.search_results(&metadata)?;
+        let search_results = popgetter.search(self.search_params_args.clone().into());
 
         let len_requests = search_results.0.shape().0;
         println!("Found {} metrics.", len_requests);
@@ -304,7 +279,8 @@ impl RunCommand for MetricsCommand {
 }
 
 /// The Countries command should return information about the various countries we have data for.
-/// This could include metrics like the number of surveys / metrics / geographies avaliable for each country.
+/// This could include metrics like the number of surveys / metrics / geographies available for
+/// each country.
 #[derive(Args, Debug)]
 pub struct CountriesCommand;
 
@@ -315,8 +291,8 @@ impl RunCommand for CountriesCommand {
     }
 }
 
-/// The Surveys command should list the various surveys that popgetter has access to and releated
-/// stastistics.
+/// The Surveys command should list the various surveys that popgetter has access to and related
+/// statistics.
 #[derive(Args, Debug)]
 pub struct SurveysCommand;
 
@@ -327,32 +303,33 @@ impl RunCommand for SurveysCommand {
     }
 }
 
-/// The Recipe command loads a recipy file and generates the output data requested
-#[derive(Args, Debug)]
-pub struct RecipeCommand {
-    #[arg(index = 1)]
-    recipe_file: String,
+/// The Recipe command loads a recipe file and generates the output data requested
+/// TODO: Reimplement this
+// #[derive(Args, Debug)]
+// pub struct RecipeCommand {
+//     #[arg(index = 1)]
+//     recipe_file: String,
 
-    #[arg(short = 'f', long)]
-    output_format: OutputFormat,
+//     #[arg(short = 'f', long)]
+//     output_format: OutputFormat,
 
-    #[arg(short = 'o', long)]
-    output_file: String,
-}
+//     #[arg(short = 'o', long)]
+//     output_file: String,
+// }
 
-impl RunCommand for RecipeCommand {
-    async fn run(&self, config: Config) -> Result<()> {
-        let popgetter = Popgetter::new_with_config(config).await?;
-        let recipe = fs::read_to_string(&self.recipe_file)?;
-        let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
-        let mut results = popgetter.get_data_request(&data_request).await?;
-        println!("{results}");
-        let formatter: OutputFormatter = (&self.output_format).into();
-        let mut f = File::create(&self.output_file)?;
-        formatter.save(&mut f, &mut results)?;
-        Ok(())
-    }
-}
+// impl RunCommand for RecipeCommand {
+//     async fn run(&self, config: Config) -> Result<()> {
+//         let popgetter = Popgetter::new_with_config(config).await?;
+//         let recipe = fs::read_to_string(&self.recipe_file)?;
+//         let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
+//         let mut results = popgetter.get_data_request(&data_request).await?;
+//         println!("{results}");
+//         let formatter: OutputFormatter = (&self.output_format).into();
+//         let mut f = File::create(&self.output_file)?;
+//         formatter.save(&mut f, &mut results)?;
+//         Ok(())
+//     }
+// }
 
 /// The entrypoint for the CLI.
 #[derive(Parser, Debug)]
@@ -377,8 +354,8 @@ pub enum Commands {
     Metrics(MetricsCommand),
     /// Surveys
     Surveys(SurveysCommand),
-    /// From recipe
-    Recipe(RecipeCommand),
+    // /// From recipe
+    // Recipe(RecipeCommand),
 }
 
 #[cfg(test)]
@@ -389,12 +366,33 @@ mod tests {
 
     #[test]
     fn test_parse_year_range() {
-        assert_eq!(parse_year_range("2000"), Ok(YearRange::Between(2000, 2000)));
-        assert_eq!(parse_year_range("2000..."), Ok(YearRange::After(2000)));
-        assert_eq!(parse_year_range("...2000"), Ok(YearRange::Before(2000)));
+        assert_eq!(
+            parse_year_range("2000"),
+            Ok(vec![YearRange::Between(2000, 2000)])
+        );
+        assert_eq!(
+            parse_year_range("2000..."),
+            Ok(vec![YearRange::After(2000)])
+        );
+        assert_eq!(
+            parse_year_range("...2000"),
+            Ok(vec![YearRange::Before(2000)])
+        );
         assert_eq!(
             parse_year_range("2000...2001"),
-            Ok(YearRange::Between(2000, 2001))
+            Ok(vec![YearRange::Between(2000, 2001)])
+        );
+        assert_eq!(
+            parse_year_range("2000...2001,2005..."),
+            Ok(vec![YearRange::Between(2000, 2001), YearRange::After(2005)])
+        );
+        assert_eq!(
+            parse_year_range("...2001,2005,2009"),
+            Ok(vec![
+                YearRange::Before(2001),
+                YearRange::Between(2005, 2005),
+                YearRange::Between(2009, 2009)
+            ])
         );
     }
 

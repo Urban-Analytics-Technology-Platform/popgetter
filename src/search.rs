@@ -1,11 +1,22 @@
-//! Search
+//! Types and functions to perform filtering on the fully joined metadata catalogue
 
-use crate::{metadata::Metadata, COL};
+use crate::{
+    config::Config,
+    geo::get_geometries,
+    metadata::ExpandedMetadata,
+    parquet::{get_metrics, MetricRequest},
+    COL,
+};
 use chrono::NaiveDate;
 use log::debug;
+use nonempty::{nonempty, NonEmpty};
 use polars::lazy::dsl::{col, lit, Expr};
-use polars::prelude::{DataFrame, LazyFrame};
+use polars::prelude::{DataFrame, DataFrameJoinOps, IntoLazy, LazyFrame};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use tokio::try_join;
+
+// TODO: add trait/struct for combine_exprs
 
 /// Combine multiple queries with OR. If there are no queries in the input list, returns None.
 fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
@@ -16,6 +27,16 @@ fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
         } else {
             Some(expr)
         };
+    }
+    query
+}
+
+/// Same as `combine_exprs_with_or`, but takes a NonEmpty list instead of a Vec, and doesn't
+/// return an Option.
+fn combine_exprs_with_or1(exprs: NonEmpty<Expr>) -> Expr {
+    let mut query: Expr = exprs.head;
+    for expr in exprs.tail.into_iter() {
+        query = query.or(expr);
     }
     query
 }
@@ -33,12 +54,32 @@ fn combine_exprs_with_and(exprs: Vec<Expr>) -> Option<Expr> {
     query
 }
 
-/// Search in a column case-insensitively for a string literal (i.e. not a regex!)
+/// Same as `combine_exprs_with_and`, but takes a NonEmpty list instead of a Vec, and doesn't
+/// return an Option.
+fn _combine_exprs_with_and1(exprs: NonEmpty<Expr>) -> Expr {
+    let mut query: Expr = exprs.head;
+    for expr in exprs.tail.into_iter() {
+        query = query.and(expr);
+    }
+    query
+}
+
+/// Search in a column case-insensitively for a string literal (i.e. not a regex!). The search
+/// parameter can appear anywhere in the column value.
 fn case_insensitive_contains(column: &str, value: &str) -> Expr {
     let regex = format!("(?i){}", regex::escape(value));
     col(column).str().contains(lit(regex), false)
 }
 
+/// Search in a column case-insensitively for a string literal (i.e. not a regex!). The search
+/// parameter must be a prefix of the column value.
+fn case_insensitive_startswith(column: &str, value: &str) -> Expr {
+    let regex = format!("(?i)^{}", regex::escape(value));
+    col(column).str().contains(lit(regex), false)
+}
+
+/// Where we want to search for a text string in. Pass multiple search contexts to search in all of
+/// them.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SearchContext {
     Hxl,
@@ -47,29 +88,25 @@ pub enum SearchContext {
 }
 
 impl SearchContext {
-    pub fn all() -> Vec<Self> {
-        vec![Self::Hxl, Self::HumanReadableName, Self::Description]
+    pub fn all() -> NonEmpty<Self> {
+        nonempty![Self::Hxl, Self::HumanReadableName, Self::Description]
     }
 }
 
 /// Implementing conversion from `SearchText` to a polars expression enables a
 /// `SearchText` to be passed to polars dataframe for filtering results.
-impl From<SearchText> for Option<Expr> {
+impl From<SearchText> for Expr {
     fn from(val: SearchText) -> Self {
-        let queries = val
-            .context
-            .iter()
-            .map(|field| match field {
-                SearchContext::Hxl => case_insensitive_contains(COL::METRIC_HXL_TAG, &val.text),
-                SearchContext::HumanReadableName => {
-                    case_insensitive_contains(COL::METRIC_HUMAN_READABLE_NAME, &val.text)
-                }
-                SearchContext::Description => {
-                    case_insensitive_contains(COL::METRIC_DESCRIPTION, &val.text)
-                }
-            })
-            .collect();
-        combine_exprs_with_or(queries)
+        let queries: NonEmpty<Expr> = val.context.map(|field| match field {
+            SearchContext::Hxl => case_insensitive_contains(COL::METRIC_HXL_TAG, &val.text),
+            SearchContext::HumanReadableName => {
+                case_insensitive_contains(COL::METRIC_HUMAN_READABLE_NAME, &val.text)
+            }
+            SearchContext::Description => {
+                case_insensitive_contains(COL::METRIC_DESCRIPTION, &val.text)
+            }
+        });
+        combine_exprs_with_or1(queries)
     }
 }
 
@@ -103,70 +140,46 @@ impl From<YearRange> for Expr {
     }
 }
 
-impl From<DataPublisher> for Option<Expr> {
+impl From<DataPublisher> for Expr {
     fn from(value: DataPublisher) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .iter()
-                .map(|val| case_insensitive_contains(COL::DATA_PUBLISHER_NAME, val))
-                .collect(),
-        )
+        case_insensitive_contains(COL::DATA_PUBLISHER_NAME, &value.0)
     }
 }
 
-impl From<SourceDataRelease> for Option<Expr> {
+impl From<SourceDataRelease> for Expr {
     fn from(value: SourceDataRelease) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .iter()
-                .map(|val| case_insensitive_contains(COL::SOURCE_DATA_RELEASE_NAME, val))
-                .collect(),
-        )
+        case_insensitive_contains(COL::SOURCE_DATA_RELEASE_NAME, &value.0)
     }
 }
 
-impl From<GeometryLevel> for Option<Expr> {
+impl From<GeometryLevel> for Expr {
     fn from(value: GeometryLevel) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .iter()
-                .map(|val| case_insensitive_contains(COL::GEOMETRY_LEVEL, val))
-                .collect(),
-        )
+        case_insensitive_contains(COL::GEOMETRY_LEVEL, &value.0)
     }
 }
 
-impl From<Country> for Option<Expr> {
+impl From<Country> for Expr {
     fn from(value: Country) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .iter()
-                .map(|val| case_insensitive_contains(COL::COUNTRY_NAME_SHORT_EN, val))
-                .collect(),
-        )
+        case_insensitive_contains(COL::COUNTRY_NAME_SHORT_EN, &value.0)
     }
 }
 
-impl From<SourceMetricId> for Option<Expr> {
+impl From<SourceMetricId> for Expr {
     fn from(value: SourceMetricId) -> Self {
-        combine_exprs_with_or(
-            value
-                .0
-                .iter()
-                .map(|val| case_insensitive_contains(COL::METRIC_SOURCE_METRIC_ID, val))
-                .collect(),
-        )
+        case_insensitive_contains(COL::METRIC_SOURCE_METRIC_ID, &value.0)
+    }
+}
+
+impl From<MetricId> for Expr {
+    fn from(value: MetricId) -> Self {
+        case_insensitive_startswith(COL::METRIC_ID, &value.0)
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchText {
     pub text: String,
-    pub context: Vec<SearchContext>,
+    pub context: NonEmpty<SearchContext>,
 }
 
 impl Default for SearchText {
@@ -178,7 +191,7 @@ impl Default for SearchText {
     }
 }
 
-/// Note: year ranges are inclusive of end points.
+/// Search over years
 #[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
 pub enum YearRange {
     Before(u16),
@@ -186,118 +199,176 @@ pub enum YearRange {
     Between(u16, u16),
 }
 
-/// To allow search over multiple years
+/// Search over metric IDs
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct GeometryLevel(pub Vec<String>);
+pub struct MetricId(pub String);
 
-/// Source data release: set of strings that will search over this
+/// Search over geometry levels
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SourceDataRelease(pub Vec<String>);
+pub struct GeometryLevel(pub String);
 
-/// Data publisher: set of strings that will search over this
+/// Search over source data release names
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DataPublisher(pub Vec<String>);
+pub struct SourceDataRelease(pub String);
 
-/// Countries: set of countries to be included in the search
+/// Search over data publisher names
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Country(pub Vec<String>);
+pub struct DataPublisher(pub String);
 
-/// Census tables: set of census tables to be included in the search
+/// Search over country (short English names)
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SourceMetricId(pub Vec<String>);
+pub struct Country(pub String);
 
+/// Search over source metric IDs in the original census table
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SearchRequest {
+pub struct SourceMetricId(pub String);
+
+/// This struct represents all the possible parameters one can search the metadata catalogue with.
+/// All parameters are optional in that they can either be empty vectors or None.
+///
+/// Each of the fields are combined with an AND operation, so searching for both text and a year
+/// range will only return metrics that satisfy both parameters.
+///
+/// However, if a parameter has multiple values (e.g. multiple text strings), these are combined
+/// with an OR operation. So searching for multiple text strings will return metrics that satisfy
+/// any of the text strings.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SearchParams {
     pub text: Vec<SearchText>,
-    pub year_range: Vec<YearRange>,
+    pub year_range: Option<Vec<YearRange>>,
+    pub metric_id: Vec<MetricId>,
     pub geometry_level: Option<GeometryLevel>,
     pub source_data_release: Option<SourceDataRelease>,
     pub data_publisher: Option<DataPublisher>,
     pub country: Option<Country>,
-    pub census_table: Option<SourceMetricId>,
+    pub source_metric_id: Option<SourceMetricId>,
 }
 
-impl SearchRequest {
-    pub fn new() -> Self {
-        Self {
-            text: vec![],
-            year_range: vec![],
-            geometry_level: None,
-            source_data_release: None,
-            data_publisher: None,
-            country: None,
-            census_table: None,
-        }
-    }
-
-    pub fn with_country(mut self, country: &str) -> Self {
-        self.country = Some(Country(vec![country.to_string()]));
-        self
-    }
-
-    pub fn with_data_publisher(mut self, data_publisher: &str) -> Self {
-        self.data_publisher = Some(DataPublisher(vec![data_publisher.to_string()]));
-        self
-    }
-
-    pub fn with_source_data_release(mut self, source_data_release: &str) -> Self {
-        self.source_data_release = Some(SourceDataRelease(vec![source_data_release.to_string()]));
-        self
-    }
-
-    pub fn with_year_range(mut self, year_range: YearRange) -> Self {
-        self.year_range = vec![year_range];
-        self
-    }
-
-    pub fn with_geometry_level(mut self, geometry_level: &str) -> Self {
-        self.geometry_level = Some(GeometryLevel(vec![geometry_level.to_string()]));
-        self
-    }
-
-    pub fn with_census_table(mut self, census_table: &str) -> Self {
-        self.census_table = Some(SourceMetricId(vec![census_table.to_string()]));
-        self
-    }
-
-    pub fn search_results(self, metadata: &Metadata) -> anyhow::Result<SearchResults> {
+impl SearchParams {
+    pub fn search(self, expanded_metadata: &ExpandedMetadata) -> SearchResults {
         debug!("Searching with request: {:?}", self);
         let expr: Option<Expr> = self.into();
-        let full_results: LazyFrame = metadata.combined_metric_source_geometry().0;
-        let result: DataFrame = match expr {
+        let full_results: LazyFrame = expanded_metadata.as_df();
+        let result: LazyFrame = match expr {
             Some(expr) => full_results.filter(expr),
             None => full_results,
-        }
-        .collect()?;
-        Ok(SearchResults(result))
+        };
+        SearchResults(result.collect().unwrap())
     }
 }
 
-impl Default for SearchRequest {
-    fn default() -> Self {
-        Self::new()
+fn to_queries_then_or<T: Into<Expr>>(queries: Vec<T>) -> Option<Expr> {
+    let queries: Vec<Expr> = queries.into_iter().map(|q| q.into()).collect();
+    combine_exprs_with_or(queries)
+}
+
+fn _to_optqueries_then_or<T: Into<Option<Expr>>>(queries: Vec<T>) -> Option<Expr> {
+    let query_options: Vec<Option<Expr>> = queries.into_iter().map(|q| q.into()).collect();
+    let queries: Vec<Expr> = query_options.into_iter().flatten().collect();
+    combine_exprs_with_or(queries)
+}
+
+impl From<SearchParams> for Option<Expr> {
+    fn from(value: SearchParams) -> Self {
+        let mut subexprs: Vec<Option<Expr>> = value
+            .text
+            .into_iter()
+            .map(|text| Some(text.into()))
+            .collect();
+        subexprs.extend([to_queries_then_or(value.metric_id)]);
+        if let Some(year_range) = value.year_range {
+            subexprs.extend([to_queries_then_or(year_range)]);
+        }
+        let other_subexprs: Vec<Option<Expr>> = vec![
+            value.geometry_level.map(|v| v.into()),
+            value.source_data_release.map(|v| v.into()),
+            value.data_publisher.map(|v| v.into()),
+            value.country.map(|v| v.into()),
+            value.source_metric_id.map(|v| v.into()),
+        ];
+        subexprs.extend(other_subexprs);
+        // Remove the Nones and unwrap the Somes
+        let valid_subexprs: Vec<Expr> = subexprs.into_iter().flatten().collect();
+        combine_exprs_with_and(valid_subexprs)
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct SearchResults(pub DataFrame);
 
-impl From<SearchRequest> for Option<Expr> {
-    fn from(value: SearchRequest) -> Self {
-        let mut subexprs: Vec<Option<Expr>> =
-            value.text.into_iter().map(|text| text.into()).collect();
-        subexprs.extend(value.year_range.into_iter().map(|v| Some(v.into())));
-        let other_subexprs: Vec<Option<Expr>> = vec![
-            value.geometry_level.and_then(|v| v.into()),
-            value.source_data_release.and_then(|v| v.into()),
-            value.data_publisher.and_then(|v| v.into()),
-            value.country.and_then(|v| v.into()),
-            value.census_table.and_then(|v| v.into()),
-        ];
-        subexprs.extend(other_subexprs);
-        // Remove the Nones and unwrap the Somes
-        let valid_subexprs: Vec<Expr> = subexprs.into_iter().flatten().collect();
-        combine_exprs_with_and(valid_subexprs)
+impl SearchResults {
+    /// Convert all the metrics in the dataframe to MetricRequests
+    pub fn to_metric_requests(self, config: &Config) -> Vec<MetricRequest> {
+        // Using unwrap throughout this function because if any of them fail, it means our upstream
+        // data is invalid!
+        // TODO: Maybe map the error type instead to provide some useful error messages
+        let df = self
+            .0
+            .lazy()
+            .select([
+                col(COL::METRIC_PARQUET_PATH),
+                col(COL::METRIC_PARQUET_COLUMN_NAME),
+                col(COL::GEOMETRY_FILEPATH_STEM),
+            ])
+            .collect()
+            .unwrap();
+        df.column(COL::METRIC_PARQUET_COLUMN_NAME)
+            .unwrap()
+            .str()
+            .unwrap()
+            .into_no_null_iter()
+            .zip(
+                df.column(COL::METRIC_PARQUET_PATH)
+                    .unwrap()
+                    .str()
+                    .unwrap()
+                    .into_no_null_iter(),
+            )
+            .zip(
+                df.column(COL::GEOMETRY_FILEPATH_STEM)
+                    .unwrap()
+                    .str()
+                    .unwrap()
+                    .into_no_null_iter(),
+            )
+            .map(|((column, metric_file), geom_file)| MetricRequest {
+                column: column.to_owned(),
+                metric_file: format!("{}/{metric_file}", config.base_path),
+                geom_file: format!("{}/{geom_file}.fgb", config.base_path),
+            })
+            .collect()
+    }
+
+    // Given a Data Request Spec
+    // Return a DataFrame of the selected dataset
+    pub async fn download(self, config: &Config) -> anyhow::Result<DataFrame> {
+        let metric_requests = self.to_metric_requests(config);
+        debug!("metric_requests = {:#?}", metric_requests);
+        let all_geom_files: HashSet<String> = metric_requests
+            .iter()
+            .map(|m| m.geom_file.clone())
+            .collect();
+        // Required because polars is blocking
+        let metrics = tokio::task::spawn_blocking(move || get_metrics(&metric_requests, None));
+
+        // TODO Handle multiple responses
+        if all_geom_files.len() > 1 {
+            panic!("Multiple geometries not yet supported");
+        }
+        // TODO Pass in the bbox as the second argument here
+        let geoms = get_geometries(all_geom_files.iter().next().unwrap(), None);
+
+        // try_join requires us to have the errors from all futures be the same.
+        // We use anyhow to get it back properly
+        let (metrics, geoms) = try_join!(
+            async move { metrics.await.map_err(anyhow::Error::from) },
+            geoms
+        )?;
+        debug!("geoms: {geoms:#?}");
+        debug!("metrics: {metrics:#?}");
+
+        let result = geoms.inner_join(&metrics?, [COL::GEO_ID], [COL::GEO_ID])?;
+        Ok(result)
     }
 }
 
