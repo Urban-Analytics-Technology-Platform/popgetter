@@ -266,13 +266,13 @@ impl RunCommand for MetricsCommand {
         println!("Found {} metrics.", len_requests);
 
         if len_requests > 50 && !self.full {
-            display_search_results(search_results, Some(50));
+            display_search_results(search_results, Some(50))?;
             println!(
                 "{} more results not shown. Use --full to show all results.",
                 len_requests - 50
             );
         } else {
-            display_search_results(search_results, None);
+            display_search_results(search_results, None)?;
         }
         Ok(())
     }
