@@ -1,6 +1,6 @@
 use comfy_table::{presets::NOTHING, *};
 use itertools::izip;
-use log::debug;
+
 use popgetter::{search::SearchResults, COL};
 
 pub fn display_search_results(
