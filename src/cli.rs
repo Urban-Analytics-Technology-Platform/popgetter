@@ -65,6 +65,13 @@ pub struct DataCommand {
     output_file: Option<String>,
     #[command(flatten)]
     search_params_args: SearchParamsArgs,
+    #[arg(
+        short = 'r',
+        long,
+        default_value_t = true,
+        help = "Force run without prompt"
+    )]
+    force_run: bool,
 }
 
 impl From<&OutputFormat> for OutputFormatter {
@@ -432,5 +439,11 @@ mod tests {
         );
         let output_format = OutputFormat::from_str("awesome_tiny_model");
         assert!(output_format.is_err(), "non listed formats should fail");
+    }
+
+    #[test]
+    fn cli() {
+        use clap::CommandFactory;
+        Cli::command().debug_assert();
     }
 }
