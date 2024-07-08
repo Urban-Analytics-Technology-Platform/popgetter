@@ -99,7 +99,7 @@ impl RunCommand for DataCommand {
         sp.stop();
         let len_requests = search_results.0.shape().0;
         println!("Found {} metrics.", len_requests);
-        let mut sp = Spinner::new(DEFAULT_PROGRESS_SPINNER, "Download Parquet files".into());
+        let mut sp = Spinner::new(DEFAULT_PROGRESS_SPINNER, "Downloading metrics".into());
         let mut data = search_results.download(&popgetter.config).await?;
         sp.stop();
 
