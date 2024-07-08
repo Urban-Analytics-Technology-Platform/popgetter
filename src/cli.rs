@@ -271,7 +271,7 @@ impl RunCommand for MetricsCommand {
 
         let mut sp = Spinner::new(
             DEFAULT_PROGRESS_SPINNER,
-            "Downloading metadata from Azure".into(),
+            "Downloading and searching metadata".into(),
         );
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
