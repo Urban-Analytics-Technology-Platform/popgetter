@@ -101,7 +101,7 @@ impl RunCommand for DataCommand {
         println!("Found {} metrics.", len_requests);
         let mut sp = Spinner::new(DEFAULT_PROGRESS_SPINNER, "Downloading metrics".into());
         let mut data = search_results.download(&popgetter.config).await?;
-        sp.stop();
+        sp.stop_with_newline();
 
         debug!("{data:#?}");
 
