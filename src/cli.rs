@@ -103,12 +103,12 @@ impl RunCommand for DataCommand {
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
 
-        sp.stop();
+        sp.stop_with_newline();
         let len_requests = search_results.0.shape().0;
         println!("Found {} metrics.", len_requests);
-        let mut sp = Spinner::new(DEFAULT_PROGRESS_SPINNER, "Download Parquet files".into());
+        let mut sp = Spinner::new(DEFAULT_PROGRESS_SPINNER, "Downloading metrics".into());
         let mut data = search_results.download(&popgetter.config).await?;
-        sp.stop();
+        sp.stop_with_newline();
 
         debug!("{data:#?}");
 
@@ -278,11 +278,11 @@ impl RunCommand for MetricsCommand {
 
         let mut sp = Spinner::new(
             DEFAULT_PROGRESS_SPINNER,
-            "Downloading metadata from Azure".into(),
+            "Downloading and searching metadata".into(),
         );
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
-        sp.stop();
+        sp.stop_with_newline();
 
         let len_requests = search_results.0.shape().0;
         println!("Found {} metrics.", len_requests);
