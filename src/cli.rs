@@ -275,7 +275,7 @@ impl RunCommand for MetricsCommand {
         );
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
-        sp.stop();
+        sp.stop_with_newline();
 
         let len_requests = search_results.0.shape().0;
         println!("Found {} metrics.", len_requests);
