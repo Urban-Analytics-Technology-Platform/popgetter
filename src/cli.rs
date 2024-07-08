@@ -107,6 +107,8 @@ impl RunCommand for DataCommand {
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
 
+        // sp.stop_and_persist is potentially a better method, but not obvious how to
+        // store the timing. Leaving below until that option is ruled out.
         // sp.stop_and_persist(&COMPLETE_PROGRESS_STRING, spinner_message.into());
         sp.stop_with_symbol(&COMPLETE_PROGRESS_STRING);
         print_metrics_count(search_results.clone());
@@ -252,6 +254,9 @@ fn parse_year_range(value: &str) -> Result<Vec<YearRange>, &'static str> {
         .collect::<Result<Vec<YearRange>, &'static str>>()
 }
 
+// A simple function to manage similaries across multiple cases.
+// May ultimately be generalised to a function to manage all progress UX
+// that can be switched on and off.
 fn print_metrics_count(search_results: SearchResults) -> usize {
     let len_requests = search_results.0.shape().0;
     println!("Found {len_requests} metric(s).");
