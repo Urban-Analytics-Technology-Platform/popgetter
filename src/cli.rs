@@ -12,16 +12,23 @@ use popgetter::{
     },
     geo::BBox,
     search::{
-        Country, DataPublisher, GeometryLevel, MetricId, SearchContext, SearchParams, SearchText,
-        SourceDataRelease, SourceMetricId, YearRange,
+        Country, DataPublisher, GeometryLevel, MetricId, SearchContext, SearchParams,
+        SearchResults, SearchText, SourceDataRelease, SourceMetricId, YearRange,
     },
     Popgetter,
 };
 use serde::{Deserialize, Serialize};
+use spinners::{Spinner, Spinners};
 use std::fs::File;
+use std::{io, process};
 use strum_macros::EnumString;
 
 use crate::display::display_search_results;
+
+const DEFAULT_PROGRESS_SPINNER: Spinners = Spinners::Dots;
+const COMPLETE_PROGRESS_STRING: &str = "✔";
+const RUNNING_TAIL_STRING: &str = "...";
+const DOWNLOADING_SEARCHING_STRING: &str = "Downloading and searching metadata";
 
 /// Defines the output formats we are able to produce data in.
 #[derive(Clone, Debug, Deserialize, Serialize, EnumString, PartialEq, Eq)]
@@ -62,6 +69,13 @@ pub struct DataCommand {
     output_file: Option<String>,
     #[command(flatten)]
     search_params_args: SearchParamsArgs,
+    #[arg(
+        short = 'r',
+        long,
+        default_value_t = false,
+        help = "Force run without prompt"
+    )]
+    force_run: bool,
 }
 
 impl From<&OutputFormat> for OutputFormatter {
@@ -86,12 +100,39 @@ impl RunCommand for DataCommand {
     async fn run(&self, config: Config) -> Result<()> {
         info!("Running `data` subcommand");
 
+        let mut sp = Spinner::with_timer(
+            DEFAULT_PROGRESS_SPINNER,
+            (DOWNLOADING_SEARCHING_STRING.to_string() + RUNNING_TAIL_STRING).into(),
+        );
         let popgetter = Popgetter::new_with_config(config).await?;
+        let search_results = popgetter.search(self.search_params_args.clone().into());
 
-        let mut data = popgetter
-            .search(self.search_params_args.clone().into())
-            .download(&popgetter.config)
-            .await?;
+        // sp.stop_and_persist is potentially a better method, but not obvious how to
+        // store the timing. Leaving below until that option is ruled out.
+        // sp.stop_and_persist(&COMPLETE_PROGRESS_STRING, spinner_message.into());
+        sp.stop_with_symbol(&COMPLETE_PROGRESS_STRING);
+        print_metrics_count(search_results.clone());
+        if !self.force_run {
+            println!("Input 'r' to run query, any other character will cancel");
+            let mut input = String::new();
+            io::stdin().read_line(&mut input).unwrap();
+            let input = input.trim().to_lowercase();
+            match input.as_str() {
+                "r" | "run" | "y" | "yes" => {}
+                _ => {
+                    println!("Cancelling query.");
+                    process::exit(0);
+                }
+            }
+        }
+
+        let spinner_message = "Downloading metrics";
+        let mut sp = Spinner::with_timer(
+            DEFAULT_PROGRESS_SPINNER,
+            (spinner_message.to_string() + RUNNING_TAIL_STRING).into(),
+        );
+        let mut data = search_results.download(&popgetter.config).await?;
+        sp.stop_with_symbol(&COMPLETE_PROGRESS_STRING);
 
         debug!("{data:#?}");
 
@@ -213,6 +254,15 @@ fn parse_year_range(value: &str) -> Result<Vec<YearRange>, &'static str> {
         .collect::<Result<Vec<YearRange>, &'static str>>()
 }
 
+// A simple function to manage similaries across multiple cases.
+// May ultimately be generalised to a function to manage all progress UX
+// that can be switched on and off.
+fn print_metrics_count(search_results: SearchResults) -> usize {
+    let len_requests = search_results.0.shape().0;
+    println!("Found {len_requests} metric(s).");
+    return len_requests;
+}
+
 fn text_searches_from_args(
     hxl: Vec<String>,
     name: Vec<String>,
@@ -259,11 +309,15 @@ impl RunCommand for MetricsCommand {
         info!("Running `metrics` subcommand");
         debug!("{:#?}", self);
 
+        let mut sp = Spinner::with_timer(
+            DEFAULT_PROGRESS_SPINNER,
+            DOWNLOADING_SEARCHING_STRING.into(),
+        );
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
+        sp.stop_with_symbol(&COMPLETE_PROGRESS_STRING);
 
-        let len_requests = search_results.0.shape().0;
-        println!("Found {} metrics.", len_requests);
+        let len_requests = print_metrics_count(search_results.clone());
 
         if len_requests > 50 && !self.full {
             display_search_results(search_results, Some(50));
@@ -418,5 +472,11 @@ mod tests {
         );
         let output_format = OutputFormat::from_str("awesome_tiny_model");
         assert!(output_format.is_err(), "non listed formats should fail");
+    }
+
+    #[test]
+    fn cli() {
+        use clap::CommandFactory;
+        Cli::command().debug_assert();
     }
 }
