@@ -374,8 +374,7 @@ impl SearchResults {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
+    // use super::*;
     // #[test]
     // fn test_search_request() {
     //     let mut sr = SearchRequest{search_string: None}.with_country("a").with_country("b");

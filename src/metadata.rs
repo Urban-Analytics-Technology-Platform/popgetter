@@ -109,9 +109,15 @@ impl Metadata {
                 [col(COL::SOURCE_DATA_RELEASE_DATA_PUBLISHER_ID)],
                 [col(COL::DATA_PUBLISHER_ID)],
                 JoinArgs::new(JoinType::Inner),
+            )
+            // TODO: consider case when many countries
+            .explode([col(COL::DATA_PUBLISHER_COUNTRIES_OF_INTEREST)])
+            .join(
+                self.countries.clone().lazy(),
+                [col(COL::DATA_PUBLISHER_COUNTRIES_OF_INTEREST)],
+                [col(COL::COUNTRY_ID)],
+                JoinArgs::new(JoinType::Inner),
             );
-        // TODO: Add a country_id column to the metadata, and merge in the countries as well. See
-        // https://github.com/Urban-Analytics-Technology-Platform/popgetter/issues/104
 
         // Debug print the column names so that we know what we can access
         let schema = df.schema().unwrap();
