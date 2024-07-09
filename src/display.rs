@@ -12,7 +12,7 @@ pub fn display_search_results(
         None => results.0,
     };
 
-    for (metric_id, hrn, desc, hxl, date, country, level) in izip!(
+    for (metric_id, hrn, desc, hxl, date, country, level, download_url) in izip!(
         df_to_show.column(COL::METRIC_ID)?.str()?,
         df_to_show.column(COL::METRIC_HUMAN_READABLE_NAME)?.str()?,
         df_to_show.column(COL::METRIC_DESCRIPTION)?.str()?,
@@ -23,7 +23,11 @@ pub fn display_search_results(
             .iter(),
         df_to_show.column(COL::COUNTRY_NAME_SHORT_EN)?.str()?,
         // Note: if using iter on an AnyValue, need to rechunk first.
-        df_to_show.column(COL::GEOMETRY_LEVEL)?.rechunk().iter()
+        df_to_show.column(COL::GEOMETRY_LEVEL)?.rechunk().iter(),
+        df_to_show
+            .column(COL::METRIC_SOURCE_DOWNLOAD_URL)?
+            .rechunk()
+            .iter()
     ) {
         let mut table = Table::new();
         table
@@ -36,6 +40,15 @@ pub fn display_search_results(
             .add_row(vec![
                 Cell::new("Metric ID").add_attribute(Attribute::Bold),
                 metric_id.unwrap().into(),
+            ])
+            .add_row(vec![
+                Cell::new("Metric ID (short)").add_attribute(Attribute::Bold),
+                metric_id
+                    .unwrap()
+                    .chars()
+                    .take(8)
+                    .collect::<String>()
+                    .into(),
             ])
             .add_row(vec![
                 Cell::new("Human readable name").add_attribute(Attribute::Bold),
@@ -60,6 +73,10 @@ pub fn display_search_results(
             .add_row(vec![
                 Cell::new("Geometry level").add_attribute(Attribute::Bold),
                 level.get_str().unwrap().into(),
+            ])
+            .add_row(vec![
+                Cell::new("Source download URL").add_attribute(Attribute::Bold),
+                download_url.get_str().unwrap().into(),
             ]);
 
         let column = table.column_mut(0).unwrap();
