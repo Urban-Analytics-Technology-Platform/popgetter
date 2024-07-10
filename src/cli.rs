@@ -393,7 +393,7 @@ impl RunCommand for SurveysCommand {
 
 /// The entrypoint for the CLI.
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None, name="popgetter", long_about="Popgetter is a tool to quickly get the data you need!")]
+#[command(version, about="Popgetter is a tool to quickly get the data you need!", long_about = None, name="popgetter")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
