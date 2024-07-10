@@ -11,6 +11,7 @@ use popgetter::{
         CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
     },
     geo::BBox,
+    metadata::get_country_names,
     search::{
         Country, DataPublisher, GeometryLevel, MetricId, SearchContext, SearchParams,
         SearchResults, SearchText, SourceDataRelease, SourceMetricId, YearRange,
@@ -340,7 +341,12 @@ pub struct CountriesCommand;
 
 impl RunCommand for CountriesCommand {
     async fn run(&self, config: Config) -> Result<()> {
-        let _popgetter = Popgetter::new_with_config(config).await?;
+        let popgetter = Popgetter::new_with_config(config).await?;
+        println!("The following countries are available:");
+        get_country_names(&popgetter.config)
+            .await?
+            .into_iter()
+            .for_each(|country| println!("{country}"));
         Ok(())
     }
 }
@@ -353,12 +359,12 @@ pub struct SurveysCommand;
 impl RunCommand for SurveysCommand {
     async fn run(&self, _config: Config) -> Result<()> {
         info!("Running `surveys` subcommand");
-        Ok(())
+        unimplemented!("The `Surveys` subcommand is not implemented for the current release");
     }
 }
 
-/// The Recipe command loads a recipe file and generates the output data requested
-/// TODO: Reimplement this
+// // TODO: Reimplement this
+// /// The Recipe command loads a recipe file and generates the output data requested
 // #[derive(Args, Debug)]
 // pub struct RecipeCommand {
 //     #[arg(index = 1)]

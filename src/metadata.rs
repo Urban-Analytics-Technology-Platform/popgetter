@@ -172,11 +172,9 @@ impl CountryMetadataLoader {
     }
 }
 
-/// Load the metadata for a list of countries and merge them into
-/// a single `Metadata` catalogue.
-pub async fn load_all(config: &Config) -> Result<Metadata> {
+pub async fn get_country_names(config: &Config) -> anyhow::Result<Vec<String>> {
     let country_text_file = format!("{}/countries.txt", config.base_path);
-    let country_names: Vec<String> = reqwest::Client::new()
+    Ok(reqwest::Client::new()
         .get(&country_text_file)
         .send()
         .await?
@@ -184,9 +182,15 @@ pub async fn load_all(config: &Config) -> Result<Metadata> {
         .await?
         .lines()
         .map(|s| s.to_string())
-        .collect();
-    info!("Detected country names: {:?}", country_names);
+        .collect())
+}
 
+/// Load the metadata for a list of countries and merge them into
+/// a single `Metadata` catalogue.
+pub async fn load_all(config: &Config) -> Result<Metadata> {
+    let country_names = get_country_names(config).await?;
+
+    info!("Detected country names: {:?}", country_names);
     let metadata: Result<Vec<Metadata>> = join_all(
         country_names
             .iter()

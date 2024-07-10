@@ -160,7 +160,18 @@ impl From<GeometryLevel> for Expr {
 
 impl From<Country> for Expr {
     fn from(value: Country) -> Self {
-        case_insensitive_contains(COL::COUNTRY_NAME_SHORT_EN, &value.0)
+        combine_exprs_with_or(vec![
+            case_insensitive_contains(COL::COUNTRY_NAME_SHORT_EN, &value.0),
+            case_insensitive_contains(COL::COUNTRY_NAME_OFFICIAL, &value.0),
+            case_insensitive_contains(COL::COUNTRY_ISO2, &value.0),
+            case_insensitive_contains(COL::COUNTRY_ISO3, &value.0),
+            case_insensitive_contains(COL::COUNTRY_ISO3166_2, &value.0),
+            // TODO: add `COUNTRY_ID` for ExpandedMetadata
+            // case_insensitive_contains(COL::COUNTRY_ID, &value.0),
+            case_insensitive_contains(COL::DATA_PUBLISHER_COUNTRIES_OF_INTEREST, &value.0),
+        ])
+        // Unwrap: cannot be None as vec above is non-empty
+        .unwrap()
     }
 }
 
