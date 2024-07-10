@@ -7,6 +7,7 @@ use log::{debug, info};
 use nonempty::nonempty;
 use popgetter::{
     config::Config,
+    data_request_spec::{self, DataRequestSpec, GeometrySpec},
     formatters::{
         CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
     },
@@ -77,6 +78,11 @@ pub struct DataCommand {
         help = "Force run without prompt"
     )]
     force_run: bool,
+    #[arg(
+        long = "no-geometry",
+        help = "When set, no geometry data is included in the results"
+    )]
+    no_geometry: bool,
 }
 
 impl From<&OutputFormat> for OutputFormatter {
@@ -108,6 +114,16 @@ impl RunCommand for DataCommand {
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
 
+        // Make DataRequestSpec
+        // TODO: possibly implement From<(DataCommand, SearchParams)> for DataRequestSpec
+        let data_request_spec = DataRequestSpec {
+            geometry: GeometrySpec {
+                include_geoms: !self.no_geometry,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
         // sp.stop_and_persist is potentially a better method, but not obvious how to
         // store the timing. Leaving below until that option is ruled out.
         // sp.stop_and_persist(&COMPLETE_PROGRESS_STRING, spinner_message.into());
@@ -132,7 +148,9 @@ impl RunCommand for DataCommand {
             DEFAULT_PROGRESS_SPINNER,
             spinner_message.to_string() + RUNNING_TAIL_STRING,
         );
-        let mut data = search_results.download(&popgetter.config).await?;
+        let mut data = search_results
+            .download(&popgetter.config, data_request_spec)
+            .await?;
         sp.stop_with_symbol(COMPLETE_PROGRESS_STRING);
 
         debug!("{data:#?}");
@@ -142,8 +160,7 @@ impl RunCommand for DataCommand {
             let mut f = File::create(output_file)?;
             formatter.save(&mut f, &mut data)?;
         } else {
-            let stdout = std::io::stdout();
-            let mut stdout_lock = stdout.lock();
+            let mut stdout_lock = std::io::stdout().lock();
             formatter.save(&mut stdout_lock, &mut data)?;
         };
         Ok(())
