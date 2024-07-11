@@ -139,7 +139,7 @@ impl RunCommand for DataCommand {
         let search_results = popgetter.search(self.search_params_args.clone().into());
 
         // Make DataRequestSpec
-        // TODO: possibly implement From<(DataCommand, SearchParams)> for DataRequestSpec
+        // TODO: consider alternative `From` impls as part of #67
         let data_request_spec = self.into();
 
         // sp.stop_and_persist is potentially a better method, but not obvious how to
@@ -189,7 +189,7 @@ impl RunCommand for DataCommand {
 /// The set of ways to search will likley increase over time
 #[derive(Args, Debug)]
 pub struct MetricsCommand {
-    // TODO: consider implementation of bbox as part of:
+    // TODO: consider implementation of bbox for metrics subcommand as part of:
     // [#67](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/67)
     // #[arg(
     //     short,
