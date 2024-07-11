@@ -55,9 +55,16 @@ pub struct DataCommand {
     #[arg(
         short,
         long,
-        value_name = "MIN_LNG,MIN_LAT,MAX_LNG,MAX_LAT",
+        value_name = "LEFT,BOTTOM,RIGHT,TOP",
         allow_hyphen_values = true,
-        help = "Bounding box in which to get the results"
+        help = "\
+Bounding box in which to get the results. The bounding box provided must be in\n\
+the same coordinate system as used in the requested geometry file. For\n\
+example, United States has geometries with latitude and longitude (EPSG:4326),\n\
+Great Britain has geometries with the British National Grid (EPSG:27700),\n\
+Northern Ireland has geometries with the Irish Grid (EPSG:29902), and\n\
+Beligum has geometries with the Belgian Lambert 2008 reference system\n\
+(EPSG:3812)."
     )]
     bbox: Option<BBox>,
     #[arg(
@@ -194,9 +201,9 @@ pub struct MetricsCommand {
     // #[arg(
     //     short,
     //     long,
-    //     value_name = "MIN_LNG,MIN_LAT,MAX_LNG,MAX_LAT",
+    //     value_name = "LEFT,BOTTOM,RIGHT,TOP",
     //     allow_hyphen_values=true,
-    //     help = "Bounding box in which to get the results"
+    //       help = "TODO"
     // )]
     // bbox: Option<BBox>,
     #[arg(
@@ -220,7 +227,9 @@ struct SearchParamsArgs {
     #[arg(
         short,
         long,
-        help = "Filter by year ranges. All ranges are inclusive; multiple ranges can be comma-separated.",
+        help = "\
+Filter by year ranges. All ranges are inclusive; multiple ranges can be\n\
+comma-separated.",
         value_name = "YEAR|START...|...END|START...END",
         value_parser = parse_year_range,
     )]
@@ -235,7 +244,9 @@ struct SearchParamsArgs {
     country: Option<String>,
     #[arg(
         long,
-        help = "Filter by source metric ID (i.e. the name of the table in the original data release)"
+        help = "\
+Filter by source metric ID (i.e. the name of the table in the original data\n\
+release)."
     )]
     source_metric_id: Option<String>,
     #[arg(
