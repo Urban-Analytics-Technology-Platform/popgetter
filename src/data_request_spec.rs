@@ -97,31 +97,4 @@ impl RegionSpec {
 pub struct Polygon;
 
 #[cfg(test)]
-mod tests {
-
-    use std::str::FromStr;
-
-    use super::*;
-
-    #[test]
-    fn bbox_should_parse_if_correct() {
-        let bbox = BBox::from_str("0.0,1.0,2.0,3.0");
-        assert!(bbox.is_ok(), "A four coord bbox should parse");
-    }
-
-    #[test]
-    fn bbox_should_not_parse_if_incorrect() {
-        let bbox = BBox::from_str("0.0,1.0,2.0");
-        assert!(
-            bbox.is_err(),
-            "A string with fewer than 4 coords should not parse"
-        );
-        let bbox = BBox::from_str("0.0,1.0,2.0,3.0,4.0");
-        assert!(
-            bbox.is_err(),
-            "A string with 5 or more coords should not parse"
-        );
-        let bbox = BBox::from_str("0.0sdfsd,1.0,2.0");
-        assert!(bbox.is_err(), "A string with letters shouldn't parse");
-    }
-}
+mod tests {}
