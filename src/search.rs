@@ -9,7 +9,7 @@ use crate::{
     COL,
 };
 use chrono::NaiveDate;
-use log::debug;
+use log::{debug, warn};
 use nonempty::{nonempty, NonEmpty};
 use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, DataFrameJoinOps, IntoLazy, LazyFrame};
@@ -380,13 +380,15 @@ impl SearchResults {
                     data_request_spec.region
                 );
             }
-            let geoms = get_geometries(
-                all_geom_files.iter().next().unwrap(),
-                data_request_spec
-                    .region
-                    .first()
-                    .and_then(|region_spec| region_spec.bbox().clone()),
-            );
+            let bbox = data_request_spec
+                .region
+                .first()
+                .and_then(|region_spec| region_spec.bbox().clone());
+
+            if bbox.is_some() {
+                warn!("The bounding box should be specified in the same coordinate system as the requested geometry.")
+            }
+            let geoms = get_geometries(all_geom_files.iter().next().unwrap(), bbox);
 
             // try_join requires us to have the errors from all futures be the same.
             // We use anyhow to get it back properly
