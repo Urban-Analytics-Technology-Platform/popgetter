@@ -21,7 +21,8 @@ Each version of `popgetter-cli` is tied to one specific version of `popgetter` t
 
 | popgetter | popgetter-cli |
 | --------- | ------------- |
-| 0.1.0     | 0.1.0         |
+| 0.1.0     |          |
+| 0.2.0     | 0.2.0         |
 | ...       | ...           |
 
 ## Developer notes
