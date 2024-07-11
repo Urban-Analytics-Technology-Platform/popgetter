@@ -7,12 +7,11 @@ use log::{debug, info};
 use nonempty::nonempty;
 use popgetter::{
     config::Config,
-    data_request_spec::{self, DataRequestSpec, GeometrySpec},
+    data_request_spec::{DataRequestSpec, GeometrySpec, RegionSpec},
     formatters::{
         CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
     },
     geo::BBox,
-    metadata::get_country_names,
     search::{
         Country, DataPublisher, GeometryLevel, MetricId, SearchContext, SearchParams,
         SearchResults, SearchText, SourceDataRelease, SourceMetricId, YearRange,
@@ -25,7 +24,7 @@ use std::fs::File;
 use std::{io, process};
 use strum_macros::EnumString;
 
-use crate::display::display_search_results;
+use crate::display::{display_countries, display_search_results};
 
 const DEFAULT_PROGRESS_SPINNER: Spinners = Spinners::Dots;
 const COMPLETE_PROGRESS_STRING: &str = "✔";
@@ -56,7 +55,8 @@ pub struct DataCommand {
     #[arg(
         short,
         long,
-        value_name = "MIN_LAT,MIN_LNG,MAX_LAT,MAX_LNG",
+        value_name = "MIN_LNG,MIN_LAT,MAX_LNG,MAX_LAT",
+        allow_hyphen_values = true,
         help = "Bounding box in which to get the results"
     )]
     bbox: Option<BBox>,
@@ -83,6 +83,30 @@ pub struct DataCommand {
         help = "When set, no geometry data is included in the results"
     )]
     no_geometry: bool,
+}
+
+impl From<&DataCommand> for DataRequestSpec {
+    fn from(value: &DataCommand) -> Self {
+        let region = value
+            .bbox
+            .as_ref()
+            .map(|bbox| vec![RegionSpec::BoundingBox(bbox.clone())])
+            .unwrap_or_default();
+        let geometry = GeometrySpec {
+            // If region_spec provided, override and always include_geoms
+            include_geoms: if region.len().gt(&0) {
+                true
+            } else {
+                !value.no_geometry
+            },
+            ..Default::default()
+        };
+        Self {
+            geometry,
+            region,
+            ..Default::default()
+        }
+    }
 }
 
 impl From<&OutputFormat> for OutputFormatter {
@@ -116,13 +140,7 @@ impl RunCommand for DataCommand {
 
         // Make DataRequestSpec
         // TODO: possibly implement From<(DataCommand, SearchParams)> for DataRequestSpec
-        let data_request_spec = DataRequestSpec {
-            geometry: GeometrySpec {
-                include_geoms: !self.no_geometry,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
+        let data_request_spec = self.into();
 
         // sp.stop_and_persist is potentially a better method, but not obvious how to
         // store the timing. Leaving below until that option is ruled out.
@@ -171,13 +189,16 @@ impl RunCommand for DataCommand {
 /// The set of ways to search will likley increase over time
 #[derive(Args, Debug)]
 pub struct MetricsCommand {
-    #[arg(
-        short,
-        long,
-        value_name = "MIN_LAT,MIN_LNG,MAX_LAT,MAX_LNG",
-        help = "Bounding box in which to get the results"
-    )]
-    bbox: Option<BBox>,
+    // TODO: consider implementation of bbox as part of:
+    // [#67](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/67)
+    // #[arg(
+    //     short,
+    //     long,
+    //     value_name = "MIN_LNG,MIN_LAT,MAX_LNG,MAX_LAT",
+    //     allow_hyphen_values=true,
+    //     help = "Bounding box in which to get the results"
+    // )]
+    // bbox: Option<BBox>,
     #[arg(
         short,
         long,
@@ -358,12 +379,16 @@ pub struct CountriesCommand;
 
 impl RunCommand for CountriesCommand {
     async fn run(&self, config: Config) -> Result<()> {
+        info!("Running `countries` subcommand");
+        let spinner_message = "Downloading countries";
+        let mut sp = Spinner::with_timer(
+            DEFAULT_PROGRESS_SPINNER,
+            spinner_message.to_string() + RUNNING_TAIL_STRING,
+        );
         let popgetter = Popgetter::new_with_config(config).await?;
-        println!("The following countries are available:");
-        get_country_names(&popgetter.config)
-            .await?
-            .into_iter()
-            .for_each(|country| println!("{country}"));
+        sp.stop_with_symbol(COMPLETE_PROGRESS_STRING);
+        println!("\nThe following countries are available:");
+        display_countries(popgetter.metadata.countries, None)?;
         Ok(())
     }
 }

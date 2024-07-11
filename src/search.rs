@@ -3,7 +3,7 @@
 use crate::{
     config::Config,
     data_request_spec::DataRequestSpec,
-    geo::{get_geometries, BBox},
+    geo::get_geometries,
     metadata::ExpandedMetadata,
     parquet::{get_metrics, MetricRequest},
     COL,
@@ -308,11 +308,6 @@ impl From<SearchParams> for Option<Expr> {
 #[derive(Clone, Debug)]
 pub struct SearchResults(pub DataFrame);
 
-pub(crate) struct DownloadConfig {
-    pub bbox: Option<BBox>,
-    pub include_geometry: bool,
-}
-
 impl SearchResults {
     /// Convert all the metrics in the dataframe to MetricRequests
     pub fn to_metric_requests(self, config: &Config) -> Vec<MetricRequest> {
@@ -374,12 +369,25 @@ impl SearchResults {
 
         // TODO Handle multiple responses
         if all_geom_files.len() > 1 {
-            panic!("Multiple geometries not yet supported");
+            todo!("Multiple geometries not yet supported");
         }
 
         let result = if data_request_spec.geometry.include_geoms {
             // TODO Pass in the bbox as the second argument here
-            let geoms = get_geometries(all_geom_files.iter().next().unwrap(), None);
+            if data_request_spec.region.len() > 1 {
+                todo!(
+                    "Multiple region specifications are not yet supported: {:#?}",
+                    data_request_spec.region
+                );
+            }
+            debug!("{:#?}", data_request_spec.region.first().unwrap().bbox());
+            let geoms = get_geometries(
+                all_geom_files.iter().next().unwrap(),
+                data_request_spec
+                    .region
+                    .first()
+                    .and_then(|region_spec| region_spec.bbox().clone()),
+            );
 
             // try_join requires us to have the errors from all futures be the same.
             // We use anyhow to get it back properly

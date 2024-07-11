@@ -1,11 +1,10 @@
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use std::{
-    ops::{Index, IndexMut},
-    str::FromStr,
-};
+// TODO: this module to be refactored following implementation of SearchParams.
+// See [#67](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/67)
 
-use crate::{parquet::MetricRequest, search::MetricId};
+use serde::{Deserialize, Serialize};
+
+use crate::geo::BBox;
+use crate::search::MetricId;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DataRequestSpec {
@@ -15,13 +14,13 @@ pub struct DataRequestSpec {
     pub years: Option<Vec<String>>,
 }
 
-#[derive(Debug)]
-pub struct MetricRequestResult {
-    pub metrics: Vec<MetricRequest>,
-    pub selected_geometry: String,
-    pub years: Vec<String>,
-}
-
+// #[derive(Debug)]
+// pub struct MetricRequestResult {
+//     pub metrics: Vec<MetricRequest>,
+//     pub selected_geometry: String,
+//     pub years: Vec<String>,
+// }
+//
 // impl DataRequestSpec {
 //     /// Generates a vector of metric requests from a `DataRequestSpec` and a catalogue.
 //     pub fn metric_requests(
@@ -85,46 +84,25 @@ pub enum RegionSpec {
     NamedArea(String),
 }
 
+impl RegionSpec {
+    pub fn bbox(&self) -> Option<BBox> {
+        match self {
+            RegionSpec::BoundingBox(bbox) => Some(bbox.clone()),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Polygon;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BBox(pub [f64; 4]);
-
-impl Index<usize> for BBox {
-    type Output = f64;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
-    }
-}
-
-impl IndexMut<usize> for BBox {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index]
-    }
-}
-
-impl FromStr for BBox {
-    type Err = &'static str;
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<f64> = value
-            .split(',')
-            .map(|s| s.trim().parse::<f64>().map_err(|_| "Failed to parse bbox"))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        if parts.len() != 4 {
-            return Err("Bounding boxes need to have 4 coords");
-        }
-        let mut bbox = [0.0; 4];
-        bbox.copy_from_slice(&parts);
-        Ok(BBox(bbox))
-    }
-}
-
 #[cfg(test)]
 mod tests {
+
+    use std::str::FromStr;
+
     use super::*;
+
     #[test]
     fn bbox_should_parse_if_correct() {
         let bbox = BBox::from_str("0.0,1.0,2.0,3.0");

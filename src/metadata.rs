@@ -172,10 +172,9 @@ impl CountryMetadataLoader {
     }
 }
 
-pub async fn get_country_names(config: &Config) -> anyhow::Result<Vec<String>> {
-    let country_text_file = format!("{}/countries.txt", config.base_path);
+async fn get_country_names(config: &Config) -> anyhow::Result<Vec<String>> {
     Ok(reqwest::Client::new()
-        .get(&country_text_file)
+        .get(&format!("{}/countries.txt", config.base_path))
         .send()
         .await?
         .text()
