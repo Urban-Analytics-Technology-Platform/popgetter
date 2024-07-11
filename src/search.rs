@@ -369,7 +369,7 @@ impl SearchResults {
 
         // TODO Handle multiple responses
         if all_geom_files.len() > 1 {
-            todo!("Multiple geometries not yet supported");
+            unimplemented!("Multiple geometries not supported in current release");
         }
 
         let result = if data_request_spec.geometry.include_geoms {
@@ -380,7 +380,6 @@ impl SearchResults {
                     data_request_spec.region
                 );
             }
-            debug!("{:#?}", data_request_spec.region.first().unwrap().bbox());
             let geoms = get_geometries(
                 all_geom_files.iter().next().unwrap(),
                 data_request_spec
