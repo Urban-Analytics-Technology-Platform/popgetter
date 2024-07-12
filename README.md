@@ -21,20 +21,6 @@ Each version of `popgetter-cli` is tied to one specific version of `popgetter` t
 
 | popgetter | popgetter-cli |
 | --------- | ------------- |
-| 0.1.0     |          |
+| 0.1.0     |               |
 | 0.2.0     | 0.2.0         |
 | ...       | ...           |
-
-## Developer notes
-
-### Updating popgetter types
-
-`popgetter-cli` depends on type-level information _about_ the data and metadata it consumes, i.e. what fields are present and what types they have.
-This information is stored as a JSON schema in the `schema` subdirectory of this repository.
-To generate this file, install the appropriate version of the `popgetter` library locally (see version table [above](#popgetter-version-compatibility)), and then run
-
-```
-popgetter-export-schema ./schema
-```
-
-from the top level of this repository.
