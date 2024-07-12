@@ -386,7 +386,10 @@ impl SearchResults {
                 .and_then(|region_spec| region_spec.bbox().clone());
 
             if bbox.is_some() {
-                warn!("The bounding box should be specified in the same coordinate system as the requested geometry.")
+                warn!(
+                    "The bounding box should be specified in the same coordinate reference system \
+                     as the requested geometry."
+                )
             }
             let geoms = get_geometries(all_geom_files.iter().next().unwrap(), bbox);
 
