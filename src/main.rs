@@ -7,10 +7,14 @@ use cli::{Cli, RunCommand};
 use log::debug;
 use popgetter::config::Config;
 
+const DEFAULT_LOGGING_LEVEL: &str = "warn";
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Set RUST_LOG to `DEFAULT_LOGGING_LEVEL` if not set
+    let _ =
+        std::env::var("RUST_LOG").map_err(|_| std::env::set_var("RUST_LOG", DEFAULT_LOGGING_LEVEL));
     pretty_env_logger::init_timed();
-
     let args = Cli::parse();
     debug!("args: {args:?}");
     let config: Config = read_config_from_toml();

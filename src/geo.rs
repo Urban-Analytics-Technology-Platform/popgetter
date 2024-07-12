@@ -15,7 +15,7 @@ use std::{
 /// `bbox`: an optional bounding box to filter the features by
 ///
 /// Returns: a Result object containing a vector of (geometry, properties).
-pub async fn get_geometries(file_url: &str, bbox: Option<&BBox>) -> Result<DataFrame> {
+pub async fn get_geometries(file_url: &str, bbox: Option<BBox>) -> Result<DataFrame> {
     let fgb = HttpFgbReader::open(file_url).await?;
 
     let mut fgb = if let Some(bbox) = bbox {
@@ -235,7 +235,7 @@ mod tests {
             -1.373_095_490_899_146_4,
             53.026_908_220_355_35,
         ]);
-        let geoms = get_geometries(&server.url("/fgb_example.fgb"), Some(&bbox)).await;
+        let geoms = get_geometries(&server.url("/fgb_example.fgb"), Some(bbox)).await;
 
         assert!(geoms.is_ok(), "The geometry call should not error");
         let geoms = geoms.unwrap();

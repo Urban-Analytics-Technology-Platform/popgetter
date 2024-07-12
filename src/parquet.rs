@@ -68,8 +68,7 @@ pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Resul
     // generally true
     let mut joined_df: Option<DataFrame> = None;
 
-    // Merge the dataframes from each remove file in to a single
-    // dataframe
+    // Merge the dataframes from each remove file in to a single dataframe
     for df in dfs? {
         if let Some(prev_dfs) = joined_df {
             joined_df = Some(prev_dfs.join(
@@ -82,8 +81,12 @@ pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Resul
             joined_df = Some(df.clone());
         }
     }
-
-    joined_df.with_context(|| "Failed to combine data queries")
+    // Return if None, or return df with COL::GEO_ID first
+    Ok(joined_df
+        .with_context(|| "Failed to combine data queries")?
+        .lazy()
+        .select(&[col(COL::GEO_ID), col("*").exclude([COL::GEO_ID])])
+        .collect()?)
 }
 
 #[cfg(test)]

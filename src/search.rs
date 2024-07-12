@@ -2,13 +2,14 @@
 
 use crate::{
     config::Config,
+    data_request_spec::DataRequestSpec,
     geo::get_geometries,
     metadata::ExpandedMetadata,
     parquet::{get_metrics, MetricRequest},
     COL,
 };
 use chrono::NaiveDate;
-use log::debug;
+use log::{debug, warn};
 use nonempty::{nonempty, NonEmpty};
 use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, DataFrameJoinOps, IntoLazy, LazyFrame};
@@ -160,7 +161,18 @@ impl From<GeometryLevel> for Expr {
 
 impl From<Country> for Expr {
     fn from(value: Country) -> Self {
-        case_insensitive_contains(COL::COUNTRY_NAME_SHORT_EN, &value.0)
+        combine_exprs_with_or(vec![
+            case_insensitive_contains(COL::COUNTRY_NAME_SHORT_EN, &value.0),
+            case_insensitive_contains(COL::COUNTRY_NAME_OFFICIAL, &value.0),
+            case_insensitive_contains(COL::COUNTRY_ISO2, &value.0),
+            case_insensitive_contains(COL::COUNTRY_ISO3, &value.0),
+            case_insensitive_contains(COL::COUNTRY_ISO3166_2, &value.0),
+            // TODO: add `COUNTRY_ID` for ExpandedMetadata
+            // case_insensitive_contains(COL::COUNTRY_ID, &value.0),
+            case_insensitive_contains(COL::DATA_PUBLISHER_COUNTRIES_OF_INTEREST, &value.0),
+        ])
+        // Unwrap: cannot be None as vec above is non-empty
+        .unwrap()
     }
 }
 
@@ -341,7 +353,11 @@ impl SearchResults {
 
     // Given a Data Request Spec
     // Return a DataFrame of the selected dataset
-    pub async fn download(self, config: &Config) -> anyhow::Result<DataFrame> {
+    pub async fn download(
+        self,
+        config: &Config,
+        data_request_spec: DataRequestSpec,
+    ) -> anyhow::Result<DataFrame> {
         let metric_requests = self.to_metric_requests(config);
         debug!("metric_requests = {:#?}", metric_requests);
         let all_geom_files: HashSet<String> = metric_requests
@@ -353,21 +369,45 @@ impl SearchResults {
 
         // TODO Handle multiple responses
         if all_geom_files.len() > 1 {
-            panic!("Multiple geometries not yet supported");
+            unimplemented!("Multiple geometries not supported in current release");
         }
-        // TODO Pass in the bbox as the second argument here
-        let geoms = get_geometries(all_geom_files.iter().next().unwrap(), None);
 
-        // try_join requires us to have the errors from all futures be the same.
-        // We use anyhow to get it back properly
-        let (metrics, geoms) = try_join!(
-            async move { metrics.await.map_err(anyhow::Error::from) },
-            geoms
-        )?;
-        debug!("geoms: {geoms:#?}");
-        debug!("metrics: {metrics:#?}");
+        let result = if data_request_spec.geometry.include_geoms {
+            // TODO Pass in the bbox as the second argument here
+            if data_request_spec.region.len() > 1 {
+                todo!(
+                    "Multiple region specifications are not yet supported: {:#?}",
+                    data_request_spec.region
+                );
+            }
+            let bbox = data_request_spec
+                .region
+                .first()
+                .and_then(|region_spec| region_spec.bbox().clone());
 
-        let result = geoms.inner_join(&metrics?, [COL::GEO_ID], [COL::GEO_ID])?;
+            if bbox.is_some() {
+                warn!(
+                    "The bounding box should be specified in the same coordinate reference system \
+                     as the requested geometry."
+                )
+            }
+            let geoms = get_geometries(all_geom_files.iter().next().unwrap(), bbox);
+
+            // try_join requires us to have the errors from all futures be the same.
+            // We use anyhow to get it back properly
+            let (metrics, geoms) = try_join!(
+                async move { metrics.await.map_err(anyhow::Error::from) },
+                geoms
+            )?;
+            debug!("geoms: {geoms:#?}");
+            debug!("metrics: {metrics:#?}");
+            geoms.inner_join(&metrics?, [COL::GEO_ID], [COL::GEO_ID])?
+        } else {
+            let metrics = metrics.await.map_err(anyhow::Error::from)??;
+            debug!("metrics: {metrics:#?}");
+            metrics
+        };
+
         Ok(result)
     }
 }

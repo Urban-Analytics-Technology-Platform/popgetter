@@ -7,6 +7,7 @@ use log::{debug, info};
 use nonempty::nonempty;
 use popgetter::{
     config::Config,
+    data_request_spec::{DataRequestSpec, GeometrySpec, RegionSpec},
     formatters::{
         CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
     },
@@ -23,7 +24,7 @@ use std::fs::File;
 use std::{io, process};
 use strum_macros::EnumString;
 
-use crate::display::display_search_results;
+use crate::display::{display_countries, display_search_results};
 
 const DEFAULT_PROGRESS_SPINNER: Spinners = Spinners::Dots;
 const COMPLETE_PROGRESS_STRING: &str = "✔";
@@ -54,8 +55,16 @@ pub struct DataCommand {
     #[arg(
         short,
         long,
-        value_name = "MIN_LAT,MIN_LNG,MAX_LAT,MAX_LNG",
-        help = "Bounding box in which to get the results"
+        value_name = "LEFT,BOTTOM,RIGHT,TOP",
+        allow_hyphen_values = true,
+        help = "\
+            Bounding box in which to get the results. The bounding box provided must be in\n\
+            the same coordinate system as used in the requested geometry file. For\n\
+            example, United States has geometries with latitude and longitude (EPSG:4326),\n\
+            Great Britain has geometries with the British National Grid (EPSG:27700),\n\
+            Northern Ireland has geometries with the Irish Grid (EPSG:29902), and\n\
+            Beligum has geometries with the Belgian Lambert 2008 reference system\n\
+            (EPSG:3812)."
     )]
     bbox: Option<BBox>,
     #[arg(
@@ -76,6 +85,37 @@ pub struct DataCommand {
         help = "Force run without prompt"
     )]
     force_run: bool,
+    #[arg(
+        long = "no-geometry",
+        help = "When set, no geometry data is included in the results"
+    )]
+    no_geometry: bool,
+    #[arg(from_global)]
+    quiet: bool,
+}
+
+impl From<&DataCommand> for DataRequestSpec {
+    fn from(value: &DataCommand) -> Self {
+        let region = value
+            .bbox
+            .as_ref()
+            .map(|bbox| vec![RegionSpec::BoundingBox(bbox.clone())])
+            .unwrap_or_default();
+        let geometry = GeometrySpec {
+            // If region_spec provided, override and always include_geoms
+            include_geoms: if region.len().gt(&0) {
+                true
+            } else {
+                !value.no_geometry
+            },
+            ..Default::default()
+        };
+        Self {
+            geometry,
+            region,
+            ..Default::default()
+        }
+    }
 }
 
 impl From<&OutputFormat> for OutputFormatter {
@@ -99,18 +139,26 @@ impl From<OutputFormat> for OutputFormatter {
 impl RunCommand for DataCommand {
     async fn run(&self, config: Config) -> Result<()> {
         info!("Running `data` subcommand");
-
-        let mut sp = Spinner::with_timer(
-            DEFAULT_PROGRESS_SPINNER,
-            DOWNLOADING_SEARCHING_STRING.to_string() + RUNNING_TAIL_STRING,
-        );
+        let sp = (!self.quiet).then(|| {
+            Spinner::with_timer(
+                DEFAULT_PROGRESS_SPINNER,
+                DOWNLOADING_SEARCHING_STRING.to_string() + RUNNING_TAIL_STRING,
+            )
+        });
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
+
+        // Make DataRequestSpec
+        // TODO: consider alternative `From` impls as part of #67
+        let data_request_spec = self.into();
 
         // sp.stop_and_persist is potentially a better method, but not obvious how to
         // store the timing. Leaving below until that option is ruled out.
         // sp.stop_and_persist(&COMPLETE_PROGRESS_STRING, spinner_message.into());
-        sp.stop_with_symbol(COMPLETE_PROGRESS_STRING);
+        if let Some(mut s) = sp {
+            s.stop_with_symbol(COMPLETE_PROGRESS_STRING)
+        }
+
         print_metrics_count(search_results.clone());
         if !self.force_run {
             println!("Input 'r' to run query, any other character will cancel");
@@ -125,15 +173,18 @@ impl RunCommand for DataCommand {
                 }
             }
         }
-
-        let spinner_message = "Downloading metrics";
-        let mut sp = Spinner::with_timer(
-            DEFAULT_PROGRESS_SPINNER,
-            spinner_message.to_string() + RUNNING_TAIL_STRING,
-        );
-        let mut data = search_results.download(&popgetter.config).await?;
-        sp.stop_with_symbol(COMPLETE_PROGRESS_STRING);
-
+        let sp = (!self.quiet).then(|| {
+            Spinner::with_timer(
+                DEFAULT_PROGRESS_SPINNER,
+                "Downloading metrics".to_string() + RUNNING_TAIL_STRING,
+            )
+        });
+        let mut data = search_results
+            .download(&popgetter.config, data_request_spec)
+            .await?;
+        if let Some(mut s) = sp {
+            s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
+        }
         debug!("{data:#?}");
 
         let formatter: OutputFormatter = (&self.output_format).into();
@@ -141,8 +192,7 @@ impl RunCommand for DataCommand {
             let mut f = File::create(output_file)?;
             formatter.save(&mut f, &mut data)?;
         } else {
-            let stdout = std::io::stdout();
-            let mut stdout_lock = stdout.lock();
+            let mut stdout_lock = std::io::stdout().lock();
             formatter.save(&mut stdout_lock, &mut data)?;
         };
         Ok(())
@@ -153,13 +203,16 @@ impl RunCommand for DataCommand {
 /// The set of ways to search will likley increase over time
 #[derive(Args, Debug)]
 pub struct MetricsCommand {
-    #[arg(
-        short,
-        long,
-        value_name = "MIN_LAT,MIN_LNG,MAX_LAT,MAX_LNG",
-        help = "Bounding box in which to get the results"
-    )]
-    bbox: Option<BBox>,
+    // TODO: consider implementation of bbox for metrics subcommand as part of:
+    // [#67](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/67)
+    // #[arg(
+    //     short,
+    //     long,
+    //     value_name = "LEFT,BOTTOM,RIGHT,TOP",
+    //     allow_hyphen_values=true,
+    //       help = "TODO"
+    // )]
+    // bbox: Option<BBox>,
     #[arg(
         short,
         long,
@@ -168,6 +221,8 @@ pub struct MetricsCommand {
     full: bool,
     #[command(flatten)]
     search_params_args: SearchParamsArgs,
+    #[arg(from_global)]
+    quiet: bool,
 }
 
 /// These are the command-line arguments that can be parsed into a SearchParams. The type is
@@ -181,7 +236,9 @@ struct SearchParamsArgs {
     #[arg(
         short,
         long,
-        help = "Filter by year ranges. All ranges are inclusive; multiple ranges can be comma-separated.",
+        help = "\
+            Filter by year ranges. All ranges are inclusive; multiple ranges can be\n\
+            comma-separated.",
         value_name = "YEAR|START...|...END|START...END",
         value_parser = parse_year_range,
     )]
@@ -196,7 +253,9 @@ struct SearchParamsArgs {
     country: Option<String>,
     #[arg(
         long,
-        help = "Filter by source metric ID (i.e. the name of the table in the original data release)"
+        help = "\
+            Filter by source metric ID (i.e. the name of the table in the original data\n\
+            release)."
     )]
     source_metric_id: Option<String>,
     #[arg(
@@ -309,13 +368,17 @@ impl RunCommand for MetricsCommand {
         info!("Running `metrics` subcommand");
         debug!("{:#?}", self);
 
-        let mut sp = Spinner::with_timer(
-            DEFAULT_PROGRESS_SPINNER,
-            DOWNLOADING_SEARCHING_STRING.into(),
-        );
+        let sp = (!self.quiet).then(|| {
+            Spinner::with_timer(
+                DEFAULT_PROGRESS_SPINNER,
+                DOWNLOADING_SEARCHING_STRING.into(),
+            )
+        });
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_results = popgetter.search(self.search_params_args.clone().into());
-        sp.stop_with_symbol(COMPLETE_PROGRESS_STRING);
+        if let Some(mut s) = sp {
+            s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
+        }
 
         let len_requests = print_metrics_count(search_results.clone());
 
@@ -336,11 +399,27 @@ impl RunCommand for MetricsCommand {
 /// This could include metrics like the number of surveys / metrics / geographies available for
 /// each country.
 #[derive(Args, Debug)]
-pub struct CountriesCommand;
+pub struct CountriesCommand {
+    #[arg(from_global)]
+    quiet: bool,
+}
 
 impl RunCommand for CountriesCommand {
     async fn run(&self, config: Config) -> Result<()> {
-        let _popgetter = Popgetter::new_with_config(config).await?;
+        info!("Running `countries` subcommand");
+        let sp = (!self.quiet).then(|| {
+            let spinner_message = "Downloading countries";
+            Spinner::with_timer(
+                DEFAULT_PROGRESS_SPINNER,
+                spinner_message.to_string() + RUNNING_TAIL_STRING,
+            )
+        });
+        let popgetter = Popgetter::new_with_config(config).await?;
+        if let Some(mut s) = sp {
+            s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
+        }
+        println!("\nThe following countries are available:");
+        display_countries(popgetter.metadata.countries, None)?;
         Ok(())
     }
 }
@@ -353,12 +432,12 @@ pub struct SurveysCommand;
 impl RunCommand for SurveysCommand {
     async fn run(&self, _config: Config) -> Result<()> {
         info!("Running `surveys` subcommand");
-        Ok(())
+        unimplemented!("The `Surveys` subcommand is not implemented for the current release");
     }
 }
 
-/// The Recipe command loads a recipe file and generates the output data requested
-/// TODO: Reimplement this
+// // TODO: Reimplement this
+// /// The Recipe command loads a recipe file and generates the output data requested
 // #[derive(Args, Debug)]
 // pub struct RecipeCommand {
 //     #[arg(index = 1)]
@@ -387,10 +466,19 @@ impl RunCommand for SurveysCommand {
 
 /// The entrypoint for the CLI.
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None, name="popgetter", long_about="Popgetter is a tool to quickly get the data you need!")]
+#[command(version, about="Popgetter is a tool to quickly get the data you need!", long_about = None, name="popgetter")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
+    #[arg(
+        short = 'q',
+        long = "quiet",
+        help = "\
+            Do not print progress bar to stdout. Prompt, results and logs (when `RUST_LOG`\n\
+            is set) will still be printed.",
+        global = true
+    )]
+    quiet: bool,
 }
 
 /// Commands contains the list of subcommands avaliable for use in the CLI.

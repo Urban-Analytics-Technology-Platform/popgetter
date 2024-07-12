@@ -11,6 +11,7 @@ pub use column_names as COL;
 // Modules
 pub mod column_names;
 pub mod config;
+pub mod data_request_spec;
 pub mod error;
 #[cfg(feature = "formatters")]
 pub mod formatters;

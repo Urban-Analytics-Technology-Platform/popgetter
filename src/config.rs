@@ -9,9 +9,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            base_path:
-                "https://popgetter.blob.core.windows.net/popgetter-dagster-test/test_v2_release"
-                    .into(),
+            // TODO: add fn to generate the release directory name from the CLI version directly
+            // E.g. this could be achieved with: https://docs.rs/built/latest/built/
+            base_path: "https://popgetter.blob.core.windows.net/releases/v0.2".into(),
         }
     }
 }
