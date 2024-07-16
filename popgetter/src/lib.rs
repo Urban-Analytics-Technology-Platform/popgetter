@@ -42,8 +42,4 @@ impl Popgetter {
     pub fn search(&self, search_params: SearchParams) -> SearchResults {
         search_params.search(&self.metadata.combined_metric_source_geometry())
     }
-
-    pub async fn search(&self, search_request: &SearchRequest) -> Result<SearchResults> {
-        search_request.clone().search_results(&self.metadata)
-    }
 }

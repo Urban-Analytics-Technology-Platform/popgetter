@@ -2,7 +2,7 @@ use std::default::Default;
 
 use ::popgetter::{
     data_request_spec::{DataRequestSpec, GeometrySpec, MetricSpec},
-    search::{SearchContext, SearchRequest, SearchResults, SearchText},
+    search::{SearchParams, SearchText},
 };
 use polars::prelude::DataFrame;
 use pyo3::{
@@ -12,12 +12,12 @@ use pyo3::{
 use pyo3_polars::PyDataFrame;
 
 async fn _search() -> DataFrame {
-    let search_request: SearchRequest = SearchRequest::default();
+    let search_params: SearchParams = SearchParams::default();
     let popgetter = ::popgetter::Popgetter::new().await.unwrap();
-    let search_results = popgetter.search(&search_request).await.unwrap();
+    let search_results = popgetter.search(search_params);
     search_results
         .0
-        .select(&[
+        .select([
             "metric_id",
             "human_readable_name",
             "metric_description",
@@ -33,25 +33,25 @@ async fn _search() -> DataFrame {
 //     popgetter.search(&search_request).await.unwrap()
 // }
 
-fn get_search(obj: &Bound<'_, PyAny>) -> PyResult<SearchRequest> {
+fn get_search(obj: &Bound<'_, PyAny>) -> PyResult<SearchParams> {
     if let Ok(text) = obj.downcast::<PyString>() {
         println!("object is a string {}", text);
         let search_text = SearchText {
             text: text.to_string(),
             ..SearchText::default()
         };
-        return Ok(SearchRequest {
+        return Ok(SearchParams {
             text: vec![search_text],
-            ..SearchRequest::default()
+            ..SearchParams::default()
         });
     }
 
     if let Ok(dict) = obj.downcast::<PyDict>() {
         println!("Object is a dict {}", dict);
-        return Ok(SearchRequest::default());
+        return Ok(SearchParams::default());
     };
 
-    Ok(SearchRequest::default())
+    Ok(SearchParams::default())
 }
 
 fn get_data_request(obj: &Bound<'_, PyAny>) -> PyResult<DataRequestSpec> {
@@ -61,7 +61,7 @@ fn get_data_request(obj: &Bound<'_, PyAny>) -> PyResult<DataRequestSpec> {
             geometry_level: None,
         },
         region: vec![],
-        metrics: vec![MetricSpec::Metric(::popgetter::metadata::MetricId::Hxl(
+        metrics: vec![MetricSpec::Metric(::popgetter::search::MetricId(
             r"\#population\+adults".into(),
         ))],
         years: None,
@@ -71,7 +71,8 @@ fn get_data_request(obj: &Bound<'_, PyAny>) -> PyResult<DataRequestSpec> {
 async fn _get_data(data_request: &DataRequestSpec) -> DataFrame {
     let popgetter = ::popgetter::Popgetter::new().await.unwrap();
     println!("running data request {:#?}", data_request);
-    popgetter.get_data_request(data_request).await.unwrap()
+    todo!("Uncomment the below when get_data_request implemented")
+    // popgetter.get_data_request(data_request).await.unwrap()
 }
 
 #[pyfunction]
@@ -89,7 +90,7 @@ fn get(
 
 #[pyfunction]
 fn search(
-    #[pyo3(from_py_with = "get_search")] search_query: SearchRequest,
+    #[pyo3(from_py_with = "get_search")] search_query: SearchParams,
 ) -> PyResult<PyDataFrame> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
