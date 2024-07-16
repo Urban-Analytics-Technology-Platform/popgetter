@@ -1,13 +1,15 @@
 use anyhow::{Context, Result};
+use log::debug;
 use polars::prelude::*;
 use std::collections::HashSet;
 
-static GEO_ID_COL_NAME: &str = "GEO_ID";
+use crate::COL;
 
 #[derive(Debug)]
 pub struct MetricRequest {
     pub column: String,
-    pub file: String,
+    pub metric_file: String,
+    pub geom_file: String,
 }
 
 /// Given a `file_url` and a list of `columns`, return a `Result<DataFrame>`
@@ -18,7 +20,7 @@ fn get_metrics_from_file(
     geo_ids: Option<&[&str]>,
 ) -> Result<DataFrame> {
     let mut cols: Vec<Expr> = columns.iter().map(|c| col(c)).collect();
-    cols.push(col(GEO_ID_COL_NAME));
+    cols.push(col(COL::GEO_ID));
 
     let args = ScanArgsParquet::default();
 
@@ -28,7 +30,7 @@ fn get_metrics_from_file(
 
     let df = if let Some(ids) = geo_ids {
         let id_series = Series::new("geo_ids", ids);
-        df.filter(col(GEO_ID_COL_NAME).is_in(lit(id_series)))
+        df.filter(col(COL::GEO_ID).is_in(lit(id_series)))
     } else {
         df
     };
@@ -41,8 +43,8 @@ fn get_metrics_from_file(
 /// retrive all the required metrics from the cloud blob storage
 ///
 pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Result<DataFrame> {
-    let file_list: HashSet<String> = metrics.iter().map(|m| m.file.clone()).collect();
-
+    let file_list: HashSet<String> = metrics.iter().map(|m| m.metric_file.clone()).collect();
+    debug!("{:#?}", file_list);
     // TODO Can we do this async so we can be downloading results from each file together?
     let dfs: Result<Vec<DataFrame>> = file_list
         .iter()
@@ -50,35 +52,41 @@ pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Resul
             let file_cols: Vec<String> = metrics
                 .iter()
                 .filter_map(|m| {
-                    if m.file == file_url.clone() {
+                    if m.metric_file == file_url.clone() {
                         Some(m.column.clone())
                     } else {
                         None
                     }
                 })
                 .collect();
+
             get_metrics_from_file(file_url, &file_cols, geo_ids)
         })
         .collect();
 
+    // TODO: The following assumes that we requested metrics for the same geo_ids. This is not
+    // generally true
     let mut joined_df: Option<DataFrame> = None;
 
-    // Merge the dataframes from each remove file in to a single
-    // dataframe
+    // Merge the dataframes from each remove file in to a single dataframe
     for df in dfs? {
         if let Some(prev_dfs) = joined_df {
             joined_df = Some(prev_dfs.join(
                 &df,
-                vec![GEO_ID_COL_NAME],
-                vec![GEO_ID_COL_NAME],
+                vec![COL::GEO_ID],
+                vec![COL::GEO_ID],
                 JoinArgs::new(JoinType::Inner),
             )?);
         } else {
             joined_df = Some(df.clone());
         }
     }
-
-    joined_df.with_context(|| "Failed to combine data queries")
+    // Return if None, or return df with COL::GEO_ID first
+    Ok(joined_df
+        .with_context(|| "Failed to combine data queries")?
+        .lazy()
+        .select(&[col(COL::GEO_ID), col("*").exclude([COL::GEO_ID])])
+        .collect()?)
 }
 
 #[cfg(test)]
@@ -89,8 +97,9 @@ mod tests {
     fn test_fetching_metrics() {
         let metrics  = [
             MetricRequest{
-                file:"https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
-                column:"B17021_E006".into()
+                metric_file: "https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
+                column: "B17021_E006".into(),
+                geom_file: "Not needed for this test".into(),
             }];
         let df = get_metrics(&metrics, None);
         assert!(df.is_ok(), "We should get back a result");
@@ -106,7 +115,7 @@ mod tests {
             "The returned dataframe should have the correct number of rows"
         );
         assert!(
-            df.column(GEO_ID_COL_NAME).is_ok(),
+            df.column(COL::GEO_ID).is_ok(),
             "The returned dataframe should have a GEO_ID column"
         );
         assert!(
@@ -119,8 +128,9 @@ mod tests {
     fn test_fetching_metrics_with_geo_filter() {
         let metrics  = [
             MetricRequest{
-                file:"https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
-                column:"B17021_E006".into()
+                metric_file: "https://popgetter.blob.core.windows.net/popgetter-cli-test/tracts_2019_fiveYear.parquet".into(),
+                column: "B17021_E006".into(),
+                geom_file: "Not needed for this test".into(),
             }];
         let df = get_metrics(
             &metrics,

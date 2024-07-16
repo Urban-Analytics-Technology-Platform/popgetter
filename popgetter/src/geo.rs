@@ -1,21 +1,21 @@
-use crate::data_request_spec::BBox;
+use crate::COL;
 use anyhow::{Context, Result};
 use flatgeobuf::{geozero, FeatureProperties, HttpFgbReader};
 use geozero::ToWkt;
 use polars::{frame::DataFrame, prelude::NamedFrom, series::Series};
+use serde::{Deserialize, Serialize};
+use std::{
+    ops::{Index, IndexMut},
+    str::FromStr,
+};
 
 /// Function to request geometries from a remotly hosted FGB
 ///
 /// `file_url`: The url of the file to read from
-///
 /// `bbox`: an optional bounding box to filter the features by
 ///
 /// Returns: a Result object containing a vector of (geometry, properties).
-pub async fn get_geometries(
-    file_url: &str,
-    bbox: Option<&BBox>,
-    geoid_col: Option<String>,
-) -> Result<DataFrame> {
+pub async fn get_geometries(file_url: &str, bbox: Option<BBox>) -> Result<DataFrame> {
     let fgb = HttpFgbReader::open(file_url).await?;
 
     let mut fgb = if let Some(bbox) = bbox {
@@ -26,19 +26,64 @@ pub async fn get_geometries(
 
     let mut geoms: Vec<String> = vec![];
     let mut ids: Vec<String> = vec![];
-    let geoid_col = geoid_col.unwrap_or_else(|| "GEOID".to_owned());
 
     while let Some(feature) = fgb.next().await? {
         let props = feature.properties()?;
         geoms.push(feature.to_wkt()?);
-        let id = props.get(&geoid_col).with_context(|| "failed to get id")?;
+        let id = props
+            .get(COL::GEO_ID)
+            .with_context(|| "failed to get geoid")?;
         ids.push(id.clone());
     }
 
-    let ids = Series::new("GEOID", ids);
+    let ids = Series::new(COL::GEO_ID, ids);
     let geoms = Series::new("geometry", geoms);
     let result = DataFrame::new(vec![ids, geoms])?;
     Ok(result)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum RegionSpec {
+    BoundingBox(BBox),
+    Polygon(Polygon),
+    NamedArea(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Polygon;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BBox(pub [f64; 4]);
+
+impl Index<usize> for BBox {
+    type Output = f64;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<usize> for BBox {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
+impl FromStr for BBox {
+    type Err = &'static str;
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<f64> = value
+            .split(',')
+            .map(|s| s.trim().parse::<f64>().map_err(|_| "Failed to parse bbox"))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        if parts.len() != 4 {
+            return Err("Bounding boxes need to have 4 coords");
+        }
+        let mut bbox = [0.0; 4];
+        bbox.copy_from_slice(&parts);
+        Ok(BBox(bbox))
+    }
 }
 
 #[cfg(test)]
@@ -51,7 +96,7 @@ mod tests {
 
     fn test_fgb() -> FgbWriter<'static> {
         let mut fgb = FgbWriter::create("countries", GeometryType::Polygon).unwrap();
-        fgb.add_column("GEOID", ColumnType::String, |_fbb, col| {
+        fgb.add_column(COL::GEO_ID, ColumnType::String, |_fbb, col| {
             col.nullable = false
         });
         let geom1 = GeoJson(
@@ -159,7 +204,7 @@ mod tests {
         let server = mock_fgb_server();
 
         // Get the geometries
-        let geoms = get_geometries(&server.url("/fgb_example.fgb"), None, None).await;
+        let geoms = get_geometries(&server.url("/fgb_example.fgb"), None).await;
         println!("{geoms:#?}");
         assert!(geoms.is_ok(), "The geometry call should not error");
         let geoms = geoms.unwrap();
@@ -190,7 +235,7 @@ mod tests {
             -1.373_095_490_899_146_4,
             53.026_908_220_355_35,
         ]);
-        let geoms = get_geometries(&server.url("/fgb_example.fgb"), Some(&bbox), None).await;
+        let geoms = get_geometries(&server.url("/fgb_example.fgb"), Some(bbox)).await;
 
         assert!(geoms.is_ok(), "The geometry call should not error");
         let geoms = geoms.unwrap();
@@ -199,5 +244,27 @@ mod tests {
         assert_eq!(geoms.shape(), (1, 2), "Should recover one features");
         // Order seems to get moved around when reading back
         println!("{geoms:#?}");
+    }
+
+    #[test]
+    fn bbox_should_parse_if_correct() {
+        let bbox = BBox::from_str("0.0,1.0,2.0,3.0");
+        assert!(bbox.is_ok(), "A four coord bbox should parse");
+    }
+
+    #[test]
+    fn bbox_should_not_parse_if_incorrect() {
+        let bbox = BBox::from_str("0.0,1.0,2.0");
+        assert!(
+            bbox.is_err(),
+            "A string with fewer than 4 coords should not parse"
+        );
+        let bbox = BBox::from_str("0.0,1.0,2.0,3.0,4.0");
+        assert!(
+            bbox.is_err(),
+            "A string with 5 or more coords should not parse"
+        );
+        let bbox = BBox::from_str("0.0sdfsd,1.0,2.0");
+        assert!(bbox.is_err(), "A string with letters shouldn't parse");
     }
 }
