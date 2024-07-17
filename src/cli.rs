@@ -7,7 +7,7 @@ use log::{debug, info};
 use nonempty::nonempty;
 use popgetter::{
     config::Config,
-    data_request_spec::{DataRequestSpec, GeometrySpec, RegionSpec},
+    data_request_spec::{DataRequestConfig, DataRequestSpec, GeometrySpec, RegionSpec},
     formatters::{
         CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
     },
@@ -20,7 +20,7 @@ use popgetter::{
 };
 use serde::{Deserialize, Serialize};
 use spinners::{Spinner, Spinners};
-use std::fs::File;
+use std::{default, fs::File};
 use std::{io, process};
 use strum_macros::EnumString;
 
@@ -118,6 +118,25 @@ impl From<&DataCommand> for DataRequestSpec {
     }
 }
 
+impl From<&DataCommand> for DataRequestConfig {
+    fn from(value: &DataCommand) -> Self {
+        let region_spec = value
+            .bbox
+            .as_ref()
+            .map(|bbox| vec![RegionSpec::BoundingBox(bbox.clone())])
+            .unwrap_or_default();
+
+        Self {
+            include_geoms: if value.bbox.is_some() {
+                true
+            } else {
+                !value.no_geometry
+            },
+            region_spec,
+        }
+    }
+}
+
 impl From<&OutputFormat> for OutputFormatter {
     fn from(value: &OutputFormat) -> Self {
         match value {
@@ -150,7 +169,7 @@ impl RunCommand for DataCommand {
 
         // Make DataRequestSpec
         // TODO: consider alternative `From` impls as part of #67
-        let data_request_spec = self.into();
+        let data_request_config: DataRequestConfig = self.into();
 
         // sp.stop_and_persist is potentially a better method, but not obvious how to
         // store the timing. Leaving below until that option is ruled out.
@@ -180,7 +199,7 @@ impl RunCommand for DataCommand {
             )
         });
         let mut data = search_results
-            .download(&popgetter.config, data_request_spec)
+            .download(&popgetter.config, &data_request_config)
             .await?;
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
@@ -359,6 +378,8 @@ impl From<SearchParamsArgs> for SearchParams {
             country: args.country.clone().map(Country),
             source_metric_id: args.source_metric_id.clone().map(SourceMetricId),
             metric_id: args.id.clone().into_iter().map(MetricId).collect(),
+            include_geoms: true,
+            region_spec: vec![],
         }
     }
 }

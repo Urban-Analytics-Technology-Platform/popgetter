@@ -2,7 +2,7 @@
 
 use crate::{
     config::Config,
-    data_request_spec::DataRequestSpec,
+    data_request_spec::{DataRequestConfig, DataRequestSpec, RegionSpec},
     geo::get_geometries,
     metadata::ExpandedMetadata,
     parquet::{get_metrics, MetricRequest},
@@ -244,7 +244,7 @@ pub struct SourceMetricId(pub String);
 /// However, if a parameter has multiple values (e.g. multiple text strings), these are combined
 /// with an OR operation. So searching for multiple text strings will return metrics that satisfy
 /// any of the text strings.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct SearchParams {
     pub text: Vec<SearchText>,
     pub year_range: Option<Vec<YearRange>>,
@@ -254,6 +254,8 @@ pub struct SearchParams {
     pub data_publisher: Option<DataPublisher>,
     pub country: Option<Country>,
     pub source_metric_id: Option<SourceMetricId>,
+    pub include_geoms: bool,
+    pub region_spec: Vec<RegionSpec>,
 }
 
 impl SearchParams {
@@ -356,7 +358,7 @@ impl SearchResults {
     pub async fn download(
         self,
         config: &Config,
-        data_request_spec: DataRequestSpec,
+        data_request_config: &DataRequestConfig,
     ) -> anyhow::Result<DataFrame> {
         let metric_requests = self.to_metric_requests(config);
         debug!("metric_requests = {:#?}", metric_requests);
@@ -372,16 +374,16 @@ impl SearchResults {
             unimplemented!("Multiple geometries not supported in current release");
         }
 
-        let result = if data_request_spec.geometry.include_geoms {
+        let result = if data_request_config.include_geoms {
             // TODO Pass in the bbox as the second argument here
-            if data_request_spec.region.len() > 1 {
+            if data_request_config.region_spec.len() > 1 {
                 todo!(
                     "Multiple region specifications are not yet supported: {:#?}",
-                    data_request_spec.region
+                    data_request_config.region_spec
                 );
             }
-            let bbox = data_request_spec
-                .region
+            let bbox = data_request_config
+                .region_spec
                 .first()
                 .and_then(|region_spec| region_spec.bbox().clone());
 

@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::geo::BBox;
-use crate::search::MetricId;
+use crate::search::{MetricId, SearchParams};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DataRequestSpec {
@@ -12,6 +12,12 @@ pub struct DataRequestSpec {
     pub region: Vec<RegionSpec>,
     pub metrics: Vec<MetricSpec>,
     pub years: Option<Vec<String>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub struct DataRequestConfig {
+    pub include_geoms: bool,
+    pub region_spec: Vec<RegionSpec>,
 }
 
 // #[derive(Debug)]
@@ -77,7 +83,7 @@ impl Default for GeometrySpec {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum RegionSpec {
     BoundingBox(BBox),
     Polygon(Polygon),
@@ -93,7 +99,7 @@ impl RegionSpec {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Polygon;
 
 #[cfg(test)]
