@@ -7,7 +7,7 @@ use log::{debug, info};
 use nonempty::nonempty;
 use popgetter::{
     config::Config,
-    data_request_spec::{DataRequestConfig, DataRequestSpec, GeometrySpec, RegionSpec},
+    data_request_spec::RegionSpec,
     formatters::{
         CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
     },
@@ -20,7 +20,7 @@ use popgetter::{
 };
 use serde::{Deserialize, Serialize};
 use spinners::{Spinner, Spinners};
-use std::{default, fs::File};
+use std::fs::File;
 use std::{io, process};
 use strum_macros::EnumString;
 
@@ -53,21 +53,6 @@ pub trait RunCommand {
 #[derive(Args, Debug)]
 pub struct DataCommand {
     #[arg(
-        short,
-        long,
-        value_name = "LEFT,BOTTOM,RIGHT,TOP",
-        allow_hyphen_values = true,
-        help = "\
-            Bounding box in which to get the results. The bounding box provided must be in\n\
-            the same coordinate system as used in the requested geometry file. For\n\
-            example, United States has geometries with latitude and longitude (EPSG:4326),\n\
-            Great Britain has geometries with the British National Grid (EPSG:27700),\n\
-            Northern Ireland has geometries with the Irish Grid (EPSG:29902), and\n\
-            Beligum has geometries with the Belgian Lambert 2008 reference system\n\
-            (EPSG:3812)."
-    )]
-    bbox: Option<BBox>,
-    #[arg(
         short = 'f',
         long,
         value_name = "geojson|geojsonseq|csv",
@@ -92,49 +77,6 @@ pub struct DataCommand {
     no_geometry: bool,
     #[arg(from_global)]
     quiet: bool,
-}
-
-impl From<&DataCommand> for DataRequestSpec {
-    fn from(value: &DataCommand) -> Self {
-        let region = value
-            .bbox
-            .as_ref()
-            .map(|bbox| vec![RegionSpec::BoundingBox(bbox.clone())])
-            .unwrap_or_default();
-        let geometry = GeometrySpec {
-            // If region_spec provided, override and always include_geoms
-            include_geoms: if region.len().gt(&0) {
-                true
-            } else {
-                !value.no_geometry
-            },
-            ..Default::default()
-        };
-        Self {
-            geometry,
-            region,
-            ..Default::default()
-        }
-    }
-}
-
-impl From<&DataCommand> for DataRequestConfig {
-    fn from(value: &DataCommand) -> Self {
-        let region_spec = value
-            .bbox
-            .as_ref()
-            .map(|bbox| vec![RegionSpec::BoundingBox(bbox.clone())])
-            .unwrap_or_default();
-
-        Self {
-            include_geoms: if value.bbox.is_some() {
-                true
-            } else {
-                !value.no_geometry
-            },
-            region_spec,
-        }
-    }
 }
 
 impl From<&OutputFormat> for OutputFormatter {
@@ -165,11 +107,12 @@ impl RunCommand for DataCommand {
             )
         });
         let popgetter = Popgetter::new_with_config(config).await?;
-        let search_results = popgetter.search(self.search_params_args.clone().into());
+        let search_params: SearchParams = self.search_params_args.clone().into();
+        let search_results = popgetter.search(search_params.clone());
 
         // Make DataRequestSpec
         // TODO: consider alternative `From` impls as part of #67
-        let data_request_config: DataRequestConfig = self.into();
+        // let data_request_config: DataRequestConfig = (self, &search_params).into();
 
         // sp.stop_and_persist is potentially a better method, but not obvious how to
         // store the timing. Leaving below until that option is ruled out.
@@ -199,7 +142,7 @@ impl RunCommand for DataCommand {
             )
         });
         let mut data = search_results
-            .download(&popgetter.config, &data_request_config)
+            .download(&popgetter.config, &search_params, !self.no_geometry)
             .await?;
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
@@ -222,16 +165,6 @@ impl RunCommand for DataCommand {
 /// The set of ways to search will likley increase over time
 #[derive(Args, Debug)]
 pub struct MetricsCommand {
-    // TODO: consider implementation of bbox for metrics subcommand as part of:
-    // [#67](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/67)
-    // #[arg(
-    //     short,
-    //     long,
-    //     value_name = "LEFT,BOTTOM,RIGHT,TOP",
-    //     allow_hyphen_values=true,
-    //       help = "TODO"
-    // )]
-    // bbox: Option<BBox>,
     #[arg(
         short,
         long,
@@ -292,44 +225,31 @@ struct SearchParamsArgs {
     description: Vec<String>,
     #[arg(short, long, help="Filter by HXL tag, name, or description", num_args=0..)]
     text: Vec<String>,
+    #[arg(
+        short,
+        long,
+        value_name = "LEFT,BOTTOM,RIGHT,TOP",
+        allow_hyphen_values = true,
+        help = "\
+            Bounding box in which to get the results. The bounding box provided must be in\n\
+            the same coordinate system as used in the requested geometry file. For\n\
+            example, United States has geometries with latitude and longitude (EPSG:4326),\n\
+            Great Britain has geometries with the British National Grid (EPSG:27700),\n\
+            Northern Ireland has geometries with the Irish Grid (EPSG:29902), and\n\
+            Beligum has geometries with the Belgian Lambert 2008 reference system\n\
+            (EPSG:3812)."
+    )]
+    bbox: Option<BBox>,
 }
 
 /// Expected behaviour:
 /// N.. -> After(N); ..N -> Before(N); M..N -> Between(M, N); N -> Between(N, N)
 /// Year ranges can be comma-separated
-fn parse_year_range(value: &str) -> Result<Vec<YearRange>, &'static str> {
-    fn parse_single_year_range(value: &str) -> Result<YearRange, &'static str> {
-        fn str_to_option_u16(value: &str) -> Result<Option<u16>, &'static str> {
-            if value.is_empty() {
-                return Ok(None);
-            }
-            match value.parse::<u16>() {
-                Ok(value) => Ok(Some(value)),
-                Err(_) => Err("Invalid year range"),
-            }
-        }
-        let parts: Vec<Option<u16>> = value
-            .split("...")
-            .map(str_to_option_u16)
-            .collect::<Result<Vec<Option<u16>>, &'static str>>()?;
-        match parts.as_slice() {
-            [Some(a)] => Ok(YearRange::Between(*a, *a)),
-            [None, Some(a)] => Ok(YearRange::Before(*a)),
-            [Some(a), None] => Ok(YearRange::After(*a)),
-            [Some(a), Some(b)] => {
-                if a > b {
-                    Err("Invalid year range")
-                } else {
-                    Ok(YearRange::Between(*a, *b))
-                }
-            }
-            _ => Err("Invalid year range"),
-        }
-    }
+fn parse_year_range(value: &str) -> Result<Vec<YearRange>, anyhow::Error> {
     value
         .split(',')
-        .map(parse_single_year_range)
-        .collect::<Result<Vec<YearRange>, &'static str>>()
+        .map(|range| range.parse())
+        .collect::<Result<Vec<YearRange>, anyhow::Error>>()
 }
 
 // A simple function to manage similaries across multiple cases.
@@ -378,8 +298,10 @@ impl From<SearchParamsArgs> for SearchParams {
             country: args.country.clone().map(Country),
             source_metric_id: args.source_metric_id.clone().map(SourceMetricId),
             metric_id: args.id.clone().into_iter().map(MetricId).collect(),
-            include_geoms: true,
-            region_spec: vec![],
+            region_spec: args
+                .bbox
+                .map(|bbox| vec![RegionSpec::BoundingBox(bbox)])
+                .unwrap_or_default(),
         }
     }
 }
@@ -530,32 +452,32 @@ mod tests {
     #[test]
     fn test_parse_year_range() {
         assert_eq!(
-            parse_year_range("2000"),
-            Ok(vec![YearRange::Between(2000, 2000)])
+            parse_year_range("2000").unwrap(),
+            vec![YearRange::Between(2000, 2000)]
         );
         assert_eq!(
-            parse_year_range("2000..."),
-            Ok(vec![YearRange::After(2000)])
+            parse_year_range("2000...").unwrap(),
+            vec![YearRange::After(2000)]
         );
         assert_eq!(
-            parse_year_range("...2000"),
-            Ok(vec![YearRange::Before(2000)])
+            parse_year_range("...2000").unwrap(),
+            vec![YearRange::Before(2000)]
         );
         assert_eq!(
-            parse_year_range("2000...2001"),
-            Ok(vec![YearRange::Between(2000, 2001)])
+            parse_year_range("2000...2001").unwrap(),
+            vec![YearRange::Between(2000, 2001)]
         );
         assert_eq!(
-            parse_year_range("2000...2001,2005..."),
-            Ok(vec![YearRange::Between(2000, 2001), YearRange::After(2005)])
+            parse_year_range("2000...2001,2005...").unwrap(),
+            vec![YearRange::Between(2000, 2001), YearRange::After(2005)]
         );
         assert_eq!(
-            parse_year_range("...2001,2005,2009"),
-            Ok(vec![
+            parse_year_range("...2001,2005,2009").unwrap(),
+            vec![
                 YearRange::Before(2001),
                 YearRange::Between(2005, 2005),
                 YearRange::Between(2009, 2009)
-            ])
+            ]
         );
     }
 
