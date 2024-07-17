@@ -2,19 +2,20 @@
 
 use crate::{
     config::Config,
-    data_request_spec::{DataRequestConfig, DataRequestSpec, RegionSpec},
+    data_request_spec::RegionSpec,
     geo::get_geometries,
     metadata::ExpandedMetadata,
     parquet::{get_metrics, MetricRequest},
     COL,
 };
+use anyhow::bail;
 use chrono::NaiveDate;
 use log::{debug, warn};
 use nonempty::{nonempty, NonEmpty};
 use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, DataFrameJoinOps, IntoLazy, LazyFrame};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
 use tokio::try_join;
 
 // TODO: add trait/struct for combine_exprs
@@ -211,6 +212,39 @@ pub enum YearRange {
     Between(u16, u16),
 }
 
+impl FromStr for YearRange {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        fn str_to_option_u16(value: &str) -> Result<Option<u16>, anyhow::Error> {
+            if value.is_empty() {
+                return Ok(None);
+            }
+            match value.parse::<u16>() {
+                Ok(value) => Ok(Some(value)),
+                Err(_) => bail!("Invalid year range"),
+            }
+        }
+        let parts: Vec<Option<u16>> = s
+            .split("...")
+            .map(str_to_option_u16)
+            .collect::<Result<Vec<Option<u16>>, _>>()?;
+        match parts.as_slice() {
+            [Some(a)] => Ok(YearRange::Between(*a, *a)),
+            [None, Some(a)] => Ok(YearRange::Before(*a)),
+            [Some(a), None] => Ok(YearRange::After(*a)),
+            [Some(a), Some(b)] => {
+                if a > b {
+                    bail!("Invalid year range")
+                } else {
+                    Ok(YearRange::Between(*a, *b))
+                }
+            }
+            _ => bail!("Invalid year range"),
+        }
+    }
+}
+
 /// Search over metric IDs
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MetricId(pub String);
@@ -254,7 +288,6 @@ pub struct SearchParams {
     pub data_publisher: Option<DataPublisher>,
     pub country: Option<Country>,
     pub source_metric_id: Option<SourceMetricId>,
-    pub include_geoms: bool,
     pub region_spec: Vec<RegionSpec>,
 }
 
@@ -358,7 +391,8 @@ impl SearchResults {
     pub async fn download(
         self,
         config: &Config,
-        data_request_config: &DataRequestConfig,
+        search_params: &SearchParams,
+        include_geoms: bool,
     ) -> anyhow::Result<DataFrame> {
         let metric_requests = self.to_metric_requests(config);
         debug!("metric_requests = {:#?}", metric_requests);
@@ -374,15 +408,15 @@ impl SearchResults {
             unimplemented!("Multiple geometries not supported in current release");
         }
 
-        let result = if data_request_config.include_geoms {
+        let result = if include_geoms {
             // TODO Pass in the bbox as the second argument here
-            if data_request_config.region_spec.len() > 1 {
+            if search_params.region_spec.len() > 1 {
                 todo!(
                     "Multiple region specifications are not yet supported: {:#?}",
-                    data_request_config.region_spec
+                    search_params.region_spec
                 );
             }
-            let bbox = data_request_config
+            let bbox = search_params
                 .region_spec
                 .first()
                 .and_then(|region_spec| region_spec.bbox().clone());
