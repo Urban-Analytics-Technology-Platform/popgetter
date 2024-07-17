@@ -9,7 +9,7 @@ use crate::search::{GeometryLevel, MetricId, SearchParams, YearRange};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DataRequestSpec {
-    pub geometry: GeometrySpec,
+    pub geometry: Option<GeometrySpec>,
     pub region: Vec<RegionSpec>,
     pub metrics: Vec<MetricSpec>,
     pub years: Option<Vec<String>>,
@@ -40,7 +40,9 @@ impl TryFrom<DataRequestSpec> for SearchParams {
                     }
                 })
                 .collect_vec(),
-            geometry_level: value.geometry.geometry_level.map(GeometryLevel),
+            geometry_level: value
+                .geometry
+                .and_then(|geometry| geometry.geometry_level.map(GeometryLevel)),
             source_data_release: None,
             data_publisher: None,
             country: None,

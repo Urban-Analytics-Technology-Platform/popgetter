@@ -11,10 +11,13 @@
   ],
   "metrics": [
     {
-      "NamedMetric": "B01001_E002"
+      "Metric": "f29c1976"
     },
     {
-      "NamedMetric": "B01001_E001"
+      "Metric": "079f3ba3"
+    },
+    {
+      "Metric": "81cae95d"
     }
   ]
 }

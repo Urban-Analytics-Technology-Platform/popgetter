@@ -7,7 +7,7 @@ use log::{debug, info};
 use nonempty::nonempty;
 use popgetter::{
     config::Config,
-    data_request_spec::RegionSpec,
+    data_request_spec::{DataRequestSpec, RegionSpec},
     formatters::{
         CSVFormatter, GeoJSONFormatter, GeoJSONSeqFormatter, OutputFormatter, OutputGenerator,
     },
@@ -380,32 +380,46 @@ impl RunCommand for SurveysCommand {
 }
 
 // // TODO: Reimplement this
-// /// The Recipe command loads a recipe file and generates the output data requested
-// #[derive(Args, Debug)]
-// pub struct RecipeCommand {
-//     #[arg(index = 1)]
-//     recipe_file: String,
+/// The Recipe command loads a recipe file and generates the output data requested
+#[derive(Args, Debug)]
+pub struct RecipeCommand {
+    #[arg(index = 1)]
+    recipe_file: String,
 
-//     #[arg(short = 'f', long)]
-//     output_format: OutputFormat,
+    #[arg(short = 'f', long)]
+    output_format: OutputFormat,
 
-//     #[arg(short = 'o', long)]
-//     output_file: String,
-// }
+    #[arg(short = 'o', long)]
+    output_file: Option<String>,
+}
 
-// impl RunCommand for RecipeCommand {
-//     async fn run(&self, config: Config) -> Result<()> {
-//         let popgetter = Popgetter::new_with_config(config).await?;
-//         let recipe = fs::read_to_string(&self.recipe_file)?;
-//         let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
-//         let mut results = popgetter.get_data_request(&data_request).await?;
-//         println!("{results}");
-//         let formatter: OutputFormatter = (&self.output_format).into();
-//         let mut f = File::create(&self.output_file)?;
-//         formatter.save(&mut f, &mut results)?;
-//         Ok(())
-//     }
-// }
+impl RunCommand for RecipeCommand {
+    async fn run(&self, config: Config) -> Result<()> {
+        let popgetter = Popgetter::new_with_config(config).await?;
+        let recipe = std::fs::read_to_string(&self.recipe_file)?;
+        let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
+        let include_geoms = data_request
+            .geometry
+            .as_ref()
+            .map(|geo| geo.include_geoms)
+            .unwrap_or(true);
+        let search_params: SearchParams = data_request.try_into()?;
+        let search_results = popgetter.search(search_params.clone());
+        let mut data = search_results
+            .download(&popgetter.config, &search_params, include_geoms)
+            .await?;
+        debug!("{data:#?}");
+        let formatter: OutputFormatter = (&self.output_format).into();
+        if let Some(output_file) = &self.output_file {
+            let mut f = File::create(output_file)?;
+            formatter.save(&mut f, &mut data)?;
+        } else {
+            let mut stdout_lock = std::io::stdout().lock();
+            formatter.save(&mut stdout_lock, &mut data)?;
+        };
+        Ok(())
+    }
+}
 
 /// The entrypoint for the CLI.
 #[derive(Parser, Debug)]
@@ -439,8 +453,8 @@ pub enum Commands {
     Metrics(MetricsCommand),
     /// Surveys
     Surveys(SurveysCommand),
-    // /// From recipe
-    // Recipe(RecipeCommand),
+    /// From recipe
+    Recipe(RecipeCommand),
 }
 
 #[cfg(test)]
