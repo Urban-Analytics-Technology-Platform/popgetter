@@ -1,10 +1,11 @@
 // TODO: this module to be refactored following implementation of SearchParams.
 // See [#67](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/67)
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::geo::BBox;
-use crate::search::{MetricId, SearchParams};
+use crate::search::{GeometryLevel, MetricId, SearchParams, YearRange};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DataRequestSpec {
@@ -14,10 +15,39 @@ pub struct DataRequestSpec {
     pub years: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct DataRequestConfig {
-    pub include_geoms: bool,
-    pub region_spec: Vec<RegionSpec>,
+impl TryFrom<DataRequestSpec> for SearchParams {
+    type Error = anyhow::Error;
+    fn try_from(value: DataRequestSpec) -> Result<Self, Self::Error> {
+        Ok(Self {
+            text: vec![],
+            year_range: if let Some(v) = value.years {
+                Some(
+                    v.iter()
+                        .map(|year| format!("{year}...{year}").parse::<YearRange>())
+                        .collect::<Result<Vec<_>, anyhow::Error>>()?,
+                )
+            } else {
+                None
+            },
+            metric_id: value
+                .metrics
+                .iter()
+                .filter_map(|metric| {
+                    match metric {
+                        MetricSpec::Metric(m) => Some(m.clone()),
+                        // TODO: handle DataProduct variant
+                        MetricSpec::DataProduct(_) => None,
+                    }
+                })
+                .collect_vec(),
+            geometry_level: value.geometry.geometry_level.map(GeometryLevel),
+            source_data_release: None,
+            data_publisher: None,
+            country: None,
+            source_metric_id: None,
+            region_spec: value.region,
+        })
+    }
 }
 
 // #[derive(Debug)]
