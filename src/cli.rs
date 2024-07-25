@@ -5,6 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use log::{debug, info};
 use nonempty::nonempty;
+use polars::frame::DataFrame;
 use popgetter::{
     config::Config,
     data_request_spec::{DataRequestSpec, RegionSpec},
@@ -20,7 +21,7 @@ use popgetter::{
 };
 use serde::{Deserialize, Serialize};
 use spinners::{Spinner, Spinners};
-use std::fs::File;
+use std::{fs::File, path::Path};
 use std::{io, process};
 use strum_macros::EnumString;
 
@@ -41,6 +42,25 @@ pub enum OutputFormat {
     GeoParquet,
     FlatGeobuf,
     Stdout,
+}
+
+fn write_output<T, U>(
+    output_generator: T,
+    mut data: DataFrame,
+    output_file: Option<U>,
+) -> anyhow::Result<()>
+where
+    T: OutputGenerator,
+    U: AsRef<Path>,
+{
+    if let Some(output_file) = output_file {
+        let mut f = File::create(output_file)?;
+        output_generator.save(&mut f, &mut data)?;
+    } else {
+        let mut stdout_lock = std::io::stdout().lock();
+        output_generator.save(&mut stdout_lock, &mut data)?;
+    };
+    Ok(())
 }
 
 /// Trait that defines what to run when a given subcommand is invoked.
@@ -141,7 +161,7 @@ impl RunCommand for DataCommand {
                 "Downloading metrics".to_string() + RUNNING_TAIL_STRING,
             )
         });
-        let mut data = search_results
+        let data = search_results
             .download(&popgetter.config, &search_params, !self.no_geometry)
             .await?;
         if let Some(mut s) = sp {
@@ -150,13 +170,7 @@ impl RunCommand for DataCommand {
         debug!("{data:#?}");
 
         let formatter: OutputFormatter = (&self.output_format).into();
-        if let Some(output_file) = &self.output_file {
-            let mut f = File::create(output_file)?;
-            formatter.save(&mut f, &mut data)?;
-        } else {
-            let mut stdout_lock = std::io::stdout().lock();
-            formatter.save(&mut stdout_lock, &mut data)?;
-        };
+        write_output(formatter, data, self.output_file.as_deref())?;
         Ok(())
     }
 }
@@ -405,18 +419,12 @@ impl RunCommand for RecipeCommand {
             .unwrap_or(true);
         let search_params: SearchParams = data_request.try_into()?;
         let search_results = popgetter.search(search_params.clone());
-        let mut data = search_results
+        let data = search_results
             .download(&popgetter.config, &search_params, include_geoms)
             .await?;
         debug!("{data:#?}");
         let formatter: OutputFormatter = (&self.output_format).into();
-        if let Some(output_file) = &self.output_file {
-            let mut f = File::create(output_file)?;
-            formatter.save(&mut f, &mut data)?;
-        } else {
-            let mut stdout_lock = std::io::stdout().lock();
-            formatter.save(&mut stdout_lock, &mut data)?;
-        };
+        write_output(formatter, data, self.output_file.as_deref())?;
         Ok(())
     }
 }
