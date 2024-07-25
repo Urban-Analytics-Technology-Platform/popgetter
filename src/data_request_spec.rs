@@ -2,10 +2,11 @@
 // See [#67](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/67)
 
 use itertools::Itertools;
+use nonempty::nonempty;
 use serde::{Deserialize, Serialize};
 
 use crate::geo::BBox;
-use crate::search::{GeometryLevel, MetricId, SearchParams, YearRange};
+use crate::search::{GeometryLevel, MetricId, SearchContext, SearchParams, SearchText, YearRange};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DataRequestSpec {
@@ -18,12 +19,28 @@ pub struct DataRequestSpec {
 impl TryFrom<DataRequestSpec> for SearchParams {
     type Error = anyhow::Error;
     fn try_from(value: DataRequestSpec) -> Result<Self, Self::Error> {
+        // TODO: handle MetricSpec::DataProduct variant
         Ok(Self {
-            text: vec![],
+            // TODO: consider updating for regex field following [#66](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/66)
+            text: value
+                .metrics
+                .iter()
+                .filter_map(|metric| match metric {
+                    MetricSpec::MetricText(text) => Some(SearchText {
+                        text: text.clone(),
+                        context: nonempty![
+                            SearchContext::HumanReadableName,
+                            SearchContext::Hxl,
+                            SearchContext::Description
+                        ],
+                    }),
+                    _ => None,
+                })
+                .collect_vec(),
             year_range: if let Some(v) = value.years {
                 Some(
                     v.iter()
-                        .map(|year| format!("{year}...{year}").parse::<YearRange>())
+                        .map(|year| year.parse::<YearRange>())
                         .collect::<Result<Vec<_>, anyhow::Error>>()?,
                 )
             } else {
@@ -32,12 +49,9 @@ impl TryFrom<DataRequestSpec> for SearchParams {
             metric_id: value
                 .metrics
                 .iter()
-                .filter_map(|metric| {
-                    match metric {
-                        MetricSpec::Metric(m) => Some(m.clone()),
-                        // TODO: handle DataProduct variant
-                        MetricSpec::DataProduct(_) => None,
-                    }
+                .filter_map(|metric| match metric {
+                    MetricSpec::MetricId(m) => Some(m.clone()),
+                    _ => None,
                 })
                 .collect_vec(),
             geometry_level: value
@@ -96,7 +110,8 @@ impl TryFrom<DataRequestSpec> for SearchParams {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MetricSpec {
-    Metric(MetricId),
+    MetricId(MetricId),
+    MetricText(String),
     DataProduct(String),
 }
 
