@@ -396,17 +396,31 @@ impl SearchResults {
     ) -> anyhow::Result<DataFrame> {
         let metric_requests = self.to_metric_requests(config);
         debug!("metric_requests = {:#?}", metric_requests);
+
+        if metric_requests.is_empty() {
+            bail!(
+                "No metric requests were derived from given `search_params`: {:#?}",
+                search_params
+            )
+        }
+
         let all_geom_files: HashSet<String> = metric_requests
             .iter()
             .map(|m| m.geom_file.clone())
             .collect();
-        // Required because polars is blocking
-        let metrics = tokio::task::spawn_blocking(move || get_metrics(&metric_requests, None));
 
-        // TODO Handle multiple responses
+        // TODO Handle multiple geometries
         if all_geom_files.len() > 1 {
             unimplemented!("Multiple geometries not supported in current release");
+        } else if all_geom_files.len() == 0 {
+            bail!(
+                "No geometry files for the following `metric_requests`: {:#?}",
+                metric_requests
+            )
         }
+
+        // Required because polars is blocking
+        let metrics = tokio::task::spawn_blocking(move || get_metrics(&metric_requests, None));
 
         let result = if include_geoms {
             // TODO Pass in the bbox as the second argument here
