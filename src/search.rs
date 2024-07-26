@@ -18,52 +18,64 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, str::FromStr};
 use tokio::try_join;
 
-// TODO: add trait/struct for combine_exprs
-
-/// Combine multiple queries with OR. If there are no queries in the input list, returns None.
-fn combine_exprs_with_or(exprs: Vec<Expr>) -> Option<Expr> {
-    let mut query: Option<Expr> = None;
-    for expr in exprs {
-        query = if let Some(partial_query) = query {
-            Some(partial_query.or(expr))
-        } else {
-            Some(expr)
-        };
-    }
-    query
+/// A trait describing implemented logical operations on types
+trait LogicalCombine {
+    /// Combine self and another query with OR.
+    fn or(self, other: Self) -> Self;
+    /// Combine self and another query with AND.
+    fn and(self, other: Self) -> Self;
 }
 
-/// Same as `combine_exprs_with_or`, but takes a NonEmpty list instead of a Vec, and doesn't
-/// return an Option.
-fn combine_exprs_with_or1(exprs: NonEmpty<Expr>) -> Expr {
-    let mut query: Expr = exprs.head;
-    for expr in exprs.tail.into_iter() {
-        query = query.or(expr);
+impl LogicalCombine for Expr {
+    fn or(self, other: Self) -> Self {
+        self.or(other)
     }
-    query
+    fn and(self, other: Self) -> Self {
+        self.and(other)
+    }
 }
 
-/// Combine multiple queries with AND. If there are no queries in the input list, returns None.
-fn combine_exprs_with_and(exprs: Vec<Expr>) -> Option<Expr> {
-    let mut query: Option<Expr> = None;
-    for expr in exprs {
-        query = if let Some(partial_query) = query {
-            Some(partial_query.and(expr))
-        } else {
-            Some(expr)
-        };
+impl LogicalCombine for Option<Expr> {
+    fn or(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(e1), Some(e2)) => Some(e1.or(e2)),
+            (Some(e1), None) | (None, Some(e1)) => Some(e1),
+            (None, None) => None,
+        }
     }
-    query
+    fn and(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(e1), Some(e2)) => Some(e1.and(e2)),
+            (Some(e1), None) | (None, Some(e1)) => Some(e1),
+            (None, None) => None,
+        }
+    }
 }
 
-/// Same as `combine_exprs_with_and`, but takes a NonEmpty list instead of a Vec, and doesn't
-/// return an Option.
-fn _combine_exprs_with_and1(exprs: NonEmpty<Expr>) -> Expr {
-    let mut query: Expr = exprs.head;
-    for expr in exprs.tail.into_iter() {
-        query = query.and(expr);
+/// A trait for reducing collections of types that implement LogicalCombine
+// TODO: consider associated type instead
+trait LogicalReduce<T>
+where
+    T: LogicalCombine,
+{
+    /// Combine multiple optional queries with OR. If there are no queries in the input list, returns None.
+    fn reduce_with_or(self) -> Option<T>;
+    /// Combine multiple queries with AND. If there are no queries in the input list, returns None.
+    fn reduce_with_and(self) -> Option<T>;
+}
+
+impl<T, U> LogicalReduce<T> for U
+where
+    T: LogicalCombine,
+    U: IntoIterator<Item = T>,
+{
+    fn reduce_with_or(self) -> Option<T> {
+        self.into_iter().reduce(|lhs, rhs| lhs.or(rhs))
     }
-    query
+
+    fn reduce_with_and(self) -> Option<T> {
+        self.into_iter().reduce(|lhs, rhs| lhs.and(rhs))
+    }
 }
 
 /// Search in a column case-insensitively for a string literal (i.e. not a regex!). The search
@@ -108,7 +120,8 @@ impl From<SearchText> for Expr {
                 case_insensitive_contains(COL::METRIC_DESCRIPTION, &val.text)
             }
         });
-        combine_exprs_with_or1(queries)
+        // Unwrap: guaranteed to no panic as non-empty
+        queries.reduce_with_or().unwrap()
     }
 }
 
@@ -162,7 +175,7 @@ impl From<GeometryLevel> for Expr {
 
 impl From<Country> for Expr {
     fn from(value: Country) -> Self {
-        combine_exprs_with_or(vec![
+        vec![
             case_insensitive_contains(COL::COUNTRY_NAME_SHORT_EN, &value.0),
             case_insensitive_contains(COL::COUNTRY_NAME_OFFICIAL, &value.0),
             case_insensitive_contains(COL::COUNTRY_ISO2, &value.0),
@@ -171,7 +184,8 @@ impl From<Country> for Expr {
             // TODO: add `COUNTRY_ID` for ExpandedMetadata
             // case_insensitive_contains(COL::COUNTRY_ID, &value.0),
             case_insensitive_contains(COL::DATA_PUBLISHER_COUNTRIES_OF_INTEREST, &value.0),
-        ])
+        ]
+        .reduce_with_or()
         // Unwrap: cannot be None as vec above is non-empty
         .unwrap()
     }
@@ -304,25 +318,36 @@ impl SearchParams {
     }
 }
 
+// TODO: consider refactor with LogicalReduce trait
 fn to_queries_then_or<T: Into<Expr>>(queries: Vec<T>) -> Option<Expr> {
     let queries: Vec<Expr> = queries.into_iter().map(|q| q.into()).collect();
-    combine_exprs_with_or(queries)
+    queries.reduce_with_or()
 }
 
+// TODO: consider refactor with LogicalReduce trait
 fn _to_optqueries_then_or<T: Into<Option<Expr>>>(queries: Vec<T>) -> Option<Expr> {
     let query_options: Vec<Option<Expr>> = queries.into_iter().map(|q| q.into()).collect();
     let queries: Vec<Expr> = query_options.into_iter().flatten().collect();
-    combine_exprs_with_or(queries)
+    queries.reduce_with_or()
 }
 
 impl From<SearchParams> for Option<Expr> {
     fn from(value: SearchParams) -> Self {
+        // Collect any text to search into `Expr`
         let mut subexprs: Vec<Option<Expr>> = value
             .text
             .into_iter()
             .map(|text| Some(text.into()))
             .collect();
+        // Collect any metric IDs to search with OR
         subexprs.extend([to_queries_then_or(value.metric_id)]);
+
+        // Combine text and MetricID search with OR
+        let mut subexprs = vec![subexprs
+            .reduce_with_or()
+            // Unwrap: nonempty guaranteed from above
+            .unwrap()];
+
         if let Some(year_range) = value.year_range {
             subexprs.extend([to_queries_then_or(year_range)]);
         }
@@ -336,7 +361,7 @@ impl From<SearchParams> for Option<Expr> {
         subexprs.extend(other_subexprs);
         // Remove the Nones and unwrap the Somes
         let valid_subexprs: Vec<Expr> = subexprs.into_iter().flatten().collect();
-        combine_exprs_with_and(valid_subexprs)
+        valid_subexprs.reduce_with_and()
     }
 }
 
@@ -464,9 +489,37 @@ impl SearchResults {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
+    use super::*;
+
+    impl LogicalCombine for bool {
+        fn or(self, other: Self) -> Self {
+            self || other
+        }
+
+        fn and(self, other: Self) -> Self {
+            self && other
+        }
+    }
+
+    #[test]
+    fn test_logical_reduce() {
+        let v: Vec<bool> = vec![];
+        assert_eq!(v.clone().reduce_with_or(), None);
+        assert_eq!(v.clone().reduce_with_and(), None);
+        let v = vec![true];
+        assert_eq!(v.clone().reduce_with_or(), Some(true));
+        assert_eq!(v.clone().reduce_with_and(), Some(true));
+        let v = vec![true, false, false];
+        assert_eq!(v.clone().reduce_with_or(), Some(true));
+        assert_eq!(v.clone().reduce_with_and(), Some(false));
+    }
+
     // #[test]
     // fn test_search_request() {
-    //     let mut sr = SearchRequest{search_string: None}.with_country("a").with_country("b");
+    //     let mut sr = SearchRequest {
+    //         search_string: None,
+    //     }
+    //     .with_country("a")
+    //     .with_country("b");
     // }
 }
