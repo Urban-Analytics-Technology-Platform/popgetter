@@ -56,14 +56,12 @@ fn get_search(obj: &Bound<'_, PyAny>) -> PyResult<SearchParams> {
 
 fn get_data_request(obj: &Bound<'_, PyAny>) -> PyResult<DataRequestSpec> {
     Ok(DataRequestSpec {
-        geometry: GeometrySpec {
+        geometry: Some(GeometrySpec {
             include_geoms: true,
             geometry_level: None,
-        },
+        }),
         region: vec![],
-        metrics: vec![MetricSpec::Metric(::popgetter::search::MetricId(
-            r"\#population\+adults".into(),
-        ))],
+        metrics: vec![MetricSpec::MetricText(r"\#population\+adults".to_string())],
         years: None,
     })
 }
