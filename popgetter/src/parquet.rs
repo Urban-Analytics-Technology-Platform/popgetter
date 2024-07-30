@@ -15,28 +15,52 @@ pub struct MetricRequest {
 /// Given a `file_url` and a list of `columns`, return a `Result<DataFrame>`
 /// with the requested columns, filtered by `geo_id`s if nessesary
 fn get_metrics_from_file(
-    file_url: &String,
+    file_url: &str,
     columns: &[String],
     geo_ids: Option<&[&str]>,
 ) -> Result<DataFrame> {
     let mut cols: Vec<Expr> = columns.iter().map(|c| col(c)).collect();
     cols.push(col(COL::GEO_ID));
 
-    let args = ScanArgsParquet::default();
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let args = ScanArgsParquet::default();
 
-    let df = LazyFrame::scan_parquet(file_url, args)?
-        .with_streaming(true)
-        .select(cols);
+        let df = LazyFrame::scan_parquet(file_url, args)?
+            .with_streaming(true)
+            .select(cols);
 
-    let df = if let Some(ids) = geo_ids {
-        let id_series = Series::new("geo_ids", ids);
-        df.filter(col(COL::GEO_ID).is_in(lit(id_series)))
-    } else {
-        df
-    };
+        let df = if let Some(ids) = geo_ids {
+            let id_series = Series::new("geo_ids", ids);
+            df.filter(col(COL::GEO_ID).is_in(lit(id_series)))
+        } else {
+            df
+        };
 
-    let result = df.collect()?;
-    Ok(result)
+        let result = df.collect()?;
+        Ok(result)
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        // // TODO: this needs to be updated to:
+        // //  - only request the columns required
+        // //  - use a blocking client (required as the function needs to remain sync for polars)
+        // Example with reqwest (non-blocking), currently will not compile since uses async:
+        // TODO: check if blocking reqwest available for WASM
+        // let response = reqwest::get(file_url).await?;
+        // let bytes = response.bytes().await?;
+        // let cursor = std::io::Cursor::new(bytes);
+        // let df = ParquetReader::new(cursor).finish()?.lazy().select(cols);
+        // let df = if let Some(ids) = geo_ids {
+        //     let id_series = Series::new("geo_ids", ids);
+        //     df.filter(col(COL::GEO_ID).is_in(lit(id_series)))
+        // } else {
+        //     df
+        // };
+        // let result = df.collect()?;
+        // Ok(result)
+        todo!()
+    }
 }
 
 /// Given a set of metrics and optional `geo_ids`, this function will
@@ -46,7 +70,7 @@ pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Resul
     let file_list: HashSet<String> = metrics.iter().map(|m| m.metric_file.clone()).collect();
     debug!("{:#?}", file_list);
     // TODO Can we do this async so we can be downloading results from each file together?
-    let dfs: Result<Vec<DataFrame>> = file_list
+    let dfs = file_list
         .iter()
         .map(|file_url| {
             let file_cols: Vec<String> = metrics
@@ -59,17 +83,16 @@ pub fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> Resul
                     }
                 })
                 .collect();
-
             get_metrics_from_file(file_url, &file_cols, geo_ids)
         })
-        .collect();
+        .collect::<Result<Vec<DataFrame>>>()?;
 
     // TODO: The following assumes that we requested metrics for the same geo_ids. This is not
     // generally true
     let mut joined_df: Option<DataFrame> = None;
 
     // Merge the dataframes from each remove file in to a single dataframe
-    for df in dfs? {
+    for df in dfs {
         if let Some(prev_dfs) = joined_df {
             joined_df = Some(prev_dfs.join(
                 &df,
