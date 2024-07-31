@@ -182,7 +182,7 @@ impl CountryMetadataLoader {
         #[cfg(target_arch = "wasm32")]
         {
             let bytes = reqwest::Client::new()
-                .get(&format!("{}/countries.txt", config.base_path))
+                .get(&full_path)
                 .send()
                 .await?
                 .bytes()
