@@ -8,7 +8,7 @@ use polars::{io::SerReader, prelude::ParquetReader};
 
 use log::debug;
 use log::info;
-#[cfg(not(target = "wasm32-unknown-unknown"))]
+#[cfg(not(target_arch = "wasm32"))]
 use polars::prelude::ScanArgsParquet;
 use polars::{
     frame::DataFrame,
