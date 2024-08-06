@@ -1,9 +1,11 @@
+use std::path::Path;
+
 use anyhow::Result;
 use data_request_spec::DataRequestSpec;
 use log::debug;
 use metadata::Metadata;
 use polars::frame::DataFrame;
-use search::{DownloadParams, Params, SearchParams, SearchResults};
+use search::{Params, SearchParams, SearchResults};
 
 use crate::config::Config;
 
@@ -38,6 +40,13 @@ impl Popgetter {
     pub async fn new_with_config(config: Config) -> Result<Self> {
         debug!("config: {config:?}");
         let metadata = metadata::load_all(&config).await?;
+        Ok(Self { metadata, config })
+    }
+
+    // TODO: add condition with feature "not_wasm" feature
+    /// Setup the Popgetter object with custom configuration
+    pub fn new_with_config_and_cache<P: AsRef<Path>>(config: Config, cache: P) -> Result<Self> {
+        let metadata = Metadata::from_cache(cache)?;
         Ok(Self { metadata, config })
     }
 
