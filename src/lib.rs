@@ -24,7 +24,8 @@ pub mod metadata;
 pub mod parquet;
 pub mod search;
 
-/// Type for popgetter data and API
+/// Type for popgetter metadata, config and API
+#[derive(Debug, PartialEq)]
 pub struct Popgetter {
     pub metadata: Metadata,
     pub config: Config,
@@ -51,6 +52,7 @@ impl Popgetter {
     }
 
     /// Generates `SearchResults` using popgetter given `SearchParams`
+    // TODO: consider reverting to an API where `SearchParams` are moved, add benches
     pub fn search(&self, search_params: &SearchParams) -> SearchResults {
         search_params
             .clone()
@@ -74,5 +76,24 @@ impl Popgetter {
         self.search(&params.search)
             .download(&self.config, &params.download)
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use tempfile::TempDir;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_popgetter_cache() -> anyhow::Result<()> {
+        let tempdir = TempDir::new()?;
+        let config = Config::default();
+        let popgetter = Popgetter::new_with_config(config.clone()).await?;
+        popgetter.metadata.write_cache(&tempdir)?;
+        let popgetter_from_cache = Popgetter::new_with_config_and_cache(config, &tempdir)?;
+        assert_eq!(popgetter, popgetter_from_cache);
+        Ok(())
     }
 }
