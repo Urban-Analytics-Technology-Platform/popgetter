@@ -42,10 +42,14 @@ nonempty = { version = "0.10.0", features = ["serialize"] }
 # Current dependency is on a UATP fork where the "parquet" feature is updated to enable compilation
 # to WASM. This will need to be temporary so a version pointing to a published crate remains
 # possible (since crates.io requires no git deps)
-polars = { git = "https://github.com/Urban-Analytics-Technology-Platform/polars.git", branch = "parquet-wasm", default-features = false}
+polars = { git = "https://github.com/Urban-Analytics-Technology-Platform/polars.git", branch = "parquet-wasm", default-features = false }
 
-[dev-dependencies]
-httpmock = "0.7.0-rc.1"
+[target.'cfg(not(target_arch="wasm32"))'.dev-dependencies]
+httpmock = { version = "0.7.0-rc.1" }
+
+[target.'cfg(target_arch="wasm32")'.dev-dependencies]
+wasm-bindgen-test = { version = "0.3" }
+
 
 [features]
 formatters = ["dep:geojson"]

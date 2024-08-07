@@ -51,10 +51,11 @@ async fn get_metrics_from_file(
     }
     #[cfg(target_arch = "wasm32")]
     {
-        // TODO: this needs to be updated to:
-        // - only request the columns required
-        //  - use a blocking client (required as the function needs to remain sync for polars)
-        // Example with reqwest (non-blocking)
+        // TODO: this needs to be updated to only request the columns required as currently
+        // will request entire parquet file
+        // An example of this is in polars (see https://github.com/pola-rs/polars/blob/3dda47e578e0b50a5bb7c459ebee6c5c76d41c75/crates/polars-io/src/parquet/read/async_impl.rs)
+        // but calls this code through creating its own multi-threaded tokio runtime that will not
+        // compile to WASM.
         let response = reqwest::get(file_url).await?;
         let bytes = response.bytes().await?;
         let cursor = std::io::Cursor::new(bytes);
@@ -121,6 +122,9 @@ pub async fn get_metrics(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) ->
 mod tests {
     use super::*;
 
+    #[cfg(target_arch = "wasm32")]
+    use wasm_bindgen_test::wasm_bindgen_test;
+
     #[tokio::test]
     async fn test_fetching_metrics() {
         let metrics  = [
@@ -163,6 +167,35 @@ mod tests {
         let df = get_metrics(
             &metrics,
             Some(&["1400000US01001020100", "1400000US01001020300"]),
+        )
+        .await;
+
+        assert!(df.is_ok(), "We should get back a result");
+        let df = df.unwrap();
+        assert_eq!(
+            df.shape().1,
+            2,
+            "The returned dataframe should have the correct number of columns"
+        );
+        assert_eq!(
+            df.shape().0,
+            2,
+            "The returned dataframe should have the correct number of rows"
+        );
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen_test(async)]
+    async fn test_fetching_metrics_with_geo_filter_wasm32() {
+        let metrics  = [
+            MetricRequest{
+                metric_file: "https://popgetter.blob.core.windows.net/releases/v0.2/usa/metrics/2019fiveYearblockgroup0.parquet".into(),
+                column: "individuals".into(),
+                geom_file: "Not needed for this test".into(),
+            }];
+        let df = get_metrics(
+            &metrics,
+            Some(&["1500000US010010201001", "1500000US721537506022"]),
         )
         .await;
 
