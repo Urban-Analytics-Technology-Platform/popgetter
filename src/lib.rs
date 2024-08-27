@@ -46,7 +46,7 @@ impl Popgetter {
         search_params.search(&self.metadata.combined_metric_source_geometry())
     }
 
-    /// Downloads results using popgetter given `SearchResults`
+    /// Downloads data using popgetter given a `DataRequestSpec`
     pub async fn get_data_request(&self, data_request_spec: DataRequestSpec) -> Result<DataFrame> {
         let include_geoms = data_request_spec
             .geometry
@@ -60,7 +60,7 @@ impl Popgetter {
             .await
     }
 
-    /// Downloads results using popgetter given `SearchResults`
+    /// Downloads data using popgetter given `SearchParams`
     pub async fn get_search_params(
         &self,
         search_params: SearchParams,
