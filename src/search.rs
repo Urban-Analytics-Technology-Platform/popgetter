@@ -272,12 +272,17 @@ pub struct SourceMetricId(pub String);
 /// This struct represents all the possible parameters one can search the metadata catalogue with.
 /// All parameters are optional in that they can either be empty vectors or None.
 ///
-/// Each of the fields are combined with an AND operation, so searching for both text and a year
-/// range will only return metrics that satisfy both parameters.
+/// Aside from `metric_id`, each of the fields are combined with an AND operation, so searching for
+/// both text and a year range will only return metrics that satisfy both parameters.
 ///
 /// However, if a parameter has multiple values (e.g. multiple text strings), these are combined
 /// with an OR operation. So searching for multiple text strings will return metrics that satisfy
 /// any of the text strings.
+///
+/// `metric_id` is considered distinctly since the list of values uniquely identifies a set of
+/// metrics. This list of metrics is combined with the final combined expression of the other fields
+/// with an OR operation. This enables a search or recipe to contain a combination of specific
+/// `metric_id`s and other fields.
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct SearchParams {
     pub text: Vec<SearchText>,
