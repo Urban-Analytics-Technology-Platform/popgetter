@@ -412,7 +412,7 @@ impl SearchResults {
         // TODO Handle multiple geometries
         if all_geom_files.len() > 1 {
             unimplemented!("Multiple geometries not supported in current release");
-        } else if all_geom_files.len() == 0 {
+        } else if all_geom_files.is_empty() {
             bail!(
                 "No geometry files for the following `metric_requests`: {:#?}",
                 metric_requests
