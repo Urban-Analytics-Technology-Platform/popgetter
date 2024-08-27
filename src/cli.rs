@@ -14,8 +14,8 @@ use popgetter::{
     },
     geo::BBox,
     search::{
-        Country, DataPublisher, GeometryLevel, MetricId, SearchContext, SearchParams,
-        SearchResults, SearchText, SourceDataRelease, SourceMetricId, YearRange,
+        Country, DataPublisher, DownloadParams, GeometryLevel, MetricId, Params, SearchContext,
+        SearchParams, SearchResults, SearchText, SourceDataRelease, SourceMetricId, YearRange,
     },
     Popgetter,
 };
@@ -83,6 +83,8 @@ pub struct DataCommand {
     output_file: Option<String>,
     #[command(flatten)]
     search_params_args: SearchParamsArgs,
+    #[command(flatten)]
+    download_params_args: DownloadParamsArgs,
     #[arg(
         short = 'r',
         long,
@@ -90,13 +92,25 @@ pub struct DataCommand {
         help = "Force run without prompt"
     )]
     force_run: bool,
+    #[arg(from_global)]
+    quiet: bool,
+}
+
+#[derive(Args, Debug, Clone)]
+struct DownloadParamsArgs {
     #[arg(
         long = "no-geometry",
         help = "When set, no geometry data is included in the results"
     )]
     no_geometry: bool,
-    #[arg(from_global)]
-    quiet: bool,
+}
+
+impl From<DownloadParamsArgs> for DownloadParams {
+    fn from(args: DownloadParamsArgs) -> Self {
+        Self {
+            include_geoms: !args.no_geometry,
+        }
+    }
 }
 
 impl From<&OutputFormat> for OutputFormatter {
@@ -138,6 +152,7 @@ impl RunCommand for DataCommand {
         }
 
         print_metrics_count(search_results.clone());
+        let download_params: DownloadParams = self.download_params_args.clone().into();
         if !self.force_run {
             println!("Input 'r' to run query, any other character will cancel");
             let mut input = String::new();
@@ -158,7 +173,7 @@ impl RunCommand for DataCommand {
             )
         });
         let data = search_results
-            .download(&popgetter.config, &search_params, !self.no_geometry)
+            .download(&popgetter.config, &search_params, &download_params)
             .await?;
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
@@ -407,15 +422,11 @@ impl RunCommand for RecipeCommand {
         let popgetter = Popgetter::new_with_config(config).await?;
         let recipe = std::fs::read_to_string(&self.recipe_file)?;
         let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
-        let include_geoms = data_request
-            .geometry
-            .as_ref()
-            .map(|geo| geo.include_geoms)
-            .unwrap_or(true);
-        let search_params: SearchParams = data_request.try_into()?;
-        let search_results = popgetter.search(search_params.clone());
+        let params: Params = data_request.try_into()?;
+        let search_results = popgetter.search(params.search.clone());
+
         let data = search_results
-            .download(&popgetter.config, &search_params, include_geoms)
+            .download(&popgetter.config, &params.search, &params.download)
             .await?;
         debug!("{data:#?}");
         let formatter: OutputFormatter = (&self.output_format).into();

@@ -3,7 +3,7 @@ use data_request_spec::DataRequestSpec;
 use log::debug;
 use metadata::Metadata;
 use polars::frame::DataFrame;
-use search::{SearchParams, SearchResults};
+use search::{DownloadParams, Params, SearchParams, SearchResults};
 
 use crate::config::Config;
 
@@ -48,15 +48,10 @@ impl Popgetter {
 
     /// Downloads data using popgetter given a `DataRequestSpec`
     pub async fn get_data_request(&self, data_request_spec: DataRequestSpec) -> Result<DataFrame> {
-        let include_geoms = data_request_spec
-            .geometry
-            .as_ref()
-            .map(|geo| geo.include_geoms)
-            .unwrap_or(true);
-        let search_params: SearchParams = data_request_spec.try_into()?;
-        let search_results = self.search(search_params.clone());
+        let params: Params = data_request_spec.try_into()?;
+        let search_results = self.search(params.search.clone());
         search_results
-            .download(&self.config, &search_params, include_geoms)
+            .download(&self.config, &params.search, &params.download)
             .await
     }
 
@@ -64,10 +59,10 @@ impl Popgetter {
     pub async fn get_search_params(
         &self,
         search_params: SearchParams,
-        include_geoms: bool,
+        download_params: DownloadParams,
     ) -> Result<DataFrame> {
         self.search(search_params.clone())
-            .download(&self.config, &search_params, include_geoms)
+            .download(&self.config, &search_params, &download_params)
             .await
     }
 }

@@ -6,7 +6,10 @@ use nonempty::nonempty;
 use serde::{Deserialize, Serialize};
 
 use crate::geo::BBox;
-use crate::search::{GeometryLevel, MetricId, SearchContext, SearchParams, SearchText, YearRange};
+use crate::search::{
+    DownloadParams, GeometryLevel, MetricId, Params, SearchContext, SearchParams, SearchText,
+    YearRange,
+};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DataRequestSpec {
@@ -16,52 +19,58 @@ pub struct DataRequestSpec {
     pub years: Option<Vec<String>>,
 }
 
-impl TryFrom<DataRequestSpec> for SearchParams {
+impl TryFrom<DataRequestSpec> for Params {
     type Error = anyhow::Error;
     fn try_from(value: DataRequestSpec) -> Result<Self, Self::Error> {
         // TODO: handle MetricSpec::DataProduct variant
         Ok(Self {
-            // TODO: consider updating for regex field following [#66](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/66)
-            text: value
-                .metrics
-                .iter()
-                .filter_map(|metric| match metric {
-                    MetricSpec::MetricText(text) => Some(SearchText {
-                        text: text.clone(),
-                        context: nonempty![
-                            SearchContext::HumanReadableName,
-                            SearchContext::Hxl,
-                            SearchContext::Description
-                        ],
-                    }),
-                    _ => None,
-                })
-                .collect_vec(),
-            year_range: if let Some(v) = value.years {
-                Some(
-                    v.iter()
-                        .map(|year| year.parse::<YearRange>())
-                        .collect::<Result<Vec<_>, anyhow::Error>>()?,
-                )
-            } else {
-                None
+            search: SearchParams {
+                // TODO: consider updating for regex field following [#66](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/66)
+                text: value
+                    .metrics
+                    .iter()
+                    .filter_map(|metric| match metric {
+                        MetricSpec::MetricText(text) => Some(SearchText {
+                            text: text.clone(),
+                            context: nonempty![
+                                SearchContext::HumanReadableName,
+                                SearchContext::Hxl,
+                                SearchContext::Description
+                            ],
+                        }),
+                        _ => None,
+                    })
+                    .collect_vec(),
+                year_range: if let Some(v) = value.years {
+                    Some(
+                        v.iter()
+                            .map(|year| year.parse::<YearRange>())
+                            .collect::<Result<Vec<_>, anyhow::Error>>()?,
+                    )
+                } else {
+                    None
+                },
+                metric_id: value
+                    .metrics
+                    .iter()
+                    .filter_map(|metric| match metric {
+                        MetricSpec::MetricId(m) => Some(m.clone()),
+                        _ => None,
+                    })
+                    .collect_vec(),
+                geometry_level: value
+                    .geometry
+                    .as_ref()
+                    .and_then(|geometry| geometry.geometry_level.to_owned().map(GeometryLevel)),
+                source_data_release: None,
+                data_publisher: None,
+                country: None,
+                source_metric_id: None,
+                region_spec: value.region,
             },
-            metric_id: value
-                .metrics
-                .iter()
-                .filter_map(|metric| match metric {
-                    MetricSpec::MetricId(m) => Some(m.clone()),
-                    _ => None,
-                })
-                .collect_vec(),
-            geometry_level: value
-                .geometry
-                .and_then(|geometry| geometry.geometry_level.map(GeometryLevel)),
-            source_data_release: None,
-            data_publisher: None,
-            country: None,
-            source_metric_id: None,
-            region_spec: value.region,
+            download: DownloadParams {
+                include_geoms: value.geometry.unwrap_or_default().include_geoms,
+            },
         })
     }
 }

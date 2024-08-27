@@ -359,6 +359,20 @@ impl From<SearchParams> for Option<Expr> {
     }
 }
 
+/// This struct includes any parameters related to downloading `SearchResults`.
+// TODO: possibly extend this type with parameters specific to download
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DownloadParams {
+    pub include_geoms: bool,
+}
+
+/// This struct combines `SearchParams` and `DownloadParams` into a single type to simplify
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Params {
+    pub search: SearchParams,
+    pub download: DownloadParams,
+}
+
 #[derive(Clone, Debug)]
 pub struct SearchResults(pub DataFrame);
 
@@ -411,7 +425,7 @@ impl SearchResults {
         self,
         config: &Config,
         search_params: &SearchParams,
-        include_geoms: bool,
+        download_params: &DownloadParams,
     ) -> anyhow::Result<DataFrame> {
         let metric_requests = self.to_metric_requests(config);
         debug!("metric_requests = {:#?}", metric_requests);
@@ -441,7 +455,7 @@ impl SearchResults {
         // Required because polars is blocking
         let metrics = tokio::task::spawn_blocking(move || get_metrics(&metric_requests, None));
 
-        let result = if include_geoms {
+        let result = if download_params.include_geoms {
             // TODO Pass in the bbox as the second argument here
             if search_params.region_spec.len() > 1 {
                 todo!(
