@@ -130,10 +130,6 @@ impl RunCommand for DataCommand {
         let search_params: SearchParams = self.search_params_args.clone().into();
         let search_results = popgetter.search(search_params.clone());
 
-        // Make DataRequestSpec
-        // TODO: consider alternative `From` impls as part of #67
-        // let data_request_config: DataRequestConfig = (self, &search_params).into();
-
         // sp.stop_and_persist is potentially a better method, but not obvious how to
         // store the timing. Leaving below until that option is ruled out.
         // sp.stop_and_persist(&COMPLETE_PROGRESS_STRING, spinner_message.into());
