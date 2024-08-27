@@ -317,12 +317,13 @@ fn _to_optqueries_then_or<T: Into<Option<Expr>>>(queries: Vec<T>) -> Option<Expr
 
 impl From<SearchParams> for Option<Expr> {
     fn from(value: SearchParams) -> Self {
+        // Non-ID SearchParams handled first with AND between fields and OR within fields
         let mut subexprs: Vec<Option<Expr>> = value
             .text
             .into_iter()
             .map(|text| Some(text.into()))
             .collect();
-        subexprs.extend([to_queries_then_or(value.metric_id)]);
+
         if let Some(year_range) = value.year_range {
             subexprs.extend([to_queries_then_or(year_range)]);
         }
@@ -336,7 +337,20 @@ impl From<SearchParams> for Option<Expr> {
         subexprs.extend(other_subexprs);
         // Remove the Nones and unwrap the Somes
         let valid_subexprs: Vec<Expr> = subexprs.into_iter().flatten().collect();
-        combine_exprs_with_and(valid_subexprs)
+
+        // Combine non-IDs with AND
+        let combined_non_id_expr = combine_exprs_with_and(valid_subexprs);
+
+        // Combine IDs provided in SearchParams with OR
+        let combined_id_expr = to_queries_then_or(value.metric_id);
+
+        // Combine ID and non-ID SearchParams with OR
+        combine_exprs_with_or(
+            vec![combined_non_id_expr, combined_id_expr]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>(),
+        )
     }
 }
 

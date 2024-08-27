@@ -466,6 +466,17 @@ mod tests {
 
     use super::*;
 
+    #[tokio::test]
+    async fn test_recipe_command() {
+        let recipe_command = RecipeCommand {
+            recipe_file: format!("{}/test_recipe.json", env!("CARGO_MANIFEST_DIR")),
+            output_format: OutputFormat::GeoJSON,
+            output_file: None,
+        };
+        let result = recipe_command.run(Config::default()).await;
+        assert!(result.is_ok())
+    }
+
     #[test]
     fn test_parse_year_range() {
         assert_eq!(
