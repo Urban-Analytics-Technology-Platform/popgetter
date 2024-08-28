@@ -14,8 +14,9 @@ use popgetter::{
     },
     geo::BBox,
     search::{
-        Country, DataPublisher, DownloadParams, GeometryLevel, MetricId, Params, SearchContext,
-        SearchParams, SearchResults, SearchText, SourceDataRelease, SourceMetricId, YearRange,
+        CaseSensitivity, Country, DataPublisher, DownloadParams, GeometryLevel, MatchType,
+        MetricId, Params, SearchConfig, SearchContext, SearchParams, SearchResults, SearchText,
+        SourceDataRelease, SourceMetricId, YearRange,
     },
     Popgetter,
 };
@@ -220,6 +221,36 @@ pub struct MetricsCommand {
     quiet: bool,
 }
 
+#[derive(Debug, Clone, clap::ValueEnum, Copy)]
+enum MatchTypeArgs {
+    Regex,
+    Exact,
+}
+
+impl From<MatchTypeArgs> for MatchType {
+    fn from(value: MatchTypeArgs) -> Self {
+        match value {
+            MatchTypeArgs::Exact => MatchType::Exact,
+            MatchTypeArgs::Regex => MatchType::Regex,
+        }
+    }
+}
+
+#[derive(Debug, Clone, clap::ValueEnum, Copy)]
+enum CaseSensitivityArgs {
+    Sensitive,
+    Insensitive,
+}
+
+impl From<CaseSensitivityArgs> for CaseSensitivity {
+    fn from(value: CaseSensitivityArgs) -> Self {
+        match value {
+            CaseSensitivityArgs::Insensitive => CaseSensitivity::Insensitive,
+            CaseSensitivityArgs::Sensitive => CaseSensitivity::Sensitive,
+        }
+    }
+}
+
 /// These are the command-line arguments that can be parsed into a SearchParams. The type is
 /// slightly different because of the way we allow people to search in text fields.
 #[derive(Args, Debug, Clone)]
@@ -283,6 +314,30 @@ struct SearchParamsArgs {
             (EPSG:3812)."
     )]
     bbox: Option<BBox>,
+
+    #[arg(
+        value_enum,
+        short = 'm',
+        long,
+        value_name = "MATCH_TYPE",
+        help = "\
+        Type of matching to perform on: 'geometry-level', 'source-data-release',\n\
+        'publisher', 'country', 'source-metric-id', 'hxl', 'name', 'description'\n\
+        arguments during the search.\n",
+        default_value_t=MatchTypeArgs::Exact
+    )]
+    match_type: MatchTypeArgs,
+    #[arg(
+        value_enum,
+        long,
+        value_name = "CASE_SENSITIVITY",
+        help = "\
+        Type of case sensitivity used in matching on: 'geometry-level',\n\
+        'source-data-release', 'publisher', 'country', 'source-metric-id', 'hxl',\n\
+        'name', 'description', 'text' arguments during the search.\n",
+        default_value_t=CaseSensitivityArgs::Insensitive
+    )]
+    case_sensitivity: CaseSensitivityArgs,
 }
 
 /// Expected behaviour:
@@ -309,23 +364,42 @@ fn text_searches_from_args(
     name: Vec<String>,
     description: Vec<String>,
     text: Vec<String>,
+    match_type: MatchType,
+    case_sensitivity: CaseSensitivity,
 ) -> Vec<SearchText> {
     let mut all_text_searches: Vec<SearchText> = vec![];
     all_text_searches.extend(hxl.iter().map(|t| SearchText {
         text: t.clone(),
         context: nonempty![SearchContext::Hxl],
+        config: SearchConfig {
+            match_type,
+            case_sensitivity,
+        },
     }));
     all_text_searches.extend(name.iter().map(|t| SearchText {
         text: t.clone(),
         context: nonempty![SearchContext::HumanReadableName],
+        config: SearchConfig {
+            match_type,
+            case_sensitivity,
+        },
     }));
     all_text_searches.extend(description.iter().map(|t| SearchText {
         text: t.clone(),
         context: nonempty![SearchContext::Description],
+        config: SearchConfig {
+            match_type,
+            case_sensitivity,
+        },
     }));
     all_text_searches.extend(text.iter().map(|t| SearchText {
         text: t.clone(),
         context: SearchContext::all(),
+        config: SearchConfig {
+            // Always use regex for "text" since SearchContext::all() includes multiple columns
+            match_type: MatchType::Regex,
+            case_sensitivity,
+        },
     }));
     all_text_searches
 }
@@ -333,14 +407,67 @@ fn text_searches_from_args(
 impl From<SearchParamsArgs> for SearchParams {
     fn from(args: SearchParamsArgs) -> Self {
         SearchParams {
-            text: text_searches_from_args(args.hxl, args.name, args.description, args.text),
+            text: text_searches_from_args(
+                args.hxl,
+                args.name,
+                args.description,
+                args.text,
+                args.match_type.into(),
+                args.case_sensitivity.into(),
+            ),
             year_range: args.year_range.clone(),
-            geometry_level: args.geometry_level.clone().map(GeometryLevel),
-            source_data_release: args.source_data_release.clone().map(SourceDataRelease),
-            data_publisher: args.publisher.clone().map(DataPublisher),
-            country: args.country.clone().map(Country),
-            source_metric_id: args.source_metric_id.clone().map(SourceMetricId),
-            metric_id: args.id.clone().into_iter().map(MetricId).collect(),
+            geometry_level: args.geometry_level.clone().map(|value| GeometryLevel {
+                value,
+                config: SearchConfig {
+                    match_type: args.match_type.into(),
+                    case_sensitivity: args.case_sensitivity.into(),
+                },
+            }),
+            source_data_release: args
+                .source_data_release
+                .clone()
+                .map(|value| SourceDataRelease {
+                    value,
+                    config: SearchConfig {
+                        match_type: args.match_type.into(),
+                        case_sensitivity: args.case_sensitivity.into(),
+                    },
+                }),
+            data_publisher: args.publisher.clone().map(|value| DataPublisher {
+                value,
+                config: SearchConfig {
+                    match_type: args.match_type.into(),
+                    case_sensitivity: args.case_sensitivity.into(),
+                },
+            }),
+            country: args.country.clone().map(|value| Country {
+                value,
+                config: SearchConfig {
+                    match_type: args.match_type.into(),
+                    case_sensitivity: args.case_sensitivity.into(),
+                },
+            }),
+            source_metric_id: args.source_metric_id.clone().map(|value| SourceMetricId {
+                value,
+                config: SearchConfig {
+                    match_type: args.match_type.into(),
+                    case_sensitivity: args.case_sensitivity.into(),
+                },
+            }),
+            metric_id: args
+                .id
+                .clone()
+                .into_iter()
+                .map(|value| MetricId {
+                    id: value,
+                    // SearchConfig always `MatchType::Startswith` and `CaseSensitivity::Insensitive`
+                    // for `MetricId`
+                    config: SearchConfig {
+                        match_type: MatchType::Startswith,
+                        case_sensitivity: CaseSensitivity::Insensitive,
+                    },
+                })
+                .collect(),
             region_spec: args
                 .bbox
                 .map(|bbox| vec![RegionSpec::BoundingBox(bbox)])
