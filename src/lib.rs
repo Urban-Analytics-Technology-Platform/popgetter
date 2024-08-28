@@ -42,14 +42,16 @@ impl Popgetter {
     }
 
     /// Generates `SearchResults` using popgetter given `SearchParams`
-    pub fn search(&self, search_params: SearchParams) -> SearchResults {
-        search_params.search(&self.metadata.combined_metric_source_geometry())
+    pub fn search(&self, search_params: &SearchParams) -> SearchResults {
+        search_params
+            .clone()
+            .search(&self.metadata.combined_metric_source_geometry())
     }
 
     /// Downloads data using popgetter given a `DataRequestSpec`
     pub async fn get_data_request(&self, data_request_spec: DataRequestSpec) -> Result<DataFrame> {
         let params: Params = data_request_spec.try_into()?;
-        let search_results = self.search(params.search.clone());
+        let search_results = self.search(&params.search);
         search_results
             .download(&self.config, &params.search, &params.download)
             .await
@@ -61,7 +63,7 @@ impl Popgetter {
         search_params: SearchParams,
         download_params: DownloadParams,
     ) -> Result<DataFrame> {
-        self.search(search_params.clone())
+        self.search(&search_params)
             .download(&self.config, &search_params, &download_params)
             .await
     }

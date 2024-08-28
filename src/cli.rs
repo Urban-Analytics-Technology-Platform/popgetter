@@ -142,7 +142,7 @@ impl RunCommand for DataCommand {
         });
         let popgetter = Popgetter::new_with_config(config).await?;
         let search_params: SearchParams = self.search_params_args.clone().into();
-        let search_results = popgetter.search(search_params.clone());
+        let search_results = popgetter.search(&search_params);
 
         // sp.stop_and_persist is potentially a better method, but not obvious how to
         // store the timing. Leaving below until that option is ruled out.
@@ -343,7 +343,7 @@ impl RunCommand for MetricsCommand {
             )
         });
         let popgetter = Popgetter::new_with_config(config).await?;
-        let search_results = popgetter.search(self.search_params_args.clone().into());
+        let search_results = popgetter.search(&self.search_params_args.clone().into());
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
         }
@@ -423,7 +423,7 @@ impl RunCommand for RecipeCommand {
         let recipe = std::fs::read_to_string(&self.recipe_file)?;
         let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
         let params: Params = data_request.try_into()?;
-        let search_results = popgetter.search(params.search.clone());
+        let search_results = popgetter.search(&params.search);
 
         let data = search_results
             .download(&popgetter.config, &params.search, &params.download)
