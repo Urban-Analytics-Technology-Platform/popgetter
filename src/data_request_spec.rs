@@ -66,10 +66,11 @@ impl TryFrom<DataRequestSpec> for Params {
                 data_publisher: None,
                 country: None,
                 source_metric_id: None,
-                region_spec: value.region,
+                region_spec: value.region.clone(),
             },
             download: DownloadParams {
                 include_geoms: value.geometry.unwrap_or_default().include_geoms,
+                region_spec: value.region,
             },
         })
     }

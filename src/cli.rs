@@ -105,10 +105,21 @@ struct DownloadParamsArgs {
     no_geometry: bool,
 }
 
-impl From<DownloadParamsArgs> for DownloadParams {
-    fn from(args: DownloadParamsArgs) -> Self {
+#[derive(Clone)]
+struct CombinedParamsArgs {
+    search_params_args: SearchParamsArgs,
+    download_params_args: DownloadParamsArgs,
+}
+
+impl From<CombinedParamsArgs> for DownloadParams {
+    fn from(combined_params_args: CombinedParamsArgs) -> Self {
         Self {
-            include_geoms: !args.no_geometry,
+            region_spec: combined_params_args
+                .search_params_args
+                .bbox
+                .map(|bbox| vec![RegionSpec::BoundingBox(bbox)])
+                .unwrap_or_default(),
+            include_geoms: !combined_params_args.download_params_args.no_geometry,
         }
     }
 }
@@ -152,7 +163,13 @@ impl RunCommand for DataCommand {
         }
 
         print_metrics_count(search_results.clone());
-        let download_params: DownloadParams = self.download_params_args.clone().into();
+        let download_params: DownloadParams = CombinedParamsArgs {
+            search_params_args: self.search_params_args.clone(),
+            download_params_args: self.download_params_args.clone(),
+        }
+        .clone()
+        .into();
+
         if !self.force_run {
             println!("Input 'r' to run query, any other character will cancel");
             let mut input = String::new();
@@ -173,7 +190,7 @@ impl RunCommand for DataCommand {
             )
         });
         let data = search_results
-            .download(&popgetter.config, &search_params, &download_params)
+            .download(&popgetter.config, &download_params)
             .await?;
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
@@ -424,9 +441,8 @@ impl RunCommand for RecipeCommand {
         let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
         let params: Params = data_request.try_into()?;
         let search_results = popgetter.search(&params.search);
-
         let data = search_results
-            .download(&popgetter.config, &params.search, &params.download)
+            .download(&popgetter.config, &params.download)
             .await?;
         debug!("{data:#?}");
         let formatter: OutputFormatter = (&self.output_format).into();
@@ -474,6 +490,7 @@ pub enum Commands {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+    use tempfile::NamedTempFile;
 
     use super::*;
 
@@ -482,7 +499,13 @@ mod tests {
         let recipe_command = RecipeCommand {
             recipe_file: format!("{}/test_recipe.json", env!("CARGO_MANIFEST_DIR")),
             output_format: OutputFormat::GeoJSON,
-            output_file: None,
+            output_file: Some(
+                NamedTempFile::new()
+                    .unwrap()
+                    .path()
+                    .to_string_lossy()
+                    .to_string(),
+            ),
         };
         let result = recipe_command.run(Config::default()).await;
         assert!(result.is_ok())

@@ -364,9 +364,11 @@ impl From<SearchParams> for Option<Expr> {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DownloadParams {
     pub include_geoms: bool,
+    pub region_spec: Vec<RegionSpec>,
 }
 
 /// This struct combines `SearchParams` and `DownloadParams` into a single type to simplify
+/// conversion from `DataRequestSpec`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Params {
     pub search: SearchParams,
@@ -378,12 +380,13 @@ pub struct SearchResults(pub DataFrame);
 
 impl SearchResults {
     /// Convert all the metrics in the dataframe to MetricRequests
-    pub fn to_metric_requests(self, config: &Config) -> Vec<MetricRequest> {
+    pub fn to_metric_requests(&self, config: &Config) -> Vec<MetricRequest> {
         // Using unwrap throughout this function because if any of them fail, it means our upstream
         // data is invalid!
         // TODO: Maybe map the error type instead to provide some useful error messages
         let df = self
             .0
+            .clone()
             .lazy()
             .select([
                 col(COL::METRIC_PARQUET_PATH),
@@ -424,7 +427,6 @@ impl SearchResults {
     pub async fn download(
         self,
         config: &Config,
-        search_params: &SearchParams,
         download_params: &DownloadParams,
     ) -> anyhow::Result<DataFrame> {
         let metric_requests = self.to_metric_requests(config);
@@ -432,8 +434,9 @@ impl SearchResults {
 
         if metric_requests.is_empty() {
             bail!(
-                "No metric requests were derived from given `search_params`: {:#?}",
-                search_params
+                "No metric requests were derived from `SearchResults`: {}\ngiven `DownloadParams`: {:#?}",
+                self.0,
+                download_params
             )
         }
 
@@ -457,13 +460,13 @@ impl SearchResults {
 
         let result = if download_params.include_geoms {
             // TODO Pass in the bbox as the second argument here
-            if search_params.region_spec.len() > 1 {
+            if download_params.region_spec.len() > 1 {
                 todo!(
                     "Multiple region specifications are not yet supported: {:#?}",
-                    search_params.region_spec
+                    download_params.region_spec
                 );
             }
-            let bbox = search_params
+            let bbox = download_params
                 .region_spec
                 .first()
                 .and_then(|region_spec| region_spec.bbox().clone());

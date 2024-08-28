@@ -53,7 +53,7 @@ impl Popgetter {
         let params: Params = data_request_spec.try_into()?;
         let search_results = self.search(&params.search);
         search_results
-            .download(&self.config, &params.search, &params.download)
+            .download(&self.config, &params.download)
             .await
     }
 
@@ -64,7 +64,7 @@ impl Popgetter {
         download_params: DownloadParams,
     ) -> Result<DataFrame> {
         self.search(&search_params)
-            .download(&self.config, &search_params, &download_params)
+            .download(&self.config, &download_params)
             .await
     }
 }
