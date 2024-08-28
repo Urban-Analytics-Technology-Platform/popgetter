@@ -19,6 +19,8 @@ pub struct DataRequestSpec {
     pub years: Option<Vec<String>>,
 }
 
+// Since `DataRequestSpec` contains parameters relevant to both `SearchParams` and `DownloadParams`,
+// the conversion is implemented for `Params`.
 impl TryFrom<DataRequestSpec> for Params {
     type Error = anyhow::Error;
     fn try_from(value: DataRequestSpec) -> Result<Self, Self::Error> {

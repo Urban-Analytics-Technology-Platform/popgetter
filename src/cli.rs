@@ -105,7 +105,9 @@ struct DownloadParamsArgs {
     no_geometry: bool,
 }
 
-#[derive(Clone)]
+/// A type combining both the `SearchParamsArgs` and `DownloadParamsArgs` to enable `DownloadParams`
+/// to be constructed since fields of `SearchParamsArgs` may also be needed for `DownloadParams`.
+#[derive(Clone, Debug)]
 struct CombinedParamsArgs {
     search_params_args: SearchParamsArgs,
     download_params_args: DownloadParamsArgs,
@@ -167,7 +169,6 @@ impl RunCommand for DataCommand {
             search_params_args: self.search_params_args.clone(),
             download_params_args: self.download_params_args.clone(),
         }
-        .clone()
         .into();
 
         if !self.force_run {
@@ -360,7 +361,7 @@ impl RunCommand for MetricsCommand {
             )
         });
         let popgetter = Popgetter::new_with_config(config).await?;
-        let search_results = popgetter.search(&self.search_params_args.clone().into());
+        let search_results = popgetter.search(&self.search_params_args.to_owned().into());
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
         }
