@@ -27,7 +27,7 @@ impl TryFrom<DataRequestSpec> for Params {
         // TODO: handle MetricSpec::DataProduct variant
         Ok(Self {
             search: SearchParams {
-                // TODO: consider updating for regex field following [#66](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/66)
+                // TODO: consider defaults during implementing [#81](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/81)
                 text: value
                     .metrics
                     .iter()
