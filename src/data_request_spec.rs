@@ -1,6 +1,3 @@
-// TODO: this module to be refactored following implementation of SearchParams.
-// See [#67](https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli/issues/67)
-
 use itertools::Itertools;
 use nonempty::nonempty;
 use serde::{Deserialize, Serialize};
@@ -77,48 +74,6 @@ impl TryFrom<DataRequestSpec> for Params {
         })
     }
 }
-
-// #[derive(Debug)]
-// pub struct MetricRequestResult {
-//     pub metrics: Vec<MetricRequest>,
-//     pub selected_geometry: String,
-//     pub years: Vec<String>,
-// }
-//
-// impl DataRequestSpec {
-//     /// Generates a vector of metric requests from a `DataRequestSpec` and a catalogue.
-//     pub fn metric_requests(
-//         &self,
-//         catalogue: &Metadata,
-//         config: &Config,
-//     ) -> Result<MetricRequestResult> {
-//         // Find all the metrics which match the requested ones, expanding
-//         // any regex matches as we do so
-//         let expanded_metric_ids: Vec<MetricId> = self
-//             .metrics
-//             .iter()
-//             .filter_map(|metric_spec| match metric_spec {
-//                 MetricSpec::Metric(id) => catalogue.expand_regex_metric(id).ok(),
-//                 MetricSpec::DataProduct(_) => None,
-//             })
-//             .flatten()
-//             .collect::<Vec<_>>();
-
-//         let full_selection_plan =
-//             catalogue.generate_selection_plan(&expanded_metric_ids, &self.geometry, &self.years)?;
-
-//         info!("Running your query with \n {full_selection_plan}");
-
-//         let metric_requests =
-//             catalogue.get_metric_requests(full_selection_plan.explicit_metric_ids, config)?;
-
-//         Ok(MetricRequestResult {
-//             metrics: metric_requests,
-//             selected_geometry: full_selection_plan.geometry,
-//             years: full_selection_plan.year,
-//         })
-//     }
-// }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MetricSpec {
