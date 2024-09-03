@@ -17,7 +17,7 @@ use tokio::try_join;
 
 use crate::{config::Config, search::MetricId, COL};
 
-/// This module contains the base url and names of the files that contain the metadata.
+/// This module contains the names of the files that contain the metadata.
 pub mod paths {
     pub const GEOMETRY_METADATA: &str = "geometry_metadata.parquet";
     pub const METRIC_METADATA: &str = "metric_metadata.parquet";

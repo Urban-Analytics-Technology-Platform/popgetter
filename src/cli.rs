@@ -153,6 +153,7 @@ async fn read_popgetter(config: Config) -> anyhow::Result<Popgetter> {
         match Popgetter::new_with_config_and_cache(config.clone(), &path) {
             Ok(popgetter) => return Ok(popgetter),
             Err(err) => {
+                // Log error, continue without cache and attempt to create one
                 error!("Failed to read metadata from cache with error: {err}");
             }
         }
