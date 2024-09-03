@@ -44,8 +44,9 @@ impl Popgetter {
         Ok(Self { metadata, config })
     }
 
-    // TODO: add condition with feature "not_wasm" feature
-    /// Setup the Popgetter object with custom configuration
+    // Only include method with "cache" feature since it requires a filesystem
+    #[cfg(feature = "cache")]
+    /// Setup the Popgetter object with custom configuration from cache
     pub fn new_with_config_and_cache<P: AsRef<Path>>(config: Config, cache: P) -> Result<Self> {
         let metadata = Metadata::from_cache(cache)?;
         Ok(Self { metadata, config })
@@ -80,6 +81,7 @@ impl Popgetter {
 }
 
 #[cfg(test)]
+#[cfg(feature = "cache")]
 mod tests {
 
     use tempfile::TempDir;

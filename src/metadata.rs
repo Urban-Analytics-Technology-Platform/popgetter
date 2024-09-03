@@ -58,12 +58,12 @@ pub struct Metadata {
     pub countries: DataFrame,
 }
 
-// TODO: add condition with feature "not_wasm" feature
+#[cfg(feature = "cache")]
 fn path_to_df<P: AsRef<Path>>(path: P) -> anyhow::Result<DataFrame> {
     Ok(LazyFrame::scan_parquet(path, ScanArgsParquet::default())?.collect()?)
 }
 
-// TODO: add condition with feature "not_wasm" feature
+#[cfg(feature = "cache")]
 fn df_to_file<P: AsRef<Path>>(path: P, df: &DataFrame) -> anyhow::Result<()> {
     let file = std::fs::File::create(path)?;
     ParquetWriter::new(file)
@@ -72,13 +72,14 @@ fn df_to_file<P: AsRef<Path>>(path: P, df: &DataFrame) -> anyhow::Result<()> {
     Ok(())
 }
 
-// TODO: add condition with feature "not_wasm" feature
+#[cfg(feature = "cache")]
 fn prepend<P: AsRef<Path>>(cache_path: P, file_name: &str) -> std::path::PathBuf {
     cache_path.as_ref().join(file_name)
 }
 
+// Only include methods with "cache" feature since it requires a filesystem
+#[cfg(feature = "cache")]
 impl Metadata {
-    // TODO: add condition with feature "not_wasm" feature
     pub fn from_cache<P: AsRef<Path>>(cache_dir: P) -> anyhow::Result<Self> {
         let metrics = path_to_df(prepend(&cache_dir, PATHS::METRIC_METADATA))?;
         let geometries = path_to_df(prepend(&cache_dir, PATHS::GEOMETRY_METADATA))?;
@@ -93,7 +94,7 @@ impl Metadata {
             countries,
         })
     }
-    // TODO: add condition with feature "not_wasm" feature
+
     pub fn write_cache<P: AsRef<Path>>(&self, cache_dir: P) -> anyhow::Result<()> {
         df_to_file(prepend(&cache_dir, PATHS::METRIC_METADATA), &self.metrics)?;
         df_to_file(

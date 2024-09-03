@@ -58,5 +58,6 @@ tempfile = "3.12"
 
 
 [features]
-default = ["formatters"]
+default = ["cache", "formatters"]
 formatters = ["dep:geojson"]
+cache = []
