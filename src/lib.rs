@@ -49,22 +49,21 @@ impl Popgetter {
     }
 
     /// Downloads data using popgetter given a `DataRequestSpec`
-    pub async fn get_data_request(&self, data_request_spec: DataRequestSpec) -> Result<DataFrame> {
-        let params: Params = data_request_spec.try_into()?;
+    pub async fn download_data_request_spec(
+        &self,
+        data_request_spec: &DataRequestSpec,
+    ) -> Result<DataFrame> {
+        let params: Params = data_request_spec.clone().try_into()?;
         let search_results = self.search(&params.search);
         search_results
             .download(&self.config, &params.download)
             .await
     }
 
-    /// Downloads data using popgetter given `SearchParams`
-    pub async fn get_search_params(
-        &self,
-        search_params: SearchParams,
-        download_params: DownloadParams,
-    ) -> Result<DataFrame> {
-        self.search(&search_params)
-            .download(&self.config, &download_params)
+    /// Downloads data using popgetter given `Params`
+    pub async fn download_params(&self, params: &Params) -> Result<DataFrame> {
+        self.search(&params.search)
+            .download(&self.config, &params.download)
             .await
     }
 }

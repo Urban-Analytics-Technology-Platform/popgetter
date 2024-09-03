@@ -8,7 +8,7 @@ use crate::search::{
     YearRange,
 };
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct DataRequestSpec {
     pub geometry: Option<GeometrySpec>,
     pub region: Vec<RegionSpec>,
@@ -75,14 +75,14 @@ impl TryFrom<DataRequestSpec> for Params {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum MetricSpec {
     MetricId(MetricId),
     MetricText(String),
     DataProduct(String),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeometrySpec {
     pub geometry_level: Option<String>,
     pub include_geoms: bool,
