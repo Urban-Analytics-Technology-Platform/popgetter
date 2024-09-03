@@ -1,7 +1,9 @@
 use anyhow::Result;
+use data_request_spec::DataRequestSpec;
 use log::debug;
 use metadata::Metadata;
-use search::{SearchParams, SearchResults};
+use polars::frame::DataFrame;
+use search::{DownloadParams, Params, SearchParams, SearchResults};
 
 use crate::config::Config;
 
@@ -20,6 +22,7 @@ pub mod metadata;
 pub mod parquet;
 pub mod search;
 
+/// Type for popgetter data and API
 pub struct Popgetter {
     pub metadata: Metadata,
     pub config: Config,
@@ -39,7 +42,28 @@ impl Popgetter {
     }
 
     /// Generates `SearchResults` using popgetter given `SearchParams`
-    pub fn search(&self, search_params: SearchParams) -> SearchResults {
-        search_params.search(&self.metadata.combined_metric_source_geometry())
+    pub fn search(&self, search_params: &SearchParams) -> SearchResults {
+        search_params
+            .clone()
+            .search(&self.metadata.combined_metric_source_geometry())
+    }
+
+    /// Downloads data using popgetter given a `DataRequestSpec`
+    pub async fn download_data_request_spec(
+        &self,
+        data_request_spec: &DataRequestSpec,
+    ) -> Result<DataFrame> {
+        let params: Params = data_request_spec.clone().try_into()?;
+        let search_results = self.search(&params.search);
+        search_results
+            .download(&self.config, &params.download)
+            .await
+    }
+
+    /// Downloads data using popgetter given `Params`
+    pub async fn download_params(&self, params: &Params) -> Result<DataFrame> {
+        self.search(&params.search)
+            .download(&self.config, &params.download)
+            .await
     }
 }

@@ -2,19 +2,20 @@
 
 use crate::{
     config::Config,
-    data_request_spec::DataRequestSpec,
+    data_request_spec::RegionSpec,
     geo::get_geometries,
     metadata::ExpandedMetadata,
     parquet::{get_metrics, MetricRequest},
     COL,
 };
+use anyhow::bail;
 use chrono::NaiveDate;
 use log::{debug, warn};
 use nonempty::{nonempty, NonEmpty};
 use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, DataFrameJoinOps, IntoLazy, LazyFrame};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
 use tokio::try_join;
 
 // TODO: add trait/struct for combine_exprs
@@ -211,6 +212,39 @@ pub enum YearRange {
     Between(u16, u16),
 }
 
+impl FromStr for YearRange {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        fn str_to_option_u16(value: &str) -> Result<Option<u16>, anyhow::Error> {
+            if value.is_empty() {
+                return Ok(None);
+            }
+            match value.parse::<u16>() {
+                Ok(value) => Ok(Some(value)),
+                Err(_) => bail!("Invalid year range"),
+            }
+        }
+        let parts: Vec<Option<u16>> = s
+            .split("...")
+            .map(str_to_option_u16)
+            .collect::<Result<Vec<Option<u16>>, _>>()?;
+        match parts.as_slice() {
+            [Some(a)] => Ok(YearRange::Between(*a, *a)),
+            [None, Some(a)] => Ok(YearRange::Before(*a)),
+            [Some(a), None] => Ok(YearRange::After(*a)),
+            [Some(a), Some(b)] => {
+                if a > b {
+                    bail!("Invalid year range")
+                } else {
+                    Ok(YearRange::Between(*a, *b))
+                }
+            }
+            _ => bail!("Invalid year range"),
+        }
+    }
+}
+
 /// Search over metric IDs
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MetricId(pub String);
@@ -238,13 +272,18 @@ pub struct SourceMetricId(pub String);
 /// This struct represents all the possible parameters one can search the metadata catalogue with.
 /// All parameters are optional in that they can either be empty vectors or None.
 ///
-/// Each of the fields are combined with an AND operation, so searching for both text and a year
-/// range will only return metrics that satisfy both parameters.
+/// Aside from `metric_id`, each of the fields are combined with an AND operation, so searching for
+/// both text and a year range will only return metrics that satisfy both parameters.
 ///
 /// However, if a parameter has multiple values (e.g. multiple text strings), these are combined
 /// with an OR operation. So searching for multiple text strings will return metrics that satisfy
 /// any of the text strings.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+///
+/// `metric_id` is considered distinctly since the list of values uniquely identifies a set of
+/// metrics. This list of metrics is combined with the final combined expression of the other fields
+/// with an OR operation. This enables a search or recipe to contain a combination of specific
+/// `metric_id`s and other fields.
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct SearchParams {
     pub text: Vec<SearchText>,
     pub year_range: Option<Vec<YearRange>>,
@@ -254,6 +293,7 @@ pub struct SearchParams {
     pub data_publisher: Option<DataPublisher>,
     pub country: Option<Country>,
     pub source_metric_id: Option<SourceMetricId>,
+    pub region_spec: Vec<RegionSpec>,
 }
 
 impl SearchParams {
@@ -282,12 +322,13 @@ fn _to_optqueries_then_or<T: Into<Option<Expr>>>(queries: Vec<T>) -> Option<Expr
 
 impl From<SearchParams> for Option<Expr> {
     fn from(value: SearchParams) -> Self {
+        // Non-ID SearchParams handled first with AND between fields and OR within fields
         let mut subexprs: Vec<Option<Expr>> = value
             .text
             .into_iter()
             .map(|text| Some(text.into()))
             .collect();
-        subexprs.extend([to_queries_then_or(value.metric_id)]);
+
         if let Some(year_range) = value.year_range {
             subexprs.extend([to_queries_then_or(year_range)]);
         }
@@ -301,8 +342,37 @@ impl From<SearchParams> for Option<Expr> {
         subexprs.extend(other_subexprs);
         // Remove the Nones and unwrap the Somes
         let valid_subexprs: Vec<Expr> = subexprs.into_iter().flatten().collect();
-        combine_exprs_with_and(valid_subexprs)
+
+        // Combine non-IDs with AND
+        let combined_non_id_expr = combine_exprs_with_and(valid_subexprs);
+
+        // Combine IDs provided in SearchParams with OR
+        let combined_id_expr = to_queries_then_or(value.metric_id);
+
+        // Combine ID and non-ID SearchParams with OR
+        combine_exprs_with_or(
+            vec![combined_non_id_expr, combined_id_expr]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>(),
+        )
     }
+}
+
+/// This struct includes any parameters related to downloading `SearchResults`.
+// TODO: possibly extend this type with parameters specific to download
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DownloadParams {
+    pub include_geoms: bool,
+    pub region_spec: Vec<RegionSpec>,
+}
+
+/// This struct combines `SearchParams` and `DownloadParams` into a single type to simplify
+/// conversion from `DataRequestSpec`.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Params {
+    pub search: SearchParams,
+    pub download: DownloadParams,
 }
 
 #[derive(Clone, Debug)]
@@ -310,12 +380,13 @@ pub struct SearchResults(pub DataFrame);
 
 impl SearchResults {
     /// Convert all the metrics in the dataframe to MetricRequests
-    pub fn to_metric_requests(self, config: &Config) -> Vec<MetricRequest> {
+    pub fn to_metric_requests(&self, config: &Config) -> Vec<MetricRequest> {
         // Using unwrap throughout this function because if any of them fail, it means our upstream
         // data is invalid!
         // TODO: Maybe map the error type instead to provide some useful error messages
         let df = self
             .0
+            .clone()
             .lazy()
             .select([
                 col(COL::METRIC_PARQUET_PATH),
@@ -356,32 +427,47 @@ impl SearchResults {
     pub async fn download(
         self,
         config: &Config,
-        data_request_spec: DataRequestSpec,
+        download_params: &DownloadParams,
     ) -> anyhow::Result<DataFrame> {
         let metric_requests = self.to_metric_requests(config);
         debug!("metric_requests = {:#?}", metric_requests);
+
+        if metric_requests.is_empty() {
+            bail!(
+                "No metric requests were derived from `SearchResults`: {}\ngiven `DownloadParams`: {:#?}",
+                self.0,
+                download_params
+            )
+        }
+
         let all_geom_files: HashSet<String> = metric_requests
             .iter()
             .map(|m| m.geom_file.clone())
             .collect();
+
+        // TODO Handle multiple geometries
+        if all_geom_files.len() > 1 {
+            unimplemented!("Multiple geometries not supported in current release");
+        } else if all_geom_files.is_empty() {
+            bail!(
+                "No geometry files for the following `metric_requests`: {:#?}",
+                metric_requests
+            )
+        }
+
         // Required because polars is blocking
         let metrics = tokio::task::spawn_blocking(move || get_metrics(&metric_requests, None));
 
-        // TODO Handle multiple responses
-        if all_geom_files.len() > 1 {
-            unimplemented!("Multiple geometries not supported in current release");
-        }
-
-        let result = if data_request_spec.geometry.include_geoms {
+        let result = if download_params.include_geoms {
             // TODO Pass in the bbox as the second argument here
-            if data_request_spec.region.len() > 1 {
+            if download_params.region_spec.len() > 1 {
                 todo!(
                     "Multiple region specifications are not yet supported: {:#?}",
-                    data_request_spec.region
+                    download_params.region_spec
                 );
             }
-            let bbox = data_request_spec
-                .region
+            let bbox = download_params
+                .region_spec
                 .first()
                 .and_then(|region_spec| region_spec.bbox().clone());
 
