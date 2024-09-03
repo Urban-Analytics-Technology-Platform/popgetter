@@ -10,6 +10,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "popgetter"
 path = "src/main.rs"
+required-features = ["cache", "formatters"]
 
 [dependencies]
 anyhow = "1.0.75"
@@ -59,5 +60,5 @@ tempfile = "3.12"
 
 [features]
 default = ["cache", "formatters"]
-formatters = ["dep:geojson"]
 cache = []
+formatters = ["dep:geojson"]
