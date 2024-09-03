@@ -31,7 +31,7 @@ enum_dispatch = "0.3"
 flatgeobuf = "~4.1.0"
 geozero = { version = "0.12.0", features = ["with-csv", "with-geojson"] }
 toml = "0.8.13"
-popgetter = { path = "../popgetter" }
+popgetter = { path = "../popgetter", features = ["cache", "formatters"]}
 comfy-table = "7.1.1"
 itertools = "0.13.0"
 strum_macros = "0.26.4"
@@ -41,3 +41,6 @@ pretty_env_logger = "0.5.0"
 strum = "0.26"
 spinners = "4.1.1"
 nonempty = { version = "0.10.0", features = ["serialize"] }
+
+[dev-dependencies]
+tempfile = "3.12"

@@ -1,9 +1,9 @@
 // FromStr is required by EnumString. The compiler seems to not be able to
 // see that and so is giving a warning. Dont remove it
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
-use log::{debug, info};
+use log::{debug, error, info};
 use nonempty::nonempty;
 use polars::frame::DataFrame;
 use popgetter::{
@@ -14,8 +14,8 @@ use popgetter::{
     },
     geo::BBox,
     search::{
-        Country, DataPublisher, GeometryLevel, MetricId, SearchContext, SearchParams,
-        SearchResults, SearchText, SourceDataRelease, SourceMetricId, YearRange,
+        Country, DataPublisher, DownloadParams, GeometryLevel, MetricId, Params, SearchContext,
+        SearchParams, SearchResults, SearchText, SourceDataRelease, SourceMetricId, YearRange,
     },
     Popgetter,
 };
@@ -83,6 +83,8 @@ pub struct DataCommand {
     output_file: Option<String>,
     #[command(flatten)]
     search_params_args: SearchParamsArgs,
+    #[command(flatten)]
+    download_params_args: DownloadParamsArgs,
     #[arg(
         short = 'r',
         long,
@@ -90,13 +92,38 @@ pub struct DataCommand {
         help = "Force run without prompt"
     )]
     force_run: bool,
+    #[arg(from_global)]
+    quiet: bool,
+}
+
+#[derive(Args, Debug, Clone)]
+struct DownloadParamsArgs {
     #[arg(
         long = "no-geometry",
         help = "When set, no geometry data is included in the results"
     )]
     no_geometry: bool,
-    #[arg(from_global)]
-    quiet: bool,
+}
+
+/// A type combining both the `SearchParamsArgs` and `DownloadParamsArgs` to enable `DownloadParams`
+/// to be constructed since fields of `SearchParamsArgs` may also be needed for `DownloadParams`.
+#[derive(Clone, Debug)]
+struct CombinedParamsArgs {
+    search_params_args: SearchParamsArgs,
+    download_params_args: DownloadParamsArgs,
+}
+
+impl From<CombinedParamsArgs> for DownloadParams {
+    fn from(combined_params_args: CombinedParamsArgs) -> Self {
+        Self {
+            region_spec: combined_params_args
+                .search_params_args
+                .bbox
+                .map(|bbox| vec![RegionSpec::BoundingBox(bbox)])
+                .unwrap_or_default(),
+            include_geoms: !combined_params_args.download_params_args.no_geometry,
+        }
+    }
 }
 
 impl From<&OutputFormat> for OutputFormatter {
@@ -117,6 +144,33 @@ impl From<OutputFormat> for OutputFormatter {
     }
 }
 
+async fn read_popgetter(config: Config) -> anyhow::Result<Popgetter> {
+    let xdg_dirs = xdg::BaseDirectories::with_prefix("popgetter")?;
+    // TODO: enable cache to be optional
+    let path = xdg_dirs.get_cache_home();
+    // Try to read metadata from cache
+    if path.exists() {
+        match Popgetter::new_with_config_and_cache(config.clone(), &path) {
+            Ok(popgetter) => return Ok(popgetter),
+            Err(err) => {
+                // Log error, continue without cache and attempt to create one
+                error!("Failed to read metadata from cache with error: {err}");
+            }
+        }
+    }
+    // If no metadata cache, get metadata and try to cache
+    std::fs::create_dir_all(&path)?;
+    let popgetter = Popgetter::new_with_config(config).await?;
+
+    // If error creating cache, remove cache path
+    if let Err(err) = popgetter.metadata.write_cache(&path) {
+        std::fs::remove_dir_all(&path)
+            .with_context(|| "Failed to remove cache dir following error writing cache: {err}")?;
+        Err(err)?
+    }
+    Ok(popgetter)
+}
+
 impl RunCommand for DataCommand {
     async fn run(&self, config: Config) -> Result<()> {
         info!("Running `data` subcommand");
@@ -126,13 +180,9 @@ impl RunCommand for DataCommand {
                 DOWNLOADING_SEARCHING_STRING.to_string() + RUNNING_TAIL_STRING,
             )
         });
-        let popgetter = Popgetter::new_with_config(config).await?;
+        let popgetter = read_popgetter(config).await?;
         let search_params: SearchParams = self.search_params_args.clone().into();
-        let search_results = popgetter.search(search_params.clone());
-
-        // Make DataRequestSpec
-        // TODO: consider alternative `From` impls as part of #67
-        // let data_request_config: DataRequestConfig = (self, &search_params).into();
+        let search_results = popgetter.search(&search_params);
 
         // sp.stop_and_persist is potentially a better method, but not obvious how to
         // store the timing. Leaving below until that option is ruled out.
@@ -142,6 +192,12 @@ impl RunCommand for DataCommand {
         }
 
         print_metrics_count(search_results.clone());
+        let download_params: DownloadParams = CombinedParamsArgs {
+            search_params_args: self.search_params_args.clone(),
+            download_params_args: self.download_params_args.clone(),
+        }
+        .into();
+
         if !self.force_run {
             println!("Input 'r' to run query, any other character will cancel");
             let mut input = String::new();
@@ -162,7 +218,7 @@ impl RunCommand for DataCommand {
             )
         });
         let data = search_results
-            .download(&popgetter.config, &search_params, !self.no_geometry)
+            .download(&popgetter.config, &download_params)
             .await?;
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
@@ -331,8 +387,8 @@ impl RunCommand for MetricsCommand {
                 DOWNLOADING_SEARCHING_STRING.into(),
             )
         });
-        let popgetter = Popgetter::new_with_config(config).await?;
-        let search_results = popgetter.search(self.search_params_args.clone().into());
+        let popgetter = read_popgetter(config).await?;
+        let search_results = popgetter.search(&self.search_params_args.to_owned().into());
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
         }
@@ -371,7 +427,7 @@ impl RunCommand for CountriesCommand {
                 spinner_message.to_string() + RUNNING_TAIL_STRING,
             )
         });
-        let popgetter = Popgetter::new_with_config(config).await?;
+        let popgetter = read_popgetter(config).await?;
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
         }
@@ -393,7 +449,6 @@ impl RunCommand for SurveysCommand {
     }
 }
 
-// // TODO: Reimplement this
 /// The Recipe command loads a recipe file and generates the output data requested
 #[derive(Args, Debug)]
 pub struct RecipeCommand {
@@ -412,15 +467,10 @@ impl RunCommand for RecipeCommand {
         let popgetter = Popgetter::new_with_config(config).await?;
         let recipe = std::fs::read_to_string(&self.recipe_file)?;
         let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
-        let include_geoms = data_request
-            .geometry
-            .as_ref()
-            .map(|geo| geo.include_geoms)
-            .unwrap_or(true);
-        let search_params: SearchParams = data_request.try_into()?;
-        let search_results = popgetter.search(search_params.clone());
+        let params: Params = data_request.try_into()?;
+        let search_results = popgetter.search(&params.search);
         let data = search_results
-            .download(&popgetter.config, &search_params, include_geoms)
+            .download(&popgetter.config, &params.download)
             .await?;
         debug!("{data:#?}");
         let formatter: OutputFormatter = (&self.output_format).into();
@@ -468,8 +518,26 @@ pub enum Commands {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+    use tempfile::NamedTempFile;
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_recipe_command() {
+        let recipe_command = RecipeCommand {
+            recipe_file: format!("{}/test_recipe.json", env!("CARGO_MANIFEST_DIR")),
+            output_format: OutputFormat::GeoJSON,
+            output_file: Some(
+                NamedTempFile::new()
+                    .unwrap()
+                    .path()
+                    .to_string_lossy()
+                    .to_string(),
+            ),
+        };
+        let result = recipe_command.run(Config::default()).await;
+        assert!(result.is_ok())
+    }
 
     #[test]
     fn test_parse_year_range() {

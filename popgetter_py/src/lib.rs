@@ -15,7 +15,7 @@ use ::popgetter::{
 
 async fn _search(search_params: SearchParams) -> DataFrame {
     let popgetter = ::popgetter::Popgetter::new().await.unwrap();
-    let search_results = popgetter.search(search_params);
+    let search_results = popgetter.search(&search_params);
     search_results
         .0
         .select([
@@ -53,7 +53,10 @@ fn get_search(obj: &Bound<'_, PyAny>) -> PyResult<SearchParams> {
 async fn _get(data_request: DataRequestSpec) -> DataFrame {
     let popgetter = ::popgetter::Popgetter::new().await.unwrap();
     println!("running data request {:#?}", data_request);
-    popgetter.get_data_request(data_request).await.unwrap()
+    popgetter
+        .download_data_request_spec(&data_request)
+        .await
+        .unwrap()
 }
 
 fn get_data_request(obj: &Bound<'_, PyAny>) -> PyResult<DataRequestSpec> {
