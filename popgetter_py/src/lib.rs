@@ -96,7 +96,7 @@ fn search(
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn popgetter(_py: Python, m: &PyModule) -> PyResult<()> {
+fn popgetter(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(search, m)?)?;
     m.add_function(wrap_pyfunction!(get, m)?)?;
     Ok(())
