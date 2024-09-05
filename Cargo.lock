@@ -2857,10 +2857,13 @@ dependencies = [
 name = "popgetter_py"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "polars",
  "popgetter",
  "pyo3",
  "pyo3-polars",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
