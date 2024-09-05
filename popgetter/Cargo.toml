@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
+dirs = { workspace = true, optional = true}
 enum_dispatch = { workspace = true }
 flatgeobuf = { workspace = true }
 futures = { workspace = true }
@@ -25,12 +26,11 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 wkb = { workspace = true }
 wkt = { workspace = true }
-xdg = { workspace = true, optional = true}
 
 [dev-dependencies]
 tempfile = { workspace = true }
 
 [features]
 default = ["cache", "formatters"]
-cache = ["dep:xdg"]
+cache = ["dep:dirs"]
 formatters = ["dep:geojson"]

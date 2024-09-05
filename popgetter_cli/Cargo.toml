@@ -11,6 +11,7 @@ path = "src/main.rs"
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 comfy-table = { workspace = true }
+dirs = { workspace = true }
 enum_dispatch = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
@@ -26,7 +27,6 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 toml = { workspace = true }
-xdg = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

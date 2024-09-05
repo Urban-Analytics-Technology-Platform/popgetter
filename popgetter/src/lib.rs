@@ -1,8 +1,8 @@
 use std::path::Path;
 
-#[cfg(feature = "cache")]
-use anyhow::Context;
 use anyhow::Result;
+#[cfg(feature = "cache")]
+use anyhow::{anyhow, Context};
 use data_request_spec::DataRequestSpec;
 use log::{debug, error};
 use metadata::Metadata;
@@ -50,8 +50,10 @@ impl Popgetter {
     #[cfg(feature = "cache")]
     /// Setup the Popgetter object with custom configuration from cache
     pub async fn new_with_config_and_cache(config: Config) -> Result<Self> {
-        let xdg_dirs = xdg::BaseDirectories::with_prefix("popgetter")?;
-        let path = xdg_dirs.get_cache_home();
+        // On macOS: ~/Library/Caches
+        let path = dirs::cache_dir()
+            .ok_or(anyhow!("Failed to get base directory"))?
+            .join("popgetter");
         Popgetter::new_with_config_and_cache_path(config, path).await
     }
 
