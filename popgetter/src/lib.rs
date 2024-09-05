@@ -52,7 +52,7 @@ impl Popgetter {
     pub async fn new_with_config_and_cache(config: Config) -> Result<Self> {
         // On macOS: ~/Library/Caches
         let path = dirs::cache_dir()
-            .ok_or(anyhow!("Failed to get base directory"))?
+            .ok_or(anyhow!("Failed to get cache directory"))?
             .join("popgetter");
         Popgetter::new_with_config_and_cache_path(config, path).await
     }

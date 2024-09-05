@@ -19,7 +19,6 @@ nonempty = { workspace = true, features = ["serialize"] }
 polars = { workspace = true, features = ["lazy", "is_in", "http", "streaming", "parquet", "polars-io", "regex", "strings", "rows"] }
 popgetter = { path = "../popgetter" }
 pretty_env_logger = { workspace = true }
-reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 spinners = { workspace = true }

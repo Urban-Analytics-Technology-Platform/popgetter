@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-dirs = { workspace = true, optional = true}
+dirs = { workspace = true, optional = true }
 enum_dispatch = { workspace = true }
 flatgeobuf = { workspace = true }
 futures = { workspace = true }

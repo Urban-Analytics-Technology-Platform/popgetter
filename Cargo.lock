@@ -2870,7 +2870,6 @@ dependencies = [
  "polars",
  "popgetter",
  "pretty_env_logger",
- "reqwest 0.12.4",
  "serde",
  "serde_json",
  "spinners",
@@ -2885,7 +2884,6 @@ dependencies = [
 name = "popgetter_py"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "polars",
  "popgetter",
  "pyo3",
