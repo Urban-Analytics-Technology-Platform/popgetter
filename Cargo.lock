@@ -2825,6 +2825,7 @@ dependencies = [
  "tokio",
  "wkb",
  "wkt",
+ "xdg",
 ]
 
 [[package]]

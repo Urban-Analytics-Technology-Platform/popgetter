@@ -1,8 +1,10 @@
 use std::path::Path;
 
+#[cfg(feature = "cache")]
+use anyhow::Context;
 use anyhow::Result;
 use data_request_spec::DataRequestSpec;
-use log::debug;
+use log::{debug, error};
 use metadata::Metadata;
 use polars::frame::DataFrame;
 use search::{Params, SearchParams, SearchResults};
@@ -47,8 +49,45 @@ impl Popgetter {
     // Only include method with "cache" feature since it requires a filesystem
     #[cfg(feature = "cache")]
     /// Setup the Popgetter object with custom configuration from cache
-    pub fn new_with_config_and_cache<P: AsRef<Path>>(config: Config, cache: P) -> Result<Self> {
-        let metadata = Metadata::from_cache(cache)?;
+    pub async fn new_with_config_and_cache(config: Config) -> Result<Self> {
+        let xdg_dirs = xdg::BaseDirectories::with_prefix("popgetter")?;
+        let path = xdg_dirs.get_cache_home();
+        Popgetter::new_with_config_and_cache_path(config, path).await
+    }
+
+    // Only include method with "cache" feature since it requires a filesystem
+    #[cfg(feature = "cache")]
+    async fn new_with_config_and_cache_path<P: AsRef<Path>>(
+        config: Config,
+        path: P,
+    ) -> Result<Self> {
+        // Try to read metadata from cache
+        if path.as_ref().exists() {
+            match Popgetter::new_from_cache_path(config.clone(), &path) {
+                Ok(popgetter) => return Ok(popgetter),
+                Err(err) => {
+                    // Log error, continue without cache and attempt to create one
+                    error!("Failed to read metadata from cache with error: {err}");
+                }
+            }
+        }
+        // If no metadata cache, get metadata and try to cache
+        std::fs::create_dir_all(&path)?;
+        let popgetter = Popgetter::new_with_config(config).await?;
+        // If error creating cache, remove cache path
+        if let Err(err) = popgetter.metadata.write_cache(&path) {
+            std::fs::remove_dir_all(&path).with_context(|| {
+                "Failed to remove cache dir following error writing cache: {err}"
+            })?;
+            Err(err)?
+        }
+        Ok(popgetter)
+    }
+
+    // Only include method with "cache" feature since it requires a filesystem
+    #[cfg(feature = "cache")]
+    fn new_from_cache_path<P: AsRef<Path>>(config: Config, path: P) -> Result<Self> {
+        let metadata = Metadata::from_cache(path)?;
         Ok(Self { metadata, config })
     }
 
@@ -94,7 +133,8 @@ mod tests {
         let config = Config::default();
         let popgetter = Popgetter::new_with_config(config.clone()).await?;
         popgetter.metadata.write_cache(&tempdir)?;
-        let popgetter_from_cache = Popgetter::new_with_config_and_cache(config, &tempdir)?;
+        let popgetter_from_cache =
+            Popgetter::new_with_config_and_cache_path(config, tempdir).await?;
         assert_eq!(popgetter, popgetter_from_cache);
         Ok(())
     }

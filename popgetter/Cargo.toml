@@ -25,11 +25,12 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 wkb = { workspace = true }
 wkt = { workspace = true }
+xdg = { workspace = true, optional = true}
 
 [dev-dependencies]
 tempfile = { workspace = true }
 
 [features]
 default = ["cache", "formatters"]
-cache = []
+cache = ["dep:xdg"]
 formatters = ["dep:geojson"]

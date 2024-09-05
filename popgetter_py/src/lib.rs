@@ -1,6 +1,7 @@
 use std::default::Default;
 
 use ::popgetter::{
+    config::Config,
     data_request_spec::DataRequestSpec,
     search::{SearchParams, SearchText},
     COL,
@@ -32,7 +33,9 @@ fn convert_py_dict<T: DeserializeOwned>(obj: &Bound<'_, PyAny>) -> PyResult<T> {
 
 /// Returns search results as a `DataFrame` from given `SearchParams`.
 async fn _search(search_params: SearchParams) -> DataFrame {
-    let popgetter = ::popgetter::Popgetter::new().await.unwrap();
+    let popgetter = ::popgetter::Popgetter::new_with_config_and_cache(Config::default())
+        .await
+        .unwrap();
     let search_results = popgetter.search(&search_params);
     search_results
         .0
@@ -75,7 +78,9 @@ fn get_search_params(obj: &Bound<'_, PyAny>) -> PyResult<SearchParams> {
 
 /// Downloads data as a `DataFrame` for a given `DataRequestSpec`.
 async fn _download_data_request_spec(data_request: DataRequestSpec) -> DataFrame {
-    let popgetter = ::popgetter::Popgetter::new().await.unwrap();
+    let popgetter = ::popgetter::Popgetter::new_with_config_and_cache(Config::default())
+        .await
+        .unwrap();
     popgetter
         .download_data_request_spec(&data_request)
         .await
