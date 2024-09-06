@@ -3,7 +3,7 @@ use std::default::Default;
 use ::popgetter::{
     config::Config,
     data_request_spec::DataRequestSpec,
-    search::{SearchParams, SearchText},
+    search::{DownloadParams, MetricId, Params, SearchParams, SearchText},
     COL,
 };
 use polars::prelude::DataFrame;
@@ -44,8 +44,27 @@ async fn _search(search_params: SearchParams) -> DataFrame {
             COL::METRIC_HUMAN_READABLE_NAME,
             COL::METRIC_DESCRIPTION,
             COL::METRIC_HXL_TAG,
+            COL::SOURCE_DATA_RELEASE_COLLECTION_PERIOD_START,
+            COL::COUNTRY_NAME_SHORT_EN,
             COL::GEOMETRY_LEVEL,
         ])
+        .unwrap()
+}
+
+/// Downloads data as a `DataFrame` from given `SearchParams`.
+async fn _search_and_download(search_params: SearchParams) -> DataFrame {
+    ::popgetter::Popgetter::new_with_config_and_cache(Config::default())
+        .await
+        .unwrap()
+        .download_params(&Params {
+            search: search_params,
+            // TODO: enable DownloadParams to be passed as function args
+            download: DownloadParams {
+                include_geoms: true,
+                region_spec: vec![],
+            },
+        })
+        .await
         .unwrap()
 }
 
@@ -54,14 +73,22 @@ async fn _search(search_params: SearchParams) -> DataFrame {
 /// error.
 fn get_search_params(obj: &Bound<'_, PyAny>) -> PyResult<SearchParams> {
     if let Ok(text) = obj.downcast::<PyString>() {
-        println!("Argument is 'str', searching as text: {}", text);
+        println!(
+            "Argument is 'str', searching as text or comma-separated metric IDs: {}",
+            text
+        );
         let search_text = SearchText {
             text: text.to_string(),
             ..SearchText::default()
         };
         return Ok(SearchParams {
             text: vec![search_text],
-            ..SearchParams::default()
+            metric_id: text
+                .to_string()
+                .split(',')
+                .map(|id_str| MetricId(id_str.to_string()))
+                .collect::<Vec<_>>(),
+            ..Default::default()
         });
     }
     if let Ok(dict) = obj.downcast::<PyDict>() {
@@ -123,10 +150,24 @@ fn search(
     Ok(PyDataFrame(result))
 }
 
+/// Searches using Popgetter from a given `SearchParams` dict or text `String` with search results
+/// then downloaded as a polars `DataFrame`.
+#[pyfunction]
+fn download(
+    #[pyo3(from_py_with = "get_search_params")] search_query: SearchParams,
+) -> PyResult<PyDataFrame> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let result = rt.block_on(_search_and_download(search_query));
+    Ok(PyDataFrame(result))
+}
+
 /// Popgetter Python module.
 #[pymodule]
 fn popgetter(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(search, m)?)?;
+    m.add_function(wrap_pyfunction!(download, m)?)?;
     m.add_function(wrap_pyfunction!(download_data_request, m)?)?;
     Ok(())
 }
