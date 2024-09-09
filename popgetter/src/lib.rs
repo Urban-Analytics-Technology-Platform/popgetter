@@ -1,10 +1,13 @@
+#[cfg(feature = "cache")]
 use std::path::Path;
 
 use anyhow::Result;
 #[cfg(feature = "cache")]
 use anyhow::{anyhow, Context};
 use data_request_spec::DataRequestSpec;
-use log::{debug, error};
+use log::debug;
+#[cfg(feature = "cache")]
+use log::error;
 use metadata::Metadata;
 use polars::frame::DataFrame;
 use search::{Params, SearchParams, SearchResults};
