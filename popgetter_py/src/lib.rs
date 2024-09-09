@@ -32,30 +32,25 @@ fn convert_py_dict<T: DeserializeOwned>(obj: &Bound<'_, PyAny>) -> PyResult<T> {
 }
 
 /// Returns search results as a `DataFrame` from given `SearchParams`.
-async fn _search(search_params: SearchParams) -> DataFrame {
-    let popgetter = Popgetter::new_with_config_and_cache(Config::default())
-        .await
-        .unwrap();
-    let search_results = popgetter.search(&search_params);
-    search_results
-        .0
-        .select([
-            COL::METRIC_ID,
-            COL::METRIC_HUMAN_READABLE_NAME,
-            COL::METRIC_DESCRIPTION,
-            COL::METRIC_HXL_TAG,
-            COL::SOURCE_DATA_RELEASE_COLLECTION_PERIOD_START,
-            COL::COUNTRY_NAME_SHORT_EN,
-            COL::GEOMETRY_LEVEL,
-        ])
-        .unwrap()
+async fn _search(search_params: SearchParams) -> anyhow::Result<DataFrame> {
+    let search_results = Popgetter::new_with_config_and_cache(Config::default())
+        .await?
+        .search(&search_params);
+    Ok(search_results.0.select([
+        COL::METRIC_ID,
+        COL::METRIC_HUMAN_READABLE_NAME,
+        COL::METRIC_DESCRIPTION,
+        COL::METRIC_HXL_TAG,
+        COL::SOURCE_DATA_RELEASE_COLLECTION_PERIOD_START,
+        COL::COUNTRY_NAME_SHORT_EN,
+        COL::GEOMETRY_LEVEL,
+    ])?)
 }
 
 /// Downloads data as a `DataFrame` from given `SearchParams`.
-async fn _search_and_download(search_params: SearchParams) -> DataFrame {
+async fn _search_and_download(search_params: SearchParams) -> anyhow::Result<DataFrame> {
     Popgetter::new_with_config_and_cache(Config::default())
-        .await
-        .unwrap()
+        .await?
         .download_params(&Params {
             search: search_params.clone(),
             // TODO: enable DownloadParams to be passed as function args
@@ -65,7 +60,6 @@ async fn _search_and_download(search_params: SearchParams) -> DataFrame {
             },
         })
         .await
-        .unwrap()
 }
 
 /// Gets `SearchParams` from a given PyAny argument. `PyString` arguments are treated as text,
@@ -104,14 +98,11 @@ fn get_search_params(obj: &Bound<'_, PyAny>) -> PyResult<SearchParams> {
 }
 
 /// Downloads data as a `DataFrame` for a given `DataRequestSpec`.
-async fn _download_data_request_spec(data_request: DataRequestSpec) -> DataFrame {
-    let popgetter = Popgetter::new_with_config_and_cache(Config::default())
-        .await
-        .unwrap();
-    popgetter
+async fn _download_data_request_spec(data_request: DataRequestSpec) -> anyhow::Result<DataFrame> {
+    Popgetter::new_with_config_and_cache(Config::default())
+        .await?
         .download_data_request_spec(&data_request)
         .await
-        .unwrap()
 }
 
 /// Gets `DataRequestSpec` from a given Python object.
@@ -134,7 +125,7 @@ fn download_data_request(
         .enable_all()
         .build()?;
     let result = rt.block_on(_download_data_request_spec(data_request));
-    Ok(PyDataFrame(result))
+    Ok(PyDataFrame(result?))
 }
 
 /// Searches using Popgetter from a given `SearchParams` dict or text `String` with search results
@@ -147,7 +138,7 @@ fn search(
         .enable_all()
         .build()?;
     let result = rt.block_on(_search(search_params));
-    Ok(PyDataFrame(result))
+    Ok(PyDataFrame(result?))
 }
 
 /// Searches using Popgetter from a given `SearchParams` dict or text `String` with search results
@@ -160,7 +151,7 @@ fn download(
         .enable_all()
         .build()?;
     let result = rt.block_on(_search_and_download(search_params));
-    Ok(PyDataFrame(result))
+    Ok(PyDataFrame(result?))
 }
 
 /// Popgetter Python module.
