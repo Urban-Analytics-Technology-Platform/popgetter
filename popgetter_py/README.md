@@ -21,6 +21,8 @@ Install polars and popgetter:
 
 ```shell
 pip install polars
+git clone https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli.git
+cd popgetter-cli/popgetter_py/
 maturin develop --release
 ```
 
@@ -43,10 +45,16 @@ data = popgetter.download(metric_ids)
 print(data.head())
 
 # Search and download data with search params
-search_params = {
-    "metric_id": ["f29c1976", "079f3ba3", "81cae95d"],
-    "text": [],
-    "region_spec": []
+ search_params = {
+    "metricId": [],
+    "text": [{
+      "text": "Key: uniqueID, Value: B01001_001;",
+      "context": ["hxl", "humanReadableName", "description"]
+    }],
+    "geometryLevel": "tract",
+    "yearRange": [{"between": [2021, 2021]}],
+    "country": "USA",
+    "regionSpec": []
 }
 search_results = popgetter.search(search_params)
 print(search_results)
