@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Set to "3.10" here but other versions should work too
+  PYTHON_VERSION: "3.10"
+
 jobs:
   linux:
     runs-on: ${{ matrix.platform.runner }}
@@ -27,19 +31,20 @@ jobs:
             target: x86_64
           - runner: ubuntu-latest
             target: x86
-          - runner: ubuntu-latest
-            target: aarch64
-          - runner: ubuntu-latest
-            target: armv7
-          - runner: ubuntu-latest
-            target: s390x
-          - runner: ubuntu-latest
-            target: ppc64le
+          # TODO: currently fails with: "Could not find directory of OpenSSL installation..."
+          # - runner: ubuntu-latest
+          #   target: aarch64
+          # - runner: ubuntu-latest
+          #   target: armv7
+          # - runner: ubuntu-latest
+          #   target: s390x
+          # - runner: ubuntu-latest
+          #   target: ppc64le
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.x
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -50,52 +55,63 @@ jobs:
             --out dist
             --find-interpreter
           sccache: "true"
+          # Install openssl as required for popgetter to compile
+          # TODO: see dicussion for openssl install for different targets:
+          # https://github.com/PyO3/maturin-action/discussions/162#discussioncomment-7978369
+          # currently only successful with yum for x86_64 and x86, compilation fails with
+          # openssl not found for other targets (tried apt-get and pacman):
+          before-script-linux: |
+              yum update -y
+              yum install -y openssl openssl-devel
           manylinux: auto
+      # See: https://github.com/pola-rs/polars/blob/main/.github/workflows/release-python.yml
+      - name: Test wheel
+        if: matrix.platform.target == 'x86_64'
+        run: |
+          pip install popgetter --force-reinstall --verbose --find-links dist/
+          python -c 'import popgetter'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-linux-${{ matrix.platform.target }}
           path: dist
 
-  musllinux:
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      matrix:
-        platform:
-          - runner: ubuntu-latest
-            target: x86_64
-          - runner: ubuntu-latest
-            target: x86
-          - runner: ubuntu-latest
-            target: aarch64
-          - runner: ubuntu-latest
-            target: armv7
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter --manifest-path popgetter_py/Cargo.toml
-          sccache: "true"
-          before-script-linux: |
-            sudo apt-get update
-            sudo apt-get install pkg-config libssl-dev
-          manylinux: musllinux_1_2
-      # See: https://github.com/pola-rs/polars/blob/main/.github/workflows/release-python.yml
-      - name: Test wheel
-        if: matrix.platform.target == 'x86_64'
-        run: |
-          pip install --force-reinstall --verbose dist/*.whl
-          python -c 'import popgetter'
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-musllinux-${{ matrix.platform.target }}
-          path: dist
+  # TODO: fix CI to run with manylinux: musllinux_1_2
+  # musllinux:
+  #   runs-on: ${{ matrix.platform.runner }}
+  #   strategy:
+  #     matrix:
+  #       platform:
+  #         - runner: ubuntu-latest
+  #           target: x86_64
+  #         - runner: ubuntu-latest
+  #           target: x86
+  #         - runner: ubuntu-latest
+  #           target: aarch64
+  #         - runner: ubuntu-latest
+  #           target: armv7
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ env.PYTHON_VERSION }}
+  #     - name: Build wheels
+  #       uses: PyO3/maturin-action@v1
+  #       with:
+  #         target: ${{ matrix.platform.target }}
+  #         args: --release --out dist --find-interpreter --manifest-path popgetter_py/Cargo.toml
+  #         sccache: "true"
+  #         before-script-linux: |
+  #             # TODO: update with package instructions specific to target for openssl
+  #             # See example: https://github.com/PyO3/maturin-action/discussions/162#discussioncomment-7978369
+  #             sudo apt-get update
+  #             sudo apt-get install -y pkg-config libssl-dev
+  #         manylinux: musllinux_1_2
+  #     - name: Upload wheels
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: wheels-musllinux-${{ matrix.platform.target }}
+  #         path: dist
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
@@ -110,7 +126,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.x
+          python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.target }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -141,7 +157,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.x
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
