@@ -57,11 +57,11 @@ async fn _search_and_download(search_params: SearchParams) -> DataFrame {
         .await
         .unwrap()
         .download_params(&Params {
-            search: search_params,
+            search: search_params.clone(),
             // TODO: enable DownloadParams to be passed as function args
             download: DownloadParams {
                 include_geoms: true,
-                region_spec: vec![],
+                region_spec: search_params.region_spec,
             },
         })
         .await
@@ -141,12 +141,12 @@ fn download_data_request(
 /// returned as a polars `DataFrame`.
 #[pyfunction]
 fn search(
-    #[pyo3(from_py_with = "get_search_params")] search_query: SearchParams,
+    #[pyo3(from_py_with = "get_search_params")] search_params: SearchParams,
 ) -> PyResult<PyDataFrame> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    let result = rt.block_on(_search(search_query));
+    let result = rt.block_on(_search(search_params));
     Ok(PyDataFrame(result))
 }
 
@@ -154,12 +154,12 @@ fn search(
 /// then downloaded as a polars `DataFrame`.
 #[pyfunction]
 fn download(
-    #[pyo3(from_py_with = "get_search_params")] search_query: SearchParams,
+    #[pyo3(from_py_with = "get_search_params")] search_params: SearchParams,
 ) -> PyResult<PyDataFrame> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    let result = rt.block_on(_search_and_download(search_query));
+    let result = rt.block_on(_search_and_download(search_params));
     Ok(PyDataFrame(result))
 }
 
