@@ -4,7 +4,7 @@ use ::popgetter::{
     config::Config,
     data_request_spec::DataRequestSpec,
     search::{DownloadParams, MetricId, Params, SearchParams, SearchText},
-    COL,
+    Popgetter, COL,
 };
 use polars::prelude::DataFrame;
 use pyo3::{
@@ -33,7 +33,7 @@ fn convert_py_dict<T: DeserializeOwned>(obj: &Bound<'_, PyAny>) -> PyResult<T> {
 
 /// Returns search results as a `DataFrame` from given `SearchParams`.
 async fn _search(search_params: SearchParams) -> DataFrame {
-    let popgetter = ::popgetter::Popgetter::new_with_config_and_cache(Config::default())
+    let popgetter = Popgetter::new_with_config_and_cache(Config::default())
         .await
         .unwrap();
     let search_results = popgetter.search(&search_params);
@@ -53,7 +53,7 @@ async fn _search(search_params: SearchParams) -> DataFrame {
 
 /// Downloads data as a `DataFrame` from given `SearchParams`.
 async fn _search_and_download(search_params: SearchParams) -> DataFrame {
-    ::popgetter::Popgetter::new_with_config_and_cache(Config::default())
+    Popgetter::new_with_config_and_cache(Config::default())
         .await
         .unwrap()
         .download_params(&Params {
@@ -105,7 +105,7 @@ fn get_search_params(obj: &Bound<'_, PyAny>) -> PyResult<SearchParams> {
 
 /// Downloads data as a `DataFrame` for a given `DataRequestSpec`.
 async fn _download_data_request_spec(data_request: DataRequestSpec) -> DataFrame {
-    let popgetter = ::popgetter::Popgetter::new_with_config_and_cache(Config::default())
+    let popgetter = Popgetter::new_with_config_and_cache(Config::default())
         .await
         .unwrap();
     popgetter

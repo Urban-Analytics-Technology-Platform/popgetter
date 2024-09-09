@@ -45,16 +45,18 @@ data = popgetter.download(metric_ids)
 print(data.head())
 
 # Search and download data with search params
- search_params = {
-    "metricId": [],
+search_params = {
+    "metric_id": [],
     "text": [{
       "text": "Key: uniqueID, Value: B01001_001;",
-      "context": ["hxl", "humanReadableName", "description"]
+      "context": ["Hxl", "HumanReadableName", "Description"]
     }],
-    "geometryLevel": "tract",
-    "yearRange": [{"between": [2021, 2021]}],
+    "geometry_level": "tract",
+    "year_range": [{"Between": [2021, 2021]}],
     "country": "USA",
-    "regionSpec": []
+    "region_spec": [
+      {"BoundingBox": [-74.251785, 40.647043, -73.673286, 40.91014]}
+    ]
 }
 search_results = popgetter.search(search_params)
 print(search_results)
@@ -70,18 +72,18 @@ import popgetter
 # Download data with a data request spec
 data_request_spec = {
   "region": [
-    {"boundingBox": [-74.251785, 40.647043, -73.673286, 40.91014]}
+    {"BoundingBox": [-74.251785, 40.647043, -73.673286, 40.91014]}
   ],
   "metrics": [
-    {"metricId": "f29c1976"},
-    {"metricId": "079f3ba3"},
-    {"metricId": "81cae95d"},
-    {"metricText": "Key: uniqueID, Value: B01001_001;"}
+    {"MetricId": "f29c1976"},
+    {"MetricId": "079f3ba3"},
+    {"MetricId": "81cae95d"},
+    {"MetricText": "Key: uniqueID, Value: B01001_001;"}
   ],
   "years": ["2021"],
   "geometry": {
-    "geometryLevel": "tract",
-    "includeGeoms": True
+    "geometry_level": "tract",
+    "include_geoms": True
   }
 }
 

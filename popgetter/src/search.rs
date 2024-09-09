@@ -83,7 +83,6 @@ fn case_insensitive_startswith(column: &str, value: &str) -> Expr {
 /// Where we want to search for a text string in. Pass multiple search contexts to search in all of
 /// them.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub enum SearchContext {
     Hxl,
     HumanReadableName,
@@ -191,7 +190,6 @@ impl From<MetricId> for Expr {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SearchText {
     pub text: String,
     pub context: NonEmpty<SearchContext>,
@@ -208,7 +206,6 @@ impl Default for SearchText {
 
 /// Search over years
 #[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub enum YearRange {
     Before(u16),
     After(u16),
@@ -287,7 +284,6 @@ pub struct SourceMetricId(pub String);
 /// with an OR operation. This enables a search or recipe to contain a combination of specific
 /// `metric_id`s and other fields.
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
-#[serde(rename_all = "camelCase")]
 pub struct SearchParams {
     pub text: Vec<SearchText>,
     pub year_range: Option<Vec<YearRange>>,
@@ -374,7 +370,6 @@ pub struct DownloadParams {
 /// This struct combines `SearchParams` and `DownloadParams` into a single type to simplify
 /// conversion from `DataRequestSpec`.
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Params {
     pub search: SearchParams,
     pub download: DownloadParams,

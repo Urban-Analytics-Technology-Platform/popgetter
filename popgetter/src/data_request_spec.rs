@@ -9,7 +9,6 @@ use crate::search::{
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
 pub struct DataRequestSpec {
     pub geometry: Option<GeometrySpec>,
     pub region: Vec<RegionSpec>,
@@ -77,7 +76,6 @@ impl TryFrom<DataRequestSpec> for Params {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub enum MetricSpec {
     MetricId(MetricId),
     MetricText(String),
@@ -85,7 +83,6 @@ pub enum MetricSpec {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct GeometrySpec {
     pub geometry_level: Option<String>,
     pub include_geoms: bool,
@@ -101,7 +98,6 @@ impl Default for GeometrySpec {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub enum RegionSpec {
     BoundingBox(BBox),
     Polygon(Polygon),

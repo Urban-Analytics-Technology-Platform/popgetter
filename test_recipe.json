@@ -1,26 +1,26 @@
 {
   "region": [
     {
-      "boundingBox": [-74.251785, 40.647043, -73.673286, 40.91014]
+      "BoundingBox": [-74.251785, 40.647043, -73.673286, 40.91014]
     }
   ],
   "metrics": [
     {
-      "metricId": "f29c1976"
+      "MetricId": "f29c1976"
     },
     {
-      "metricId": "079f3ba3"
+      "MetricId": "079f3ba3"
     },
     {
-      "metricId": "81cae95d"
+      "MetricId": "81cae95d"
     },
     {
-      "metricText": "Key: uniqueID, Value: B01001_001;"
+      "MetricText": "Key: uniqueID, Value: B01001_001;"
     }
   ],
   "years": ["2021"],
   "geometry": {
-    "geometryLevel": "tract",
-    "includeGeoms": true
+    "geometry_level": "tract",
+    "include_geoms": true
   }
 }
