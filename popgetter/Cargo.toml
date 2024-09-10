@@ -1,0 +1,36 @@
+[package]
+name = "popgetter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+dirs = { workspace = true, optional = true }
+enum_dispatch = { workspace = true }
+flatgeobuf = { workspace = true }
+futures = { workspace = true }
+geo = { workspace = true }
+geojson = { workspace = true, optional = true }
+geozero = { workspace = true, features = ["with-csv", "with-geojson"] }
+httpmock = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+nonempty = { workspace = true, features = ["serialize"] }
+polars = { workspace = true, features = ["lazy", "is_in", "http", "streaming", "parquet", "polars-io", "regex", "strings", "rows"] }
+regex = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+wkb = { workspace = true }
+wkt = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[features]
+default = ["cache", "formatters"]
+cache = ["dep:dirs"]
+formatters = ["dep:geojson"]

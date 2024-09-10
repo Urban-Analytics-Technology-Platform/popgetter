@@ -1,64 +1,42 @@
-[package]
-name = "popgetter_cli"
-version = "0.2.0"
-edition = "2021"
+[workspace]
+members = [
+    "popgetter",
+    "popgetter_cli",
+    "popgetter_py"
+]
 
-[lib]
-name = "popgetter"
-path = "src/lib.rs"
+resolver = "2"
 
-[[bin]]
-name = "popgetter"
-path = "src/main.rs"
-required-features = ["cache", "formatters"]
-
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.75"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0" }
-tokio = { version = "1.30.0", features = ["full"] }
-clap = { version = "4.5.0", features = ["derive"] }
-polars = { version = "0.39.2", features = [
-    "lazy",
-    "is_in",
-    "http",
-    "streaming",
-    "parquet",
-    "polars-io",
-    "regex",
-    "strings",
-    "rows",
-] }
-typify = "0.0.16"
-chrono = { version = "0.4.37", features = ['serde'] }
-reqwest = { version = "0.12.3", features = ["json"] }
-strum = "0.26"
-strum_macros = "0.26"
+chrono = "0.4.37"
+clap = "4.5.0"
+comfy-table = "7.1.1"
+dirs = "5"
 enum_dispatch = "0.3"
 flatgeobuf = "~4.1.0"
-geozero = { version = "0.12.0", features = ["with-csv", "with-geojson"] }
-httpmock = "0.7.0-rc.1"
-geojson = { version = "0.24.1", optional = true }
-geo = "0.28.0"
-wkt = "0.10.3"
-wkb = "0.7.1"
-log = "0.4.21"
-pretty_env_logger = "0.5.0"
 futures = "0.3.30"
-toml = "0.8.13"
-xdg = "2.5.2"
-regex = "1.10.4"
+geo = "0.28.0"
+geojson = "0.24.1"
+geozero = "0.12.0"
+httpmock = "0.7.0-rc.1"
 itertools = "0.13.0"
-comfy-table = "7.1.1"
-thiserror = "1"
-nonempty = { version = "0.10.0", features = ["serialize"] }
+log = "0.4.21"
+nonempty = "0.10.0"
+polars = "0.42.0"
+pretty_env_logger = "0.5.0"
+pyo3 = "0.22.0"
+pyo3-polars = "0.16.0"
+regex = "1.10.4"
+reqwest = "0.12.3"
+serde = "1.0"
+serde_json = "1.0"
 spinners = "4.1.1"
-
-[dev-dependencies]
+strum = "0.26"
+strum_macros = "0.26.4"
 tempfile = "3.12"
-
-
-[features]
-default = ["cache", "formatters"]
-cache = []
-formatters = ["dep:geojson"]
+thiserror = "1"
+tokio = "1.38.0"
+toml = "0.8.13"
+wkb = "0.7.1"
+wkt = "0.10.3"

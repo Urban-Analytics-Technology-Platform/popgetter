@@ -137,7 +137,7 @@ impl Display for FullSelectionPlan {
 impl Metadata {
     /// Generate a Lazy DataFrame which joins the metrics, source and geometry metadata
     pub fn combined_metric_source_geometry(&self) -> ExpandedMetadata {
-        let df: LazyFrame = self
+        let mut df: LazyFrame = self
             .metrics
             .clone()
             .lazy()

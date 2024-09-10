@@ -27,10 +27,11 @@ async fn main() -> Result<()> {
 }
 
 fn read_config_from_toml() -> Config {
-    // macOS: ~/.config/popgetter/config.toml
-    let xdg_dirs = xdg::BaseDirectories::with_prefix("popgetter").unwrap();
-    let file_path = xdg_dirs.place_config_file("config.toml").unwrap();
-
+    // macOS: ~/Library/Application Support/popgetter/config.toml
+    let file_path = dirs::config_dir()
+        .unwrap()
+        .join("popgetter")
+        .join("config.toml");
     match std::fs::read_to_string(file_path) {
         Ok(contents) => toml::from_str(&contents).expect("Invalid TOML in config file"),
         Err(e) => {

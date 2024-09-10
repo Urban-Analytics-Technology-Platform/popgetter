@@ -1,9 +1,9 @@
 // FromStr is required by EnumString. The compiler seems to not be able to
 // see that and so is giving a warning. Dont remove it
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
-use log::{debug, error, info};
+use log::{debug, info};
 use nonempty::nonempty;
 use polars::frame::DataFrame;
 use popgetter::{
@@ -144,33 +144,6 @@ impl From<OutputFormat> for OutputFormatter {
     }
 }
 
-async fn read_popgetter(config: Config) -> anyhow::Result<Popgetter> {
-    let xdg_dirs = xdg::BaseDirectories::with_prefix("popgetter")?;
-    // TODO: enable cache to be optional
-    let path = xdg_dirs.get_cache_home();
-    // Try to read metadata from cache
-    if path.exists() {
-        match Popgetter::new_with_config_and_cache(config.clone(), &path) {
-            Ok(popgetter) => return Ok(popgetter),
-            Err(err) => {
-                // Log error, continue without cache and attempt to create one
-                error!("Failed to read metadata from cache with error: {err}");
-            }
-        }
-    }
-    // If no metadata cache, get metadata and try to cache
-    std::fs::create_dir_all(&path)?;
-    let popgetter = Popgetter::new_with_config(config).await?;
-
-    // If error creating cache, remove cache path
-    if let Err(err) = popgetter.metadata.write_cache(&path) {
-        std::fs::remove_dir_all(&path)
-            .with_context(|| "Failed to remove cache dir following error writing cache: {err}")?;
-        Err(err)?
-    }
-    Ok(popgetter)
-}
-
 impl RunCommand for DataCommand {
     async fn run(&self, config: Config) -> Result<()> {
         info!("Running `data` subcommand");
@@ -180,7 +153,7 @@ impl RunCommand for DataCommand {
                 DOWNLOADING_SEARCHING_STRING.to_string() + RUNNING_TAIL_STRING,
             )
         });
-        let popgetter = read_popgetter(config).await?;
+        let popgetter = Popgetter::new_with_config_and_cache(config).await?;
         let search_params: SearchParams = self.search_params_args.clone().into();
         let search_results = popgetter.search(&search_params);
 
@@ -387,7 +360,7 @@ impl RunCommand for MetricsCommand {
                 DOWNLOADING_SEARCHING_STRING.into(),
             )
         });
-        let popgetter = read_popgetter(config).await?;
+        let popgetter = Popgetter::new_with_config_and_cache(config).await?;
         let search_results = popgetter.search(&self.search_params_args.to_owned().into());
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
@@ -427,7 +400,7 @@ impl RunCommand for CountriesCommand {
                 spinner_message.to_string() + RUNNING_TAIL_STRING,
             )
         });
-        let popgetter = read_popgetter(config).await?;
+        let popgetter = Popgetter::new_with_config_and_cache(config).await?;
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
         }
@@ -525,7 +498,7 @@ mod tests {
     #[tokio::test]
     async fn test_recipe_command() {
         let recipe_command = RecipeCommand {
-            recipe_file: format!("{}/test_recipe.json", env!("CARGO_MANIFEST_DIR")),
+            recipe_file: format!("{}/../test_recipe.json", env!("CARGO_MANIFEST_DIR")),
             output_format: OutputFormat::GeoJSON,
             output_file: Some(
                 NamedTempFile::new()
