@@ -217,6 +217,13 @@ pub struct MetricsCommand {
     full: bool,
     #[command(flatten)]
     search_params_args: SearchParamsArgs,
+    #[arg(help = "Summarise results with count of unique values by field")]
+    summary: bool,
+    #[arg(help = "Exclude description from search results")]
+    exclude_description: bool,
+    #[arg(help = "Unique values of a field", value_name = "FIELD")]
+    unique: Option<String>,
+
     #[arg(from_global)]
     quiet: bool,
 }
