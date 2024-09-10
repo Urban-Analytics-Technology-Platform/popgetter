@@ -16,7 +16,7 @@ use popgetter::{
     search::{
         CaseSensitivity, Country, DataPublisher, DownloadParams, GeometryLevel, MatchType,
         MetricId, Params, SearchConfig, SearchContext, SearchParams, SearchResults, SearchText,
-        SourceDataRelease, SourceMetricId, YearRange,
+        SourceDataRelease, SourceDownloadUrl, SourceMetricId, YearRange,
     },
     Popgetter,
 };
@@ -284,6 +284,8 @@ struct SearchParamsArgs {
             release)."
     )]
     source_metric_id: Option<String>,
+    #[arg(long, help = "Filter by source download URL")]
+    source_download_url: Option<String>,
     #[arg(
         short = 'i',
         long,
@@ -438,6 +440,14 @@ impl From<SearchParamsArgs> for SearchParams {
                 config: SearchConfig {
                     match_type: args.match_type.into(),
                     case_sensitivity: args.case_sensitivity.into(),
+                },
+            }),
+            source_download_url: args.source_download_url.map(|value| SourceDownloadUrl {
+                value,
+                // Always use regex for source download URL
+                config: SearchConfig {
+                    match_type: MatchType::Regex,
+                    case_sensitivity: CaseSensitivity::Insensitive,
                 },
             }),
             country: args.country.clone().map(|value| Country {

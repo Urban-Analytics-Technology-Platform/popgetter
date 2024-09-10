@@ -74,6 +74,7 @@ impl TryFrom<DataRequestSpec> for Params {
                         })
                 }),
                 source_data_release: None,
+                source_download_url: None,
                 data_publisher: None,
                 country: None,
                 source_metric_id: None,

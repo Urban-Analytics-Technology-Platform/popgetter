@@ -200,6 +200,16 @@ impl From<DataPublisher> for Expr {
     }
 }
 
+impl From<SourceDownloadUrl> for Expr {
+    fn from(value: SourceDownloadUrl) -> Self {
+        get_filter_fn(&value.config.match_type)(
+            COL::METRIC_SOURCE_DOWNLOAD_URL,
+            &value.value,
+            &value.config.case_sensitivity,
+        )
+    }
+}
+
 impl From<SourceDataRelease> for Expr {
     fn from(value: SourceDataRelease) -> Self {
         get_filter_fn(&value.config.match_type)(
@@ -390,6 +400,12 @@ pub struct SourceDataRelease {
     pub config: SearchConfig,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SourceDownloadUrl {
+    pub value: String,
+    pub config: SearchConfig,
+}
+
 /// Search over data publisher names
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DataPublisher {
@@ -433,6 +449,7 @@ pub struct SearchParams {
     pub geometry_level: Option<GeometryLevel>,
     pub source_data_release: Option<SourceDataRelease>,
     pub data_publisher: Option<DataPublisher>,
+    pub source_download_url: Option<SourceDownloadUrl>,
     pub country: Option<Country>,
     pub source_metric_id: Option<SourceMetricId>,
     pub region_spec: Vec<RegionSpec>,
@@ -478,6 +495,7 @@ impl From<SearchParams> for Option<Expr> {
             value.geometry_level.map(|v| v.into()),
             value.source_data_release.map(|v| v.into()),
             value.data_publisher.map(|v| v.into()),
+            value.source_download_url.map(|v| v.into()),
             value.country.map(|v| v.into()),
             value.source_metric_id.map(|v| v.into()),
         ];
