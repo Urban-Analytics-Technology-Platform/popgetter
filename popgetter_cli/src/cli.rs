@@ -15,8 +15,8 @@ use popgetter::{
     geo::BBox,
     search::{
         CaseSensitivity, Country, DataPublisher, DownloadParams, GeometryLevel, MatchType,
-        MetricId, Params, SearchConfig, SearchContext, SearchParams, SearchResults, SearchText,
-        SourceDataRelease, SourceDownloadUrl, SourceMetricId, YearRange,
+        MetricId, Params, SearchConfig, SearchContext, SearchParams, SearchText, SourceDataRelease,
+        SourceDownloadUrl, SourceMetricId, YearRange,
     },
     Popgetter,
 };
@@ -26,7 +26,10 @@ use std::{fs::File, path::Path};
 use std::{io, process};
 use strum_macros::EnumString;
 
-use crate::display::{display_countries, display_search_results};
+use crate::display::{
+    display_column, display_column_unique, display_countries, display_metdata_columns,
+    display_search_results, display_search_results_no_description, display_summary,
+};
 
 const DEFAULT_PROGRESS_SPINNER: Spinners = Spinners::Dots;
 const COMPLETE_PROGRESS_STRING: &str = "✔";
@@ -165,7 +168,8 @@ impl RunCommand for DataCommand {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING)
         }
 
-        print_metrics_count(search_results.clone());
+        let len_requests = search_results.0.shape().0;
+        print_metrics_count(len_requests);
         let download_params: DownloadParams = CombinedParamsArgs {
             search_params_args: self.search_params_args.clone(),
             download_params_args: self.download_params_args.clone(),
@@ -215,15 +219,18 @@ pub struct MetricsCommand {
         help = "Show all metrics even if there are a large number"
     )]
     full: bool,
+    #[arg(long, help = "Summarise results with count of unique values by field")]
+    summary: bool,
+    #[arg(long, help = "Exclude description from search results")]
+    exclude_description: bool,
+    #[arg(long, help = "Unique values of a column", value_name = "COLUMN NAME")]
+    unique: Option<String>,
+    #[arg(long, help = "Values of a column", value_name = "COLUMN NAME")]
+    column: Option<String>,
+    #[arg(long, help = "Print columns of metadata")]
+    display_columns: bool,
     #[command(flatten)]
     search_params_args: SearchParamsArgs,
-    #[arg(help = "Summarise results with count of unique values by field")]
-    summary: bool,
-    #[arg(help = "Exclude description from search results")]
-    exclude_description: bool,
-    #[arg(help = "Unique values of a field", value_name = "FIELD")]
-    unique: Option<String>,
-
     #[arg(from_global)]
     quiet: bool,
 }
@@ -323,7 +330,6 @@ struct SearchParamsArgs {
             (EPSG:3812)."
     )]
     bbox: Option<BBox>,
-
     #[arg(
         value_enum,
         short = 'm',
@@ -362,10 +368,8 @@ fn parse_year_range(value: &str) -> Result<Vec<YearRange>, anyhow::Error> {
 // A simple function to manage similaries across multiple cases.
 // May ultimately be generalised to a function to manage all progress UX
 // that can be switched on and off.
-fn print_metrics_count(search_results: SearchResults) -> usize {
-    let len_requests = search_results.0.shape().0;
+fn print_metrics_count(len_requests: usize) {
     println!("Found {len_requests} metric(s).");
-    len_requests
 }
 
 fn text_searches_from_args(
@@ -505,21 +509,37 @@ impl RunCommand for MetricsCommand {
             )
         });
         let popgetter = Popgetter::new_with_config_and_cache(config).await?;
+
         let search_results = popgetter.search(&self.search_params_args.to_owned().into());
         if let Some(mut s) = sp {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
         }
-
-        let len_requests = print_metrics_count(search_results.clone());
-
-        if len_requests > 50 && !self.full {
-            display_search_results(search_results, Some(50))?;
-            println!(
-                "{} more results not shown. Use --full to show all results.",
-                len_requests - 50
-            );
+        let len_requests = search_results.0.shape().0;
+        // Comditional display
+        if self.display_columns {
+            display_metdata_columns(&popgetter.metadata.combined_metric_source_geometry())?;
+        } else if self.summary {
+            display_summary(search_results)?;
+        } else if let Some(column) = self.unique.as_ref() {
+            display_column_unique(search_results, column)?;
+        } else if let Some(column) = self.column.as_ref() {
+            display_column(search_results, column)?;
         } else {
-            display_search_results(search_results, None)?;
+            let display_search_results_fn = if self.exclude_description {
+                display_search_results_no_description
+            } else {
+                display_search_results
+            };
+            if len_requests > 50 && !self.full {
+                print_metrics_count(len_requests);
+                display_search_results_fn(search_results, Some(50))?;
+                println!(
+                    "{} more results not shown. Use --full to show all results.",
+                    len_requests - 50
+                );
+            } else {
+                display_search_results(search_results, None)?;
+            }
         }
         Ok(())
     }
