@@ -515,7 +515,8 @@ impl RunCommand for MetricsCommand {
             s.stop_with_symbol(COMPLETE_PROGRESS_STRING);
         }
         let len_requests = search_results.0.shape().0;
-        // Comditional display
+
+        // Conditional display
         if self.display_columns {
             display_metdata_columns(&popgetter.metadata.combined_metric_source_geometry())?;
         } else if self.summary {
@@ -538,7 +539,7 @@ impl RunCommand for MetricsCommand {
                     len_requests - 50
                 );
             } else {
-                display_search_results(search_results, None)?;
+                display_search_results_fn(search_results, None)?;
             }
         }
         Ok(())
