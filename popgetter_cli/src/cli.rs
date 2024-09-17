@@ -213,26 +213,40 @@ impl RunCommand for DataCommand {
 /// The set of ways to search will likley increase over time
 #[derive(Args, Debug)]
 pub struct MetricsCommand {
-    #[arg(
-        short,
-        long,
-        help = "Show all metrics even if there are a large number"
-    )]
-    full: bool,
+    #[command(flatten)]
+    search_params_args: SearchParamsArgs,
+    #[clap(flatten)]
+    output_options: OutputOptions,
+    #[clap(flatten)]
+    metrics_results_options: MetricsResultsOptions,
+    #[arg(from_global)]
+    quiet: bool,
+}
+
+#[derive(Debug, Args)]
+#[group(required = false, multiple = false)]
+pub struct OutputOptions {
     #[arg(long, help = "Summarise results with count of unique values by field")]
     summary: bool,
-    #[arg(long, help = "Exclude description from search results")]
-    exclude_description: bool,
     #[arg(long, help = "Unique values of a column", value_name = "COLUMN NAME")]
     unique: Option<String>,
     #[arg(long, help = "Values of a column", value_name = "COLUMN NAME")]
     column: Option<String>,
     #[arg(long, help = "Print columns of metadata")]
     display_columns: bool,
-    #[command(flatten)]
-    search_params_args: SearchParamsArgs,
-    #[arg(from_global)]
-    quiet: bool,
+}
+
+#[derive(Debug, Args)]
+#[group(required = false, multiple = true)]
+pub struct MetricsResultsOptions {
+    #[arg(
+        short,
+        long,
+        help = "Show all metrics even if there are a large number"
+    )]
+    full: bool,
+    #[arg(long, help = "Exclude description from search results")]
+    exclude_description: bool,
 }
 
 #[derive(Debug, Clone, clap::ValueEnum, Copy)]
@@ -516,22 +530,29 @@ impl RunCommand for MetricsCommand {
         }
         let len_requests = search_results.0.shape().0;
 
-        // Conditional display
-        if self.display_columns {
+        // Output options:
+        // Display: metadata columns
+        if self.output_options.display_columns {
             display_metdata_columns(&popgetter.metadata.combined_metric_source_geometry())?;
-        } else if self.summary {
+        // Display: summary
+        } else if self.output_options.summary {
             display_summary(search_results)?;
-        } else if let Some(column) = self.unique.as_ref() {
+        // Display: unique
+        } else if let Some(column) = self.output_options.unique.as_ref() {
             display_column_unique(search_results, column)?;
-        } else if let Some(column) = self.column.as_ref() {
+        // Display: column
+        } else if let Some(column) = self.output_options.column.as_ref() {
             display_column(search_results, column)?;
+        // Display: metrics results
         } else {
-            let display_search_results_fn = if self.exclude_description {
+            // MetricsResultsOptions: exclude description
+            let display_search_results_fn = if self.metrics_results_options.exclude_description {
                 display_search_results_no_description
             } else {
                 display_search_results
             };
-            if len_requests > 50 && !self.full {
+            // MetricsResultsOptions: full
+            if len_requests > 50 && !self.metrics_results_options.full {
                 print_metrics_count(len_requests);
                 display_search_results_fn(search_results, Some(50))?;
                 println!(
