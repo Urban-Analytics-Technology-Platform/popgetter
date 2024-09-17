@@ -28,7 +28,7 @@ use strum_macros::EnumString;
 
 use crate::display::{
     display_column, display_column_unique, display_countries, display_metdata_columns,
-    display_search_results, display_search_results_no_description, display_summary,
+    display_search_results, display_summary,
 };
 
 const DEFAULT_PROGRESS_SPINNER: Spinners = Spinners::Dots;
@@ -548,20 +548,29 @@ impl RunCommand for MetricsCommand {
         } else {
             // MetricsResultsOptions: exclude description
             let display_search_results_fn = if self.metrics_results_options.exclude_description {
-                display_search_results_no_description
+                // display_search_results_no_description
+                display_search_results
             } else {
                 display_search_results
             };
             // MetricsResultsOptions: full
             if len_requests > 50 && !self.metrics_results_options.full {
                 print_metrics_count(len_requests);
-                display_search_results_fn(search_results, Some(50))?;
+                display_search_results_fn(
+                    search_results,
+                    Some(50),
+                    self.metrics_results_options.exclude_description,
+                )?;
                 println!(
                     "{} more results not shown. Use --full to show all results.",
                     len_requests - 50
                 );
             } else {
-                display_search_results_fn(search_results, None)?;
+                display_search_results_fn(
+                    search_results,
+                    None,
+                    self.metrics_results_options.exclude_description,
+                )?;
             }
         }
         Ok(())
