@@ -215,8 +215,9 @@ impl RunCommand for DataCommand {
 pub struct MetricsCommand {
     #[command(flatten)]
     search_params_args: SearchParamsArgs,
+    // TODO: consider refactoring SummaryOptions into a separate subcommand so that
     #[clap(flatten)]
-    output_options: OutputOptions,
+    summary_options: SummaryOptions,
     #[clap(flatten)]
     metrics_results_options: MetricsResultsOptions,
     #[arg(from_global)]
@@ -225,7 +226,7 @@ pub struct MetricsCommand {
 
 #[derive(Debug, Args)]
 #[group(required = false, multiple = false)]
-pub struct OutputOptions {
+pub struct SummaryOptions {
     #[arg(long, help = "Summarise results with count of unique values by field")]
     summary: bool,
     #[arg(long, help = "Unique values of a column", value_name = "COLUMN NAME")]
@@ -233,7 +234,7 @@ pub struct OutputOptions {
     #[arg(long, help = "Values of a column", value_name = "COLUMN NAME")]
     column: Option<String>,
     #[arg(long, help = "Print columns of metadata")]
-    display_columns: bool,
+    display_metadata_columns: bool,
 }
 
 #[derive(Debug, Args)]
@@ -532,16 +533,16 @@ impl RunCommand for MetricsCommand {
 
         // Output options:
         // Display: metadata columns
-        if self.output_options.display_columns {
+        if self.summary_options.display_metadata_columns {
             display_metdata_columns(&popgetter.metadata.combined_metric_source_geometry())?;
         // Display: summary
-        } else if self.output_options.summary {
+        } else if self.summary_options.summary {
             display_summary(search_results)?;
         // Display: unique
-        } else if let Some(column) = self.output_options.unique.as_ref() {
+        } else if let Some(column) = self.summary_options.unique.as_ref() {
             display_column_unique(search_results, column)?;
         // Display: column
-        } else if let Some(column) = self.output_options.column.as_ref() {
+        } else if let Some(column) = self.summary_options.column.as_ref() {
             display_column(search_results, column)?;
         // Display: metrics results
         } else {
