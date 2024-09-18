@@ -76,8 +76,8 @@ fn filter_contains(column: &str, value: &str, case_sensitivity: &CaseSensitivity
     col(column).str().contains(lit(regex), false)
 }
 
-// /// Search in a column for a string literal (i.e. not a regex!). The search parameter must be a
-// /// prefix of the column value.
+/// Search in a column for a string literal (i.e. not a regex!). The search parameter must be a
+/// prefix of the column value.
 fn filter_startswith(column: &str, value: &str, case_sensitivity: &CaseSensitivity) -> Expr {
     let regex = match case_sensitivity {
         CaseSensitivity::Insensitive => format!("(?i)^{}", regex::escape(value)),
