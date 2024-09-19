@@ -86,7 +86,7 @@ fn get_search_params(obj: &Bound<'_, PyAny>) -> PyResult<SearchParams> {
                 .map(|id_str| MetricId {
                     id: id_str.to_string(),
                     config: SearchConfig {
-                        match_type: MatchType::Regex,
+                        match_type: MatchType::Startswith,
                         case_sensitivity: CaseSensitivity::Insensitive,
                     },
                 })
