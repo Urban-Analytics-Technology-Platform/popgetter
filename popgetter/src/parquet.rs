@@ -182,6 +182,7 @@ pub fn get_metrics_sql(metrics: &[MetricRequest], geo_ids: Option<&[&str]>) -> R
 
     // If from single URL, no join is required
     if file_urls.len().eq(&1) {
+        // Unwrap: cannot be None since length is 1
         return Ok(queries.into_iter().next().unwrap());
     }
 
@@ -331,11 +332,16 @@ mod tests {
                 geom_file: "".to_string(),
             },
         ];
-        let expected_query = r#"SELECT q0.GEO_ID, q0."1", q0."2", q1."3", q1."4"
+
+        let expected_single_file_query = r#"SELECT "GEO_ID", "1", "2" FROM read_parquet('https://popgetter.blob.core.windows.net/releases/v0.2/gb_nir/metrics/DZ21DT0001.parquet') WHERE "GEO_ID" IN ('N20000001', 'N20000002')"#;
+        let actual_single_file_query = get_metrics_sql(&metric_requests[..2], Some(&geo_ids))?;
+        assert_eq!(actual_single_file_query, expected_single_file_query);
+
+        let expected_multi_file_query = r#"SELECT q0.GEO_ID, q0."1", q0."2", q1."3", q1."4"
 FROM (SELECT "GEO_ID", "1", "2" FROM read_parquet('https://popgetter.blob.core.windows.net/releases/v0.2/gb_nir/metrics/DZ21DT0001.parquet') WHERE "GEO_ID" IN ('N20000001', 'N20000002')) q0
 JOIN (SELECT "GEO_ID", "3", "4" FROM read_parquet('https://popgetter.blob.core.windows.net/releases/v0.2/gb_nir/metrics/DZ21DT0002.parquet') WHERE "GEO_ID" IN ('N20000001', 'N20000002')) q1 USING (GEO_ID)"#;
-        let actual_query = get_metrics_sql(&metric_requests, Some(&geo_ids))?;
-        assert_eq!(actual_query, expected_query);
+        let actual_multi_file_query = get_metrics_sql(&metric_requests, Some(&geo_ids))?;
+        assert_eq!(actual_multi_file_query, expected_multi_file_query);
         Ok(())
     }
 
