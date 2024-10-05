@@ -23,6 +23,7 @@ pub struct CensusTransform {
     rename_column: Option<(String, String)>,
 }
 
+#[enum_dispatch]
 pub trait Transform {
     fn transform(&self, output: DataFrame) -> PolarsResult<DataFrame>;
 }

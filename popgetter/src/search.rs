@@ -6,7 +6,7 @@ use crate::{
     geo::get_geometries,
     metadata::ExpandedMetadata,
     parquet::{get_metrics, MetricRequest},
-    transform::PopgetterTransform,
+    transform::{PopgetterTransform, Transform},
     COL,
 };
 use anyhow::bail;
@@ -661,7 +661,7 @@ impl SearchResults {
             metrics
         };
 
-        Ok(result)
+        Ok(download_params.transform.transform(result)?)
     }
 }
 
