@@ -18,6 +18,7 @@ use popgetter::{
         MetricId, Params, SearchConfig, SearchContext, SearchParams, SearchText, SourceDataRelease,
         SourceDownloadUrl, SourceMetricId, YearRange,
     },
+    transform::{CensusTransform, PopgetterTransform},
     Popgetter,
 };
 use serde::{Deserialize, Serialize};
@@ -126,6 +127,7 @@ impl From<CombinedParamsArgs> for DownloadParams {
                 .map(|bbox| vec![RegionSpec::BoundingBox(bbox)])
                 .unwrap_or_default(),
             include_geoms: !combined_params_args.download_params_args.no_geometry,
+            transform: PopgetterTransform::Census(CensusTransform::default()),
         }
     }
 }

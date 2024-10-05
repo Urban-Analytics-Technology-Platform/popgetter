@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+bon = "2.3.0"
 chrono = { workspace = true, features = ["serde"] }
 dirs = { workspace = true, optional = true }
 enum_dispatch = { workspace = true }

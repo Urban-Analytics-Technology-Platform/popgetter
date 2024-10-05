@@ -25,6 +25,7 @@ pub mod geo;
 pub mod metadata;
 pub mod parquet;
 pub mod search;
+pub mod transform;
 
 /// Type for popgetter metadata, config and API
 #[derive(Debug, PartialEq)]

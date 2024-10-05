@@ -6,18 +6,15 @@ use crate::{
     geo::get_geometries,
     metadata::ExpandedMetadata,
     parquet::{get_metrics, MetricRequest},
+    transform::PopgetterTransform,
     COL,
 };
 use anyhow::bail;
 use chrono::NaiveDate;
-use enum_dispatch::enum_dispatch;
 use log::{debug, error, warn};
 use nonempty::{nonempty, NonEmpty};
+use polars::lazy::dsl::{col, lit, Expr};
 use polars::prelude::{DataFrame, DataFrameJoinOps, IntoLazy, LazyFrame};
-use polars::{
-    error::PolarsResult,
-    lazy::dsl::{col, lit, Expr},
-};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, str::FromStr};
 use tokio::try_join;
@@ -532,6 +529,7 @@ impl From<SearchParams> for Option<Expr> {
 pub struct DownloadParams {
     pub include_geoms: bool,
     pub region_spec: Vec<RegionSpec>,
+    pub transform: PopgetterTransform,
 }
 
 /// This struct combines `SearchParams` and `DownloadParams` into a single type to simplify
@@ -664,39 +662,6 @@ impl SearchResults {
         };
 
         Ok(result)
-    }
-}
-
-#[enum_dispatch(Transform)]
-enum DataType {
-    Category(CategoryTransform),
-    Count(CountTransform),
-}
-
-struct CategoryTransform {
-    include_metadata: bool,
-}
-
-struct CountTransform {
-    rename_column: Option<(String, String)>,
-}
-
-pub trait Transform {
-    fn transform(&self, output: DataFrame) -> PolarsResult<DataFrame>;
-}
-
-impl Transform for CategoryTransform {
-    fn transform(&self, output: DataFrame) -> PolarsResult<DataFrame> {
-        todo!()
-    }
-}
-
-impl Transform for CountTransform {
-    fn transform(&self, mut output: DataFrame) -> PolarsResult<DataFrame> {
-        if let Some((old_name, new_name)) = self.rename_column.as_ref() {
-            output.rename(old_name, new_name)?;
-        }
-        Ok(output)
     }
 }
 

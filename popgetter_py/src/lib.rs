@@ -7,6 +7,7 @@ use ::popgetter::{
         CaseSensitivity, DownloadParams, MatchType, MetricId, Params, SearchConfig, SearchParams,
         SearchText,
     },
+    transform::PopgetterTransform,
     Popgetter, COL,
 };
 use polars::prelude::DataFrame;
@@ -60,6 +61,7 @@ async fn _search_and_download(search_params: SearchParams) -> anyhow::Result<Dat
             download: DownloadParams {
                 include_geoms: true,
                 region_spec: search_params.region_spec,
+                transform: PopgetterTransform::Census(Default::default()),
             },
         })
         .await

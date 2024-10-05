@@ -7,6 +7,7 @@ use crate::search::{
     CaseSensitivity, DownloadParams, GeometryLevel, MatchType, MetricId, Params, SearchConfig,
     SearchContext, SearchParams, SearchText, YearRange,
 };
+use crate::transform::{CensusTransform, PopgetterTransform};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct DataRequestSpec {
@@ -83,6 +84,9 @@ impl TryFrom<DataRequestSpec> for Params {
             download: DownloadParams {
                 include_geoms: value.geometry.unwrap_or_default().include_geoms,
                 region_spec: value.region,
+                transform: PopgetterTransform::Census(
+                    CensusTransform::builder().maybe_rename_column(None).build(),
+                ),
             },
         })
     }
