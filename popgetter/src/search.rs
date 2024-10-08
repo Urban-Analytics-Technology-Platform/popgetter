@@ -529,7 +529,7 @@ impl From<SearchParams> for Option<Expr> {
 pub struct DownloadParams {
     pub include_geoms: bool,
     pub region_spec: Vec<RegionSpec>,
-    pub transform: PopgetterTransform,
+    pub transform: Vec<PopgetterTransform>,
 }
 
 /// This struct combines `SearchParams` and `DownloadParams` into a single type to simplify
@@ -661,7 +661,10 @@ impl SearchResults {
             metrics
         };
 
-        Ok(download_params.transform.transform(result)?)
+        Ok(download_params
+            .transform
+            .iter()
+            .try_fold(result, |result, transform| transform.transform(result))?)
     }
 }
 

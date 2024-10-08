@@ -84,9 +84,9 @@ impl TryFrom<DataRequestSpec> for Params {
             download: DownloadParams {
                 include_geoms: value.geometry.unwrap_or_default().include_geoms,
                 region_spec: value.region,
-                transform: PopgetterTransform::Census(
+                transform: vec![PopgetterTransform::Census(
                     CensusTransform::builder().maybe_rename_column(None).build(),
-                ),
+                )],
             },
         })
     }

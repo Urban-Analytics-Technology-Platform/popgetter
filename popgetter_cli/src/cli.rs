@@ -127,7 +127,7 @@ impl From<CombinedParamsArgs> for DownloadParams {
                 .map(|bbox| vec![RegionSpec::BoundingBox(bbox)])
                 .unwrap_or_default(),
             include_geoms: !combined_params_args.download_params_args.no_geometry,
-            transform: PopgetterTransform::Census(CensusTransform::default()),
+            transform: vec![PopgetterTransform::Census(CensusTransform::default())],
         }
     }
 }

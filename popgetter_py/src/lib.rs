@@ -61,7 +61,7 @@ async fn _search_and_download(search_params: SearchParams) -> anyhow::Result<Dat
             download: DownloadParams {
                 include_geoms: true,
                 region_spec: search_params.region_spec,
-                transform: PopgetterTransform::Census(Default::default()),
+                transform: vec![PopgetterTransform::Census(Default::default())],
             },
         })
         .await
