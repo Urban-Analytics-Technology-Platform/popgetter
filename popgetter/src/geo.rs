@@ -1,6 +1,6 @@
 use crate::COL;
 use anyhow::{Context, Result};
-use flatgeobuf::{geozero, FeatureProperties, HttpFgbReader};
+use flatgeobuf::{FeatureProperties, HttpFgbReader};
 use geozero::ToWkt;
 use polars::{frame::DataFrame, prelude::NamedFrom, series::Series};
 use serde::{Deserialize, Serialize};
