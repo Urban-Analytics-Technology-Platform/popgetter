@@ -1,7 +1,7 @@
 // To run this example execute: cargo run --example vector_store_qdrant --features qdrant
 
 use langchain_rust::{
-    embedding::openai::openai_embedder::OpenAiEmbedder,
+    embedding::{openai::openai_embedder::OpenAiEmbedder, Embedder},
     llm::AzureConfig,
     schemas::Document,
     vectorstore::{
@@ -9,11 +9,24 @@ use langchain_rust::{
         VectorStore,
     },
 };
+use serde_json::Value;
 
-use std::io::Write;
+use std::{collections::HashMap, io::Write};
+
+use anyhow::anyhow;
+
+use popgetter::{Popgetter, COL};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let color_map = HashMap::from([
+        ("Scotland", "red"),
+        ("Belgium", "green"),
+        ("Northern Ireland", "blue"),
+        ("United States", "yellow"),
+        ("England and Wales", "orange"),
+    ]);
+
     // Initialize Embedder
 
     use langchain_rust::vectorstore::VecStoreOptions;
@@ -23,10 +36,14 @@ async fn main() -> anyhow::Result<()> {
         .with_api_key(std::env::var("AZURE_OPEN_AI_KEY")?)
         .with_api_base(endpoint)
         .with_api_version("2023-05-15")
-        // .with_deployment_id("text-embedding-ada-002");
         .with_deployment_id("popgetter");
 
     let embedder = OpenAiEmbedder::new(azure_config);
+
+    // Embedding
+    // let result = embedder.embed_query("Why is the sky blue?").await.unwrap();
+    // println!("{:?}", result);
+    // println!("{:?}", result.len());
 
     // Requires OpenAI API key to be set in the environment variable OPENAI_API_KEY
     // let embedder = OpenAiEmbedder::default();
@@ -39,51 +56,79 @@ async fn main() -> anyhow::Result<()> {
     let store = StoreBuilder::new()
         .embedder(embedder)
         .client(client)
-        .collection_name("langchain-rs")
+        .collection_name("popgetter_1000_400")
         .build()
         .await
         .unwrap();
 
-    // Add documents to the database
-    let doc1 = Document::new(
-        "langchain-rust is a port of the langchain python library to rust and was written in 2024.",
-    );
-    let doc2 = Document::new(
-        "langchaingo is a port of the langchain python library to go language and was written in 2023."
-    );
-    let doc3 = Document::new(
-        "Capital of United States of America (USA) is Washington D.C. and the capital of France is Paris."
-    );
-    let doc4 = Document::new("Capital of France is Paris.");
-    let doc5 = Document::new("The sky is blue because of nitrogen");
-
-    store
-        .add_documents(
-            &vec![doc1, doc2, doc3, doc4, doc5],
-            &VecStoreOptions::default(),
+    let popgetter = Popgetter::new_with_config_and_cache(Default::default()).await?;
+    let combined_metadata = popgetter
+        .metadata
+        .combined_metric_source_geometry()
+        .0
+        .collect()?;
+    let mut v = vec![];
+    for (description, country) in combined_metadata
+        .column(COL::METRIC_HUMAN_READABLE_NAME)?
+        .str()?
+        .into_iter()
+        .zip(
+            combined_metadata
+                .column(COL::COUNTRY_NAME_SHORT_EN)?
+                .str()?
+                .into_iter(),
         )
-        .await
-        .unwrap();
+        .step_by(400)
+        .take(1000)
+    {
+        let s: String = description.ok_or(anyhow!("Not a str"))?.into();
 
-    // Ask for user input
-    // print!("Query> ");
-    // std::io::stdout().flush().unwrap();
-    let mut query = "why is the sky blue?".to_string();
-    // std::io::stdin().read_line(&mut query).unwrap();
-
-    let results = store
-        .similarity_search(&query, 4, &VecStoreOptions::default())
-        .await
-        .unwrap();
-
-    if results.is_empty() {
-        println!("No results found.");
-        return Ok(());
-    } else {
-        results.iter().for_each(|r| {
-            // println!("Document: {:?}", r.page_content);
-            println!("Document: {:?}", r);
-        });
+        // TODO: add method to return HashMap of a row with keys (columns) and values
+        // Could just use the IDs and lookup in polars too.
+        let mut hm: HashMap<String, Value> = HashMap::new();
+        hm.insert(
+            "country".to_owned(),
+            Value::String(country.unwrap().to_string()),
+        );
+        hm.insert(
+            "color".to_owned(),
+            Value::String(color_map.get(country.unwrap()).unwrap().to_string()),
+        );
+        // TODO: add other metadata
+        let doc = Document::new(s).with_metadata(hm);
+        v.push(doc);
     }
-    Ok(())
+
+    // // Add documents to the database
+    // TODO: make this `popgetter llm init`
+    // store
+    //     .add_documents(&v, &VecStoreOptions::default())
+    //     .await
+    //     .unwrap();
+
+    // `popgetter llm query "QUERY"`
+    loop {
+        // Ask for user input
+        print!("Query> ");
+        std::io::stdout().flush().unwrap();
+        let mut query = "".to_string();
+        std::io::stdin().read_line(&mut query).unwrap();
+
+        // TODO: see if we can subset similarity search by metadata values
+        let results = store
+            .similarity_search(&query, 4, &VecStoreOptions::default())
+            .await
+            .unwrap();
+
+        // TODO: Add filtering by metadata values (e.g. country)
+        // https://qdrant.tech/documentation/concepts/hybrid-queries/?q=color#re-ranking-with-payload-values
+        if results.is_empty() {
+            println!("No results found.");
+            return Ok(());
+        } else {
+            results.iter().for_each(|r| {
+                println!("Document: {:#?}", r);
+            });
+        }
+    }
 }
