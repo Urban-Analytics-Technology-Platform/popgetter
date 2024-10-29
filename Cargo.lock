@@ -3442,10 +3442,12 @@ name = "popgetter-llm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
  "itertools 0.13.0",
  "langchain-rust",
  "polars",
  "popgetter",
+ "rand",
  "serde",
  "serde_json",
  "tokio",
