@@ -8,5 +8,6 @@ anyhow.workspace = true
 langchain-rust = { version = "4.6.0", features = ["qdrant", "qdrant-client"] }
 polars.workspace = true
 popgetter = { path = "../popgetter" }
+serde = { workspace = true, features = ["serde_derive"] }
 serde_json.workspace = true
 tokio.workspace = true

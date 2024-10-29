@@ -3445,6 +3445,7 @@ dependencies = [
  "langchain-rust",
  "polars",
  "popgetter",
+ "serde",
  "serde_json",
  "tokio",
 ]
