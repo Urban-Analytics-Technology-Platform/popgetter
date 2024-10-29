@@ -1,4 +1,7 @@
-use langchain_rust::llm::{AzureConfig, OpenAI};
+use langchain_rust::{
+    embedding::openai::OpenAiEmbedder,
+    llm::{AzureConfig, OpenAI},
+};
 
 // TODO: make config
 const GPT4O_ENDPOINT: &str = "https://popgetterllm.openai.azure.com";
@@ -21,11 +24,11 @@ pub fn azure_open_ai_gpt4o(api_key: &str) -> OpenAI<AzureConfig> {
     OpenAI::new(azure_config)
 }
 
-pub fn azure_open_ai_embedding(api_key: &str) -> OpenAI<AzureConfig> {
+pub fn azure_open_ai_embedding(api_key: &str) -> OpenAiEmbedder<AzureConfig> {
     let azure_config = AzureConfig::default()
         .with_api_key(api_key)
         .with_api_base(EMBEDDING_ENDPOINT)
         .with_api_version(EMBEDDING_API_VERSION)
         .with_deployment_id(EMBEDDING_DEPLOYMENT_ID);
-    OpenAI::new(azure_config)
+    OpenAiEmbedder::new(azure_config)
 }

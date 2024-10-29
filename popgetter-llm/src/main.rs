@@ -1,7 +1,7 @@
 // To run this example execute: cargo run --example vector_store_qdrant --features qdrant
 
 use langchain_rust::{
-    embedding::{openai::openai_embedder::OpenAiEmbedder, Embedder},
+    embedding::openai::openai_embedder::OpenAiEmbedder,
     llm::AzureConfig,
     schemas::Document,
     vectorstore::{

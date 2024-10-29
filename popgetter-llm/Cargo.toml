@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow.workspace = true
+itertools.workspace = true
 langchain-rust = { version = "4.6.0", features = ["qdrant", "qdrant-client"] }
 polars.workspace = true
 popgetter = { path = "../popgetter" }
