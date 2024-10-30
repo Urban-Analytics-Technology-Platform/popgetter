@@ -82,3 +82,8 @@ pub async fn query_embeddings(
         .unwrap();
     Ok(results)
 }
+
+#[cfg(test)]
+mod tests {
+    // use super::*;
+}
