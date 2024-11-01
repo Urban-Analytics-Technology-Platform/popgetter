@@ -1,6 +1,8 @@
 mod cli;
 mod display;
 
+use std::io::prelude::*;
+
 use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, RunCommand};
@@ -21,7 +23,16 @@ async fn main() -> Result<()> {
     debug!("config: {config:?}");
 
     if let Some(command) = args.command {
-        command.run(config).await?;
+        // Return ok if pipe is closed instead of error, otherwise return error
+        // See: https://stackoverflow.com/a/65760807, https://github.com/rust-lang/rust/issues/62569
+        if let Err(err) = command.run(config).await {
+            if let Some(err) = err.downcast_ref::<std::io::Error>() {
+                if err.kind() == std::io::ErrorKind::BrokenPipe {
+                    return Ok(());
+                }
+            }
+            Err(err)?;
+        }
     }
     Ok(())
 }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io::Write;
 use std::sync::OnceLock;
 
 use comfy_table::{presets::NOTHING, *};
@@ -192,7 +193,7 @@ pub fn display_search_results(
                 }
             }
         }
-        println!("\n{}", table);
+        writeln!(&mut std::io::stdout().lock(), "{}", table)?;
     }
     Ok(())
 }
