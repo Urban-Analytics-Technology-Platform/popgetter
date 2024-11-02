@@ -9,10 +9,14 @@ use langchain_rust::{
     vectorstore::{qdrant::Store, VecStoreOptions, VectorStore},
 };
 use popgetter::{Popgetter, COL};
-use rand::{rngs::StdRng, seq::IteratorRandom, SeedableRng};
+use rand::{rngs::StdRng, seq::IteratorRandom, Rng, SeedableRng};
 use serde_json::Value;
 
-pub async fn init_embeddings(store: &mut Store) -> anyhow::Result<()> {
+pub async fn init_embeddings(
+    store: &mut Store,
+    sample_n: Option<usize>,
+    seed: Option<u64>,
+) -> anyhow::Result<()> {
     let popgetter = Popgetter::new_with_config_and_cache(Default::default()).await?;
     let combined_metadata = popgetter
         .metadata
@@ -21,23 +25,24 @@ pub async fn init_embeddings(store: &mut Store) -> anyhow::Result<()> {
         .collect()?;
     let mut v = vec![];
 
+    let seed = seed.unwrap_or(StdRng::from_entropy().gen());
+    let sample_n = sample_n.unwrap_or(combined_metadata.shape().0);
     for (description, country, id) in izip!(
         combined_metadata
             .column(COL::METRIC_HUMAN_READABLE_NAME)?
             .str()?
             .into_iter()
-            // TODO: make sample configurable
-            .choose_multiple(&mut StdRng::seed_from_u64(0), 1000),
+            .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n),
         combined_metadata
             .column(COL::COUNTRY_NAME_SHORT_EN)?
             .str()?
             .into_iter()
-            .choose_multiple(&mut StdRng::seed_from_u64(0), 1000),
+            .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n),
         combined_metadata
             .column(COL::METRIC_ID)?
             .str()?
             .into_iter()
-            .choose_multiple(&mut StdRng::seed_from_u64(0), 1000)
+            .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n)
     ) {
         let s: String = description.ok_or(anyhow!("Not a str"))?.into();
 

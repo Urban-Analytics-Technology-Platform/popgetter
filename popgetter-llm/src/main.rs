@@ -19,8 +19,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Init,
+    Init(InitArgs),
     Query(QueryArgs),
+}
+
+#[derive(Args)]
+struct InitArgs {
+    #[arg(long)]
+    sample_n: Option<usize>,
+    #[arg(long)]
+    seed: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, EnumString, PartialEq, Eq)]
@@ -63,9 +71,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let popgetter = Popgetter::new_with_config_and_cache(Default::default()).await?;
 
     match cli.command {
-        Commands::Init => {
+        Commands::Init(init_args) => {
             // Init embeddings
-            init_embeddings(&mut store).await?;
+            init_embeddings(&mut store, init_args.sample_n, init_args.seed).await?;
         }
         Commands::Query(query_args) => {
             match query_args.output_format {
