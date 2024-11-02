@@ -12,6 +12,7 @@ use log::info;
 use popgetter::{Popgetter, COL};
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng, SeedableRng};
 use serde_json::Value;
+use tiktoken_rs::cl100k_base;
 
 pub async fn init_embeddings(
     store: &mut Store,
@@ -66,11 +67,21 @@ pub async fn init_embeddings(
 
     // TODO: add rate limiting
     // Add documents to store
-    let chunk_size = 1000;
+    let chunk_size = 500;
+
+    // Get tokenizer for tokens:
+    // https://platform.openai.com/docs/guides/embeddings/how-can-i-tell-how-many-tokens-a-string-has-before-i-embed-it#how-can-i-tell-how-many-tokens-a-string-has-before-i-embed-it
+    let bpe = cl100k_base().unwrap();
+    let mut total_tokens: usize = 0;
     for (chunk_idx, docs) in v.chunks(chunk_size).enumerate() {
+        total_tokens += docs
+            .iter()
+            .map(|doc| bpe.encode_ordinary(&doc.page_content).len())
+            .sum::<usize>();
         info!(
-            "Chunk idx: {chunk_idx:>5}, documents added: {0:>8}",
-            chunk_size * chunk_idx
+            "Chunk idx: {chunk_idx:>5};\ttotal documents: {0:>8};\ttotal tokens: {1:>12}",
+            chunk_size * chunk_idx,
+            total_tokens
         );
         store
             .add_documents(docs, &VecStoreOptions::default())

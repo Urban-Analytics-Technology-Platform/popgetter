@@ -1313,6 +1313,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fancy-regex"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "531e46835a22af56d1e3b66f04844bed63158bc094a628bec1d321d9b4c44bf2"
+dependencies = [
+ "bit-set",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
 name = "fast-float"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2287,7 +2298,7 @@ dependencies = [
  "strum_macros 0.26.4",
  "text-splitter",
  "thiserror",
- "tiktoken-rs",
+ "tiktoken-rs 0.5.9",
  "tokio",
  "tokio-stream",
  "url",
@@ -3456,6 +3467,7 @@ dependencies = [
  "strum 0.26.2",
  "strum_macros 0.26.4",
  "thiserror",
+ "tiktoken-rs 0.6.0",
  "tokio",
 ]
 
@@ -3552,7 +3564,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn 2.0.66",
@@ -4735,7 +4747,7 @@ dependencies = [
  "regex",
  "strum 0.26.2",
  "thiserror",
- "tiktoken-rs",
+ "tiktoken-rs 0.5.9",
  "unicode-segmentation",
 ]
 
@@ -4768,9 +4780,25 @@ dependencies = [
  "anyhow",
  "base64 0.21.7",
  "bstr",
- "fancy-regex",
+ "fancy-regex 0.12.0",
  "lazy_static",
  "parking_lot",
+ "rustc-hash",
+]
+
+[[package]]
+name = "tiktoken-rs"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44075987ee2486402f0808505dd65692163d243a337fc54363d49afac41087f6"
+dependencies = [
+ "anyhow",
+ "base64 0.21.7",
+ "bstr",
+ "fancy-regex 0.13.0",
+ "lazy_static",
+ "parking_lot",
+ "regex",
  "rustc-hash",
 ]
 

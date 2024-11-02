@@ -20,3 +20,4 @@ log.workspace = true
 indoc = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
+tiktoken-rs = "0.6.0"
