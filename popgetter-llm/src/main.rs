@@ -29,6 +29,8 @@ struct InitArgs {
     sample_n: Option<usize>,
     #[arg(long)]
     seed: Option<u64>,
+    #[arg(long)]
+    skip: Option<usize>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, EnumString, PartialEq, Eq)]
@@ -79,7 +81,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Commands::Init(init_args) => {
             // Init embeddings
-            init_embeddings(&mut store, init_args.sample_n, init_args.seed).await?;
+            init_embeddings(
+                &mut store,
+                init_args.sample_n,
+                init_args.seed,
+                init_args.skip,
+            )
+            .await?;
         }
         Commands::Query(query_args) => {
             match query_args.output_format {

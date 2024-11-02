@@ -18,6 +18,7 @@ pub async fn init_embeddings(
     store: &mut Store,
     sample_n: Option<usize>,
     seed: Option<u64>,
+    skip: Option<usize>,
 ) -> anyhow::Result<()> {
     let popgetter = Popgetter::new_with_config_and_cache(Default::default()).await?;
     let combined_metadata = popgetter
@@ -29,22 +30,29 @@ pub async fn init_embeddings(
 
     let seed = seed.unwrap_or(StdRng::from_entropy().gen());
     let sample_n = sample_n.unwrap_or(combined_metadata.shape().0);
+    let skip = skip.unwrap_or(0);
     for (description, country, id) in izip!(
         combined_metadata
             .column(COL::METRIC_HUMAN_READABLE_NAME)?
             .str()?
             .into_iter()
-            .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n),
+            .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n)
+            .into_iter()
+            .skip(skip),
         combined_metadata
             .column(COL::COUNTRY_NAME_SHORT_EN)?
             .str()?
             .into_iter()
-            .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n),
+            .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n)
+            .into_iter()
+            .skip(skip),
         combined_metadata
             .column(COL::METRIC_ID)?
             .str()?
             .into_iter()
             .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n)
+            .into_iter()
+            .skip(skip)
     ) {
         let s: String = description.ok_or(anyhow!("Not a str"))?.into();
 
@@ -79,8 +87,9 @@ pub async fn init_embeddings(
             .map(|doc| bpe.encode_ordinary(&doc.page_content).len())
             .sum::<usize>();
         info!(
-            "Chunk idx: {chunk_idx:>5};\ttotal documents: {0:>8};\ttotal tokens: {1:>12}",
+            "Chunk idx: {chunk_idx:>5};\ttotal documents: {0:>8} (inc. skipped: {1:>8});\ttotal tokens: {2:>12}",
             chunk_size * chunk_idx,
+            chunk_size * chunk_idx + skip,
             total_tokens
         );
         store
