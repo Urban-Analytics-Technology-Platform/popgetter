@@ -50,6 +50,12 @@ struct QueryArgs {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Set RUST_LOG to `DEFAULT_LOGGING_LEVEL` if not set
+    const DEFAULT_LOGGING_LEVEL: &str = "info";
+    let _ =
+        std::env::var("RUST_LOG").map_err(|_| std::env::set_var("RUST_LOG", DEFAULT_LOGGING_LEVEL));
+    pretty_env_logger::init_timed();
+
     let cli = Cli::parse();
 
     // Initialize Embedder
