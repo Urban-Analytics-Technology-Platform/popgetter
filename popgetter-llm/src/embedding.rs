@@ -3,16 +3,39 @@
 use std::collections::HashMap;
 
 use anyhow::anyhow;
-use itertools::izip;
+use itertools::{izip, Itertools};
 use langchain_rust::{
     schemas::Document,
     vectorstore::{qdrant::Store, VecStoreOptions, VectorStore},
 };
 use log::info;
 use popgetter::{Popgetter, COL};
-use rand::{rngs::StdRng, seq::IteratorRandom, Rng, SeedableRng};
+use rand::{
+    rngs::StdRng,
+    seq::{IteratorRandom, SliceRandom},
+    Rng, SeedableRng,
+};
 use serde_json::Value;
 use tiktoken_rs::cl100k_base;
+
+// Since `.choose_multiple` docs indicates that it does not provide a random sample, this fn
+// includes an intermediate vec that is shuffled.
+// TODO: explore if can be implemented as a `shuffled()` method through extension trait
+fn shuffled_sample_of_size_n_with_skip<T, I: Iterator<Item = T>>(
+    iter: I,
+    seed: u64,
+    sample_n: usize,
+    skip: usize,
+) -> Vec<T> {
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut v = iter
+        .into_iter()
+        .choose_multiple(&mut rng, sample_n)
+        .into_iter()
+        .collect_vec();
+    v.shuffle(&mut rng);
+    v.into_iter().skip(skip).collect()
+}
 
 pub async fn init_embeddings(
     store: &mut Store,
@@ -31,29 +54,33 @@ pub async fn init_embeddings(
     let seed = seed.unwrap_or(StdRng::from_entropy().gen());
     let sample_n = sample_n.unwrap_or(combined_metadata.shape().0);
     let skip = skip.unwrap_or(0);
-    for (description, country, id) in izip!(
+
+    // Get shuffled samples
+    let human_readable_names = shuffled_sample_of_size_n_with_skip(
         combined_metadata
             .column(COL::METRIC_HUMAN_READABLE_NAME)?
             .str()?
-            .into_iter()
-            .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n)
-            .into_iter()
-            .skip(skip),
+            .into_iter(),
+        seed,
+        sample_n,
+        skip,
+    );
+    let countries = shuffled_sample_of_size_n_with_skip(
         combined_metadata
             .column(COL::COUNTRY_NAME_SHORT_EN)?
             .str()?
-            .into_iter()
-            .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n)
-            .into_iter()
-            .skip(skip),
-        combined_metadata
-            .column(COL::METRIC_ID)?
-            .str()?
-            .into_iter()
-            .choose_multiple(&mut StdRng::seed_from_u64(seed), sample_n)
-            .into_iter()
-            .skip(skip)
-    ) {
+            .into_iter(),
+        seed,
+        sample_n,
+        skip,
+    );
+    let metric_ids = shuffled_sample_of_size_n_with_skip(
+        combined_metadata.column(COL::METRIC_ID)?.str()?.into_iter(),
+        seed,
+        sample_n,
+        skip,
+    );
+    for (description, country, id) in izip!(human_readable_names, countries, metric_ids) {
         let s: String = description.ok_or(anyhow!("Not a str"))?.into();
 
         // TODO: add method to return HashMap of a row with keys (columns) and values
