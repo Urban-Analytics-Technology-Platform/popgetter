@@ -1,12 +1,10 @@
 use std::collections::HashMap;
+use std::io::Write;
 use std::sync::OnceLock;
 
 use comfy_table::{presets::NOTHING, *};
 use itertools::izip;
-use polars::{
-    frame::{DataFrame, UniqueKeepStrategy},
-    prelude::SortMultipleOptions,
-};
+use polars::{frame::DataFrame, prelude::SortMultipleOptions};
 use popgetter::{metadata::ExpandedMetadata, search::SearchResults, COL};
 
 static LOOKUP: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
@@ -108,8 +106,8 @@ pub fn display_countries(countries: DataFrame, max_results: Option<usize>) -> an
             country_iso3116_2.unwrap_or_default(),
         ]);
     }
-    println!("\n{}", table);
-    Ok(())
+
+    Ok(writeln!(&mut std::io::stdout(), "\n{}", table)?)
 }
 
 pub fn display_search_results(
@@ -192,7 +190,7 @@ pub fn display_search_results(
                 }
             }
         }
-        println!("\n{}", table);
+        writeln!(&mut std::io::stdout(), "{}", table)?;
     }
     Ok(())
 }
@@ -227,40 +225,29 @@ pub fn display_summary(results: SearchResults) -> anyhow::Result<()> {
     let column = table.column_mut(1).unwrap();
     column.set_cell_alignment(CellAlignment::Right);
 
-    println!("\n{}", table);
-    Ok(())
+    Ok(writeln!(&mut std::io::stdout(), "\n{}", table)?)
 }
 
 /// Display a given column from the search results
 pub fn display_column(search_results: SearchResults, column: &str) -> anyhow::Result<()> {
-    search_results
+    Ok(search_results
         .0
-        .select([column])?
+        .column(column)?
+        .rechunk()
         .iter()
-        .for_each(|series| {
-            series
-                .rechunk()
-                .iter()
-                .map(|el| el.get_str().map(|s| s.to_string()).unwrap())
-                .for_each(|el| println!("{el}"))
-        });
-    Ok(())
+        .map(|el| el.get_str().map(|s| s.to_string()).unwrap())
+        .try_for_each(|el| writeln!(&mut std::io::stdout(), "{el}"))?)
 }
 
 /// Display the unique values of a given column from the search results
 pub fn display_column_unique(search_results: SearchResults, column: &str) -> anyhow::Result<()> {
-    search_results
+    Ok(search_results
         .0
-        .select([column])?
-        .unique(None, UniqueKeepStrategy::Any, None)?
+        .column(column)?
+        .unique()?
         .iter()
-        .for_each(|series| {
-            series
-                .iter()
-                .map(|el| el.get_str().map(|s| s.to_string()).unwrap())
-                .for_each(|el| println!("{el}"))
-        });
-    Ok(())
+        .map(|el| el.get_str().map(|s| s.to_string()).unwrap())
+        .try_for_each(|el| writeln!(&mut std::io::stdout(), "{el}"))?)
 }
 
 /// Display the columns of the expanded metadata that can be used for displaying metrics results
@@ -271,7 +258,5 @@ pub fn display_metdata_columns(expanded_metadata: &ExpandedMetadata) -> anyhow::
         .collect()?
         .get_column_names()
         .into_iter()
-        .collect::<Vec<_>>()
-        .into_iter()
-        .for_each(|val| println!("{val}")))
+        .try_for_each(|el| writeln!(&mut std::io::stdout(), "{el}"))?)
 }
