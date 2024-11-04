@@ -1,8 +1,6 @@
 mod cli;
 mod display;
 
-use std::io::prelude::*;
-
 use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, RunCommand};
