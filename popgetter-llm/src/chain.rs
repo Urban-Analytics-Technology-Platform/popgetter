@@ -162,16 +162,22 @@ pub async fn generate_recipe(
             ```json
             [
                 {
-                "MetricId": "f29c1976"
+                    "MetricId": {
+                    "id": "f29c1976"
+                    }
                 },
                 {
-                "MetricId": "079f3ba3"
+                    "MetricId": {
+                    "id": "079f3ba3"
+                    }
                 },
                 {
-                "MetricId": "81cae95d"
+                    "MetricId": {
+                    "id": "81cae95d"
+                    }
                 },
                 {
-                "MetricText": "Key: uniqueID, Value: B01001_001;"
+                    "MetricText": "Key: uniqueID, Value: B01001_001;"
                 }
             ]
             ```
