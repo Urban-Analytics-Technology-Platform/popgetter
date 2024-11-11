@@ -3,6 +3,7 @@ use langchain_rust::{
     llm::{AzureConfig, OpenAI},
     vectorstore::qdrant::{Qdrant, Store, StoreBuilder},
 };
+use polars::prelude::*;
 
 use crate::error::PopgetterLLMResult;
 
@@ -52,4 +53,12 @@ pub async fn get_store() -> PopgetterLLMResult<Store> {
         .collection_name("popgetter")
         .build()
         .await?)
+}
+
+pub fn serialize_to_json(dataframe: &mut DataFrame) -> anyhow::Result<String> {
+    let mut buffer = Vec::<u8>::new();
+    JsonWriter::new(&mut buffer)
+        .with_json_format(JsonFormat::Json)
+        .finish(dataframe)?;
+    Ok(String::from_utf8(buffer.to_owned())?)
 }

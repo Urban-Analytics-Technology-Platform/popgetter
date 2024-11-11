@@ -23,6 +23,91 @@ use crate::{
     utils::{api_key, azure_open_ai_gpt4o},
 };
 
+pub const SYSTEM_PROMPT_1: &str = indoc! {r#"
+    You are a very accomplished geographer and can interpret Rust data types.
+
+    Convert the following set of metrics into a `Vec<MetricSpec>`. The `MetricSpec` is a Rust type:
+    ```
+    #[derive(Clone, Serialize, Deserialize, Debug)]
+    pub enum MetricSpec {
+        MetricId(MetricId),
+        MetricText(String),
+        DataProduct(String),
+    }
+    ```
+
+    Your output should always be in JSON format with the following as an example of a JSON
+    version of a `DataRequestSpec`:
+    ```json
+    [
+        {
+            "MetricId": {
+                "id": "f29c1976"
+            }
+        },
+        {
+            "MetricId": {
+                "id": "079f3ba3"
+            }
+        },
+        {
+            "MetricId": {
+                "id": "81cae95d"
+            }
+        },
+        {
+            "MetricText": "Key: uniqueID, Value: B01001_001;"
+        }
+    ]
+    ```
+    Ignore all references to location and instead populate the metrics specified only.
+
+    Only return the JSON string without any code backticks.
+"#};
+
+// TODO: refine system prompt for JSON rows of the dataframe
+pub const SYSTEM_PROMPT_2: &str = indoc! {r#"
+    You are a very accomplished geographer and can interpret Rust data types.
+
+    Convert the following set of metrics into a `Vec<MetricSpec>`. The `MetricSpec` is a Rust type:
+    ```
+    #[derive(Clone, Serialize, Deserialize, Debug)]
+    pub enum MetricSpec {
+        MetricId(MetricId),
+        MetricText(String),
+        DataProduct(String),
+    }
+    ```
+
+    Your output should always be in JSON format with the following as an example of a JSON
+    version of a `DataRequestSpec`:
+    ```json
+    [
+        {
+            "MetricId": {
+                "id": "f29c1976"
+            }
+        },
+        {
+            "MetricId": {
+                "id": "079f3ba3"
+            }
+        },
+        {
+            "MetricId": {
+                "id": "81cae95d"
+            }
+        },
+        {
+            "MetricText": "Key: uniqueID, Value: B01001_001;"
+        }
+    ]
+    ```
+    Ignore all references to location and instead populate the metrics specified only.
+
+    Only return the JSON string without any code backticks.
+"#};
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GeographicEntity {
     pub place: String,
@@ -84,13 +169,13 @@ pub async fn extract_geographic_entities(
     Ok(result)
 }
 
-pub async fn generate_recipe(
+pub async fn initial_propmpt_to_results_prompt(
     prompt: &str,
     store: &Store,
     popgetter: &Popgetter,
     limit: usize,
     use_metric_ids: bool,
-) -> PopgetterLLMResult<DataRequestSpec> {
+) -> PopgetterLLMResult<String> {
     // Step 1: generate the BBoxes
     // TODO: update this to get the exact BBox
     // let _geographic_entities = extract_geographic_entities(prompt).await?;
@@ -141,52 +226,19 @@ pub async fn generate_recipe(
         .join("\n\n");
 
     info!("{}", results);
+    Ok(format!("Top metric results:\n {results}"))
+}
 
+pub async fn generate_recipe_from_results(
+    prompt: &str,
+    system_prompt: &str,
+) -> PopgetterLLMResult<DataRequestSpec> {
     // Step 3: With a new prompt with data request spec and top metrics, send query
     let open_ai = azure_open_ai_gpt4o(&api_key()?);
 
     // We can also guide it's response with a prompt template. Prompt templates are used to convert raw user input to a better input to the LLM.
     let system_prompt = message_formatter![
-        fmt_message!(Message::new_system_message(indoc! {r#"
-            You are a very accomplished geographer and can interpret Rust data types.
-
-            Convert the following set of metrics into a `Vec<MetricSpec>`. The `MetricSpec` is a Rust type:
-            ```
-            #[derive(Clone, Serialize, Deserialize, Debug)]
-            pub enum MetricSpec {
-                MetricId(MetricId),
-                MetricText(String),
-                DataProduct(String),
-            }
-            ```
-
-            Your output should always be in JSON format with the following as an example of a JSON
-            version of a `DataRequestSpec`:
-            ```json
-            [
-                {
-                    "MetricId": {
-                        "id": "f29c1976"
-                    }
-                },
-                {
-                    "MetricId": {
-                        "id": "079f3ba3"
-                    }
-                },
-                {
-                    "MetricId": {
-                        "id": "81cae95d"
-                    }
-                },
-                {
-                    "MetricText": "Key: uniqueID, Value: B01001_001;"
-                }
-            ]
-            ```
-            Ignore all references to location and instead populate the metrics specified only.
-
-            Only return the JSON string without any code backticks."#})),
+        fmt_message!(Message::new_system_message(system_prompt)),
         fmt_template!(HumanMessagePromptTemplate::new(template_fstring!(
             "{input}", "input"
         )))
@@ -201,10 +253,10 @@ pub async fn generate_recipe(
     // We can now invoke it and ask the same question. It still won't know the answer, but it should
     // respond in a more proper tone for a technical writer!
     // let combined_query_and_metrics = format!("Query: {prompt}\n\nTop metric results: {results}");
-    let combined_query_and_metrics = format!("Top metric results: {results}");
+    // let combined_query_and_metrics = format!("{results}");
     let raw_result = chain
         .invoke(prompt_args! {
-            "input" => combined_query_and_metrics
+            "input" => prompt
         })
         .await?;
 
@@ -227,6 +279,19 @@ pub async fn generate_recipe(
         metrics: result,
         years: None,
     })
+}
+
+pub async fn generate_recipe(
+    prompt: &str,
+    system_prompt: &str,
+    store: &Store,
+    popgetter: &Popgetter,
+    limit: usize,
+    use_metric_ids: bool,
+) -> PopgetterLLMResult<DataRequestSpec> {
+    let results_prompt =
+        initial_propmpt_to_results_prompt(prompt, store, popgetter, limit, use_metric_ids).await?;
+    generate_recipe_from_results(&results_prompt, system_prompt).await
 }
 
 #[cfg(test)]
@@ -280,7 +345,7 @@ mod tests {
             .await
             .unwrap();
         let store = get_store().await.unwrap();
-        let result = generate_recipe(prompt, &store, &popgetter, 10, false)
+        let result = generate_recipe(prompt, SYSTEM_PROMPT_1, &store, &popgetter, 10, false)
             .await
             .unwrap();
         println!("{:?}", result);
@@ -298,7 +363,7 @@ mod tests {
         let store = get_store().await.unwrap();
 
         // TODO: to ensure only one geometry, currently limit to 1 result
-        let result = generate_recipe(prompt, &store, &popgetter, 1, true)
+        let result = generate_recipe(prompt, SYSTEM_PROMPT_1, &store, &popgetter, 1, true)
             .await
             .unwrap();
         println!("{:?}", result);

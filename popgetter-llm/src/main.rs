@@ -8,9 +8,9 @@ use popgetter::{
 };
 use popgetter_cli::{cli::SearchParamsArgs, display::display_search_results};
 use popgetter_llm::{
-    chain::generate_recipe,
+    chain::{generate_recipe, generate_recipe_from_results, SYSTEM_PROMPT_1, SYSTEM_PROMPT_2},
     embedding::{init_embeddings, query_embeddings},
-    utils::{api_key, azure_open_ai_embedding},
+    utils::{api_key, azure_open_ai_embedding, serialize_to_json},
 };
 
 use qdrant_client::qdrant::{Condition, Filter};
@@ -46,6 +46,7 @@ struct InitArgs {
 enum OutputFormat {
     SearchResults,
     DataRequestSpec,
+    SearchResultsToRecipe,
 }
 
 #[derive(Args)]
@@ -155,9 +156,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         display_search_results(SearchResults(results), None, false).unwrap();
                     }
                 }
+                OutputFormat::SearchResultsToRecipe => {
+                    // TODO: see if we can subset similarity search by metadata values
+                    let results =
+                        query_embeddings(&query_args.query, query_args.limit, &store).await?;
+
+                    let ids = Series::new(
+                        COL::METRIC_ID,
+                        results
+                            .iter()
+                            .map(|doc| {
+                                doc.metadata
+                                    .get(COL::METRIC_ID)
+                                    .unwrap()
+                                    .as_str()
+                                    .unwrap()
+                                    .to_string()
+                            })
+                            .collect_vec(),
+                    );
+
+                    // Filter afterwards with `COL::METRIC_ID`
+                    let mut results = popgetter
+                        .search(&search_params)
+                        .0
+                        .lazy()
+                        .filter(col(COL::METRIC_ID).is_in(lit(ids)))
+                        .collect()
+                        .unwrap();
+
+                    if results.shape().0.eq(&0) {
+                        println!("No results found.");
+                        return Ok(());
+                    } else {
+                        display_search_results(SearchResults(results.clone()), None, false)
+                            .unwrap();
+                    }
+
+                    // Generate full metdata as results, now pass this to the recipe generator
+                    let results_json = serialize_to_json(&mut results).unwrap();
+
+                    let data_request_spec =
+                        generate_recipe_from_results(&results_json, SYSTEM_PROMPT_2).await?;
+                    println!("Recipe:\n{:#?}", data_request_spec);
+                }
                 OutputFormat::DataRequestSpec => {
                     let data_request_spec = generate_recipe(
                         &query_args.query,
+                        SYSTEM_PROMPT_1,
                         &store,
                         &popgetter,
                         query_args.limit,
