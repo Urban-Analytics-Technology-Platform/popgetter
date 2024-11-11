@@ -3468,6 +3468,7 @@ dependencies = [
  "log",
  "polars",
  "popgetter",
+ "popgetter_cli",
  "pretty_env_logger",
  "qdrant-client",
  "rand",

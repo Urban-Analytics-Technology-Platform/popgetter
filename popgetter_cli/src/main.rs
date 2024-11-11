@@ -1,5 +1,5 @@
-mod cli;
-mod display;
+use popgetter_cli::cli;
+use popgetter_cli::display;
 
 use anyhow::Result;
 use clap::Parser;

@@ -69,6 +69,7 @@ where
 
 /// Trait that defines what to run when a given subcommand is invoked.
 #[enum_dispatch]
+
 pub trait RunCommand {
     async fn run(&self, config: Config) -> Result<()>;
 }
@@ -283,7 +284,7 @@ impl From<CaseSensitivityArgs> for CaseSensitivity {
 /// These are the command-line arguments that can be parsed into a SearchParams. The type is
 /// slightly different because of the way we allow people to search in text fields.
 #[derive(Args, Debug, Clone)]
-struct SearchParamsArgs {
+pub struct SearchParamsArgs {
     // Note: using `std::vec::Vec` rather than just `Vec`, to enforce that multiple year ranges are
     // passed in a single argument e.g. `-y 2014...2016,2018...2019` rather than multiple arguments
     // e.g. `-y 2014...2016 -y 2018...2019`. See https://github.com/clap-rs/clap/issues/4626 and

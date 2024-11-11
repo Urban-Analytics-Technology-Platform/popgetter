@@ -11,6 +11,7 @@ langchain-rust = { workspace = true, features = ["qdrant", "qdrant-client"] }
 pretty_env_logger.workspace = true
 polars.workspace = true
 popgetter = { path = "../popgetter" }
+popgetter_cli = { path = "../popgetter_cli" }
 rand = { workspace = true }
 serde = { workspace = true, features = ["serde_derive"] }
 serde_json.workspace = true

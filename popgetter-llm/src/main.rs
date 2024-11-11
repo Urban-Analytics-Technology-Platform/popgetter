@@ -1,11 +1,18 @@
 use clap::{Args, Parser, Subcommand};
+use itertools::Itertools;
 use langchain_rust::vectorstore::qdrant::{Qdrant, StoreBuilder};
-use popgetter::Popgetter;
+use polars::prelude::*;
+use popgetter::{
+    search::{SearchParams, SearchResults},
+    Popgetter, COL,
+};
+use popgetter_cli::{cli::SearchParamsArgs, display::display_search_results};
 use popgetter_llm::{
     chain::generate_recipe,
     embedding::{init_embeddings, query_embeddings},
     utils::{api_key, azure_open_ai_embedding},
 };
+
 use qdrant_client::qdrant::{Condition, Filter};
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
@@ -45,10 +52,10 @@ enum OutputFormat {
 struct QueryArgs {
     #[arg(index = 1)]
     query: String,
-    #[arg(short = 'c', long, help = "Subset query to a given country")]
-    country: Option<String>,
     #[arg(long, help = "Number of results to be returned")]
     limit: usize,
+    #[command(flatten)]
+    search_params_args: SearchParamsArgs,
     #[arg(long, help = "Output format: 'SearchResults' or 'DataRequestSpec'")]
     output_format: OutputFormat,
 }
@@ -92,15 +99,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await?;
         }
         Commands::Query(query_args) => {
+            let search_params: SearchParams = query_args.search_params_args.into();
             // Init store
             let mut store_builder = StoreBuilder::new()
                 .embedder(embedder)
                 .client(client)
                 .collection_name("popgetter");
 
+            // Filtering by metadata values (e.g. country)
+            // https://qdrant.tech/documentation/concepts/hybrid-queries/?q=color#re-ranking-with-payload-values
             // Add country as search filter if given
-            if let Some(country) = query_args.country {
-                let search_filter = Filter::must([Condition::matches("metadata.country", country)]);
+            if let Some(country) = search_params.country.as_ref() {
+                let search_filter = Filter::must([Condition::matches(
+                    "metadata.country",
+                    country.value.to_string(),
+                )]);
                 store_builder = store_builder.search_filter(search_filter);
             }
             let store = store_builder.build().await?;
@@ -111,15 +124,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let results =
                         query_embeddings(&query_args.query, query_args.limit, &store).await?;
 
-                    // TODO: Add filtering by metadata values (e.g. country)
-                    // https://qdrant.tech/documentation/concepts/hybrid-queries/?q=color#re-ranking-with-payload-values
-                    if results.is_empty() {
+                    let ids = Series::new(
+                        COL::METRIC_ID,
+                        results
+                            .iter()
+                            .map(|doc| {
+                                doc.metadata
+                                    .get(COL::METRIC_ID)
+                                    .unwrap()
+                                    .as_str()
+                                    .unwrap()
+                                    .to_string()
+                            })
+                            .collect_vec(),
+                    );
+
+                    // Filter afterwards with `COL::METRIC_ID`
+                    let results = popgetter
+                        .search(&search_params)
+                        .0
+                        .lazy()
+                        .filter(col(COL::METRIC_ID).is_in(lit(ids)))
+                        .collect()
+                        .unwrap();
+
+                    if results.shape().0.eq(&0) {
                         println!("No results found.");
                         return Ok(());
                     } else {
-                        results.iter().for_each(|r| {
-                            println!("Document: {:#?}", r);
-                        });
+                        display_search_results(SearchResults(results), None, false).unwrap();
                     }
                 }
                 OutputFormat::DataRequestSpec => {
