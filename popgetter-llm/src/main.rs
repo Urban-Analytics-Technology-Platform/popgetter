@@ -6,6 +6,7 @@ use popgetter_llm::{
     embedding::{init_embeddings, query_embeddings},
     utils::{api_key, azure_open_ai_embedding},
 };
+use qdrant_client::qdrant::{Condition, Filter};
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
 
@@ -44,9 +45,11 @@ enum OutputFormat {
 struct QueryArgs {
     #[arg(index = 1)]
     query: String,
-    #[arg(long)]
+    #[arg(short = 'c', long, help = "Subset query to a given country")]
+    country: Option<String>,
+    #[arg(long, help = "Number of results to be returned")]
     limit: usize,
-    #[arg(long)]
+    #[arg(long, help = "Output format: 'SearchResults' or 'DataRequestSpec'")]
     output_format: OutputFormat,
 }
 
@@ -68,18 +71,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // docker run -p 6334:6334 qdrant/qdrant
     let client = Qdrant::from_url("http://localhost:6334").build().unwrap();
 
-    // Init store
-    let mut store = StoreBuilder::new()
-        .embedder(embedder)
-        .client(client)
-        .collection_name("popgetter")
-        .build()
-        .await?;
-
     let popgetter = Popgetter::new_with_config_and_cache(Default::default()).await?;
 
     match cli.command {
         Commands::Init(init_args) => {
+            // Init store
+            let mut store = StoreBuilder::new()
+                .embedder(embedder)
+                .client(client)
+                .collection_name("popgetter")
+                .build()
+                .await?;
             // Init embeddings
             init_embeddings(
                 &mut store,
@@ -90,6 +92,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await?;
         }
         Commands::Query(query_args) => {
+            // Init store
+            let mut store_builder = StoreBuilder::new()
+                .embedder(embedder)
+                .client(client)
+                .collection_name("popgetter");
+
+            // Add country as search filter if given
+            if let Some(country) = query_args.country {
+                let search_filter = Filter::must([Condition::matches("metadata.country", country)]);
+                store_builder = store_builder.search_filter(search_filter);
+            }
+            let store = store_builder.build().await?;
+
             match query_args.output_format {
                 OutputFormat::SearchResults => {
                     // TODO: see if we can subset similarity search by metadata values

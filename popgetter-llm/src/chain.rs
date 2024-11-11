@@ -9,6 +9,7 @@ use langchain_rust::{
     template_fstring,
     vectorstore::qdrant::Store,
 };
+use log::info;
 use polars::prelude::*;
 use popgetter::{
     data_request_spec::{DataRequestSpec, GeometrySpec, MetricSpec},
@@ -139,6 +140,8 @@ pub async fn generate_recipe(
         .collect_vec()
         .join("\n\n");
 
+    info!("{}", results);
+
     // Step 3: With a new prompt with data request spec and top metrics, send query
     let open_ai = azure_open_ai_gpt4o(&api_key()?);
 
@@ -163,17 +166,17 @@ pub async fn generate_recipe(
             [
                 {
                     "MetricId": {
-                    "id": "f29c1976"
+                        "id": "f29c1976"
                     }
                 },
                 {
                     "MetricId": {
-                    "id": "079f3ba3"
+                        "id": "079f3ba3"
                     }
                 },
                 {
                     "MetricId": {
-                    "id": "81cae95d"
+                        "id": "81cae95d"
                     }
                 },
                 {

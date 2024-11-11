@@ -15,7 +15,7 @@ use rand::{
     seq::{IteratorRandom, SliceRandom},
     Rng, SeedableRng,
 };
-use serde_json::Value;
+use serde_json::{json, Value};
 use tiktoken_rs::cl100k_base;
 
 // Since `.choose_multiple` docs indicates that it does not provide a random sample, this fn
