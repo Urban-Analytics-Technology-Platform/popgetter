@@ -125,6 +125,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let results =
                         query_embeddings(&query_args.query, query_args.limit, &store).await?;
 
+                    log::info!("Results: {:#?}", results);
+
                     let ids = Series::new(
                         COL::METRIC_ID,
                         results
@@ -211,7 +213,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         false,
                     )
                     .await?;
-                    println!("Recipe:\n{:#?}", data_request_spec);
+                    log::info!("Deserialized recipe:");
+                    log::info!("{:#?}", data_request_spec);
+
+                    // log::info!("Downloading data request...");
                 }
             }
         }

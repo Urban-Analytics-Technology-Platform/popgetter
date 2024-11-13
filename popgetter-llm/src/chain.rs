@@ -263,7 +263,8 @@ pub async fn generate_recipe_from_results(
     // Once can generate a data request spec, deserialize to type
     // let result: DataRequestSpec = serde_json::from_str(&raw_result)?;
     // Ok(raw_result)
-    log::debug!("{raw_result}");
+    log::info!("Returned JSON:");
+    log::info!("{raw_result}");
 
     let result: Vec<MetricSpec> = serde_json::from_str(&raw_result)?;
 
