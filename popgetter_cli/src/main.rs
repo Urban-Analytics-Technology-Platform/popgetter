@@ -1,16 +1,17 @@
-use popgetter_cli::cli;
-use popgetter_cli::display;
+mod cli;
+mod display;
+mod error;
 
-use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, RunCommand};
+use error::{PopgetterCliError, PopgetterCliResult};
 use log::debug;
 use popgetter::config::Config;
 
 const DEFAULT_LOGGING_LEVEL: &str = "warn";
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> PopgetterCliResult<()> {
     // Set RUST_LOG to `DEFAULT_LOGGING_LEVEL` if not set
     let _ =
         std::env::var("RUST_LOG").map_err(|_| std::env::set_var("RUST_LOG", DEFAULT_LOGGING_LEVEL));
@@ -24,7 +25,7 @@ async fn main() -> Result<()> {
         // Return ok if pipe is closed instead of error, otherwise return error
         // See: https://stackoverflow.com/a/65760807, https://github.com/rust-lang/rust/issues/62569
         if let Err(err) = command.run(config).await {
-            if let Some(err) = err.downcast_ref::<std::io::Error>() {
+            if let PopgetterCliError::IOError(err) = &err {
                 if err.kind() == std::io::ErrorKind::BrokenPipe {
                     return Ok(());
                 }

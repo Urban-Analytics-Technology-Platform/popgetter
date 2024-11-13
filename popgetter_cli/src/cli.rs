@@ -1,11 +1,16 @@
-// FromStr is required by EnumString. The compiler seems to not be able to
-// see that and so is giving a warning. Dont remove it
-use anyhow::Result;
+use std::{fs::File, path::Path};
+use std::{io, process};
+
+use anyhow::Context;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
+use itertools::Itertools;
+use langchain_rust::vectorstore::qdrant::{Qdrant, StoreBuilder};
 use log::{debug, info};
 use nonempty::nonempty;
-use polars::frame::DataFrame;
+use polars::prelude::*;
+use polars::{frame::DataFrame, series::Series};
+use popgetter::search::SearchResults;
 use popgetter::{
     config::Config,
     data_request_spec::{DataRequestSpec, RegionSpec},
@@ -18,18 +23,24 @@ use popgetter::{
         MetricId, Params, SearchConfig, SearchContext, SearchParams, SearchText, SourceDataRelease,
         SourceDownloadUrl, SourceMetricId, YearRange,
     },
-    Popgetter,
+    Popgetter, COL,
 };
+use popgetter_llm::{
+    chain::{generate_recipe, generate_recipe_from_results, SYSTEM_PROMPT_1, SYSTEM_PROMPT_2},
+    embedding::{init_embeddings, query_embeddings},
+    utils::{api_key, azure_open_ai_embedding, serialize_to_json},
+};
+use qdrant_client::qdrant::{Condition, Filter};
 use serde::{Deserialize, Serialize};
 use spinners::{Spinner, Spinners};
-use std::{fs::File, path::Path};
-use std::{io, process};
 use strum_macros::EnumString;
 
+use crate::display::display_search_results;
 use crate::display::{
     display_column, display_column_unique, display_countries, display_metdata_columns,
-    display_search_results, display_summary,
+    display_summary,
 };
+use crate::error::PopgetterCliResult;
 
 const DEFAULT_PROGRESS_SPINNER: Spinners = Spinners::Dots;
 const COMPLETE_PROGRESS_STRING: &str = "✔";
@@ -52,13 +63,13 @@ fn write_output<T, U>(
     output_generator: T,
     mut data: DataFrame,
     output_file: Option<U>,
-) -> anyhow::Result<()>
+) -> PopgetterCliResult<()>
 where
     T: OutputGenerator,
     U: AsRef<Path>,
 {
     if let Some(output_file) = output_file {
-        let mut f = File::create(output_file)?;
+        let mut f = File::create(output_file).context("Failed to write output")?;
         output_generator.save(&mut f, &mut data)?;
     } else {
         let mut stdout_lock = std::io::stdout().lock();
@@ -69,9 +80,8 @@ where
 
 /// Trait that defines what to run when a given subcommand is invoked.
 #[enum_dispatch]
-
 pub trait RunCommand {
-    async fn run(&self, config: Config) -> Result<()>;
+    async fn run(&self, config: Config) -> PopgetterCliResult<()>;
 }
 
 /// The `data` command downloads and outputs metrics for a given region in a given format.
@@ -150,7 +160,7 @@ impl From<OutputFormat> for OutputFormatter {
 }
 
 impl RunCommand for DataCommand {
-    async fn run(&self, config: Config) -> Result<()> {
+    async fn run(&self, config: Config) -> PopgetterCliResult<()> {
         info!("Running `data` subcommand");
         let sp = (!self.quiet).then(|| {
             Spinner::with_timer(
@@ -371,14 +381,210 @@ pub struct SearchParamsArgs {
     case_sensitivity: CaseSensitivityArgs,
 }
 
+/// LLM
+#[derive(Subcommand)]
+#[enum_dispatch]
+enum LLMCommands {
+    Init(InitArgs),
+    Query(QueryArgs),
+}
+
+#[derive(Args)]
+struct InitArgs {
+    #[arg(long)]
+    sample_n: Option<usize>,
+    #[arg(long)]
+    seed: Option<u64>,
+    #[arg(long)]
+    skip: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, EnumString, PartialEq, Eq)]
+#[strum(ascii_case_insensitive)]
+enum LLMOutputFormat {
+    SearchResults,
+    DataRequestSpec,
+    SearchResultsToRecipe,
+}
+
+impl RunCommand for InitArgs {
+    async fn run(&self, _config: Config) -> PopgetterCliResult<()> {
+        // Initialize Embedder
+        let embedder = azure_open_ai_embedding(&api_key()?);
+
+        // Initialize the qdrant_client::Qdrant
+        // Ensure Qdrant is running at localhost, with gRPC port at 6334
+        // docker run -p 6334:6334 qdrant/qdrant
+        let client = Qdrant::from_url("http://localhost:6334").build().unwrap();
+
+        // Init store
+        let mut store = StoreBuilder::new()
+            .embedder(embedder)
+            .client(client)
+            .collection_name("popgetter")
+            .build()
+            .await
+            // TODO: fix unwrap
+            .unwrap();
+
+        // Init embeddings
+        init_embeddings(&mut store, self.sample_n, self.seed, self.skip).await?;
+
+        Ok(())
+    }
+}
+
+impl RunCommand for QueryArgs {
+    async fn run(&self, config: Config) -> PopgetterCliResult<()> {
+        // Initialize Embedder
+        let embedder = azure_open_ai_embedding(&api_key()?);
+
+        // Initialize the qdrant_client::Qdrant
+        // Ensure Qdrant is running at localhost, with gRPC port at 6334
+        // docker run -p 6334:6334 qdrant/qdrant
+        let client = Qdrant::from_url("http://localhost:6334").build().unwrap();
+        let popgetter = Popgetter::new_with_config_and_cache(config).await?;
+        let search_params: SearchParams = self.search_params_args.clone().into();
+        // Init store
+        let mut store_builder = StoreBuilder::new()
+            .embedder(embedder)
+            .client(client)
+            .collection_name("popgetter");
+
+        // Filtering by metadata values (e.g. country)
+        // https://qdrant.tech/documentation/concepts/hybrid-queries/?q=color#re-ranking-with-payload-values
+        // Add country as search filter if given
+        if let Some(country) = search_params.country.as_ref() {
+            let search_filter = Filter::must([Condition::matches(
+                "metadata.country",
+                country.value.to_string(),
+            )]);
+            store_builder = store_builder.search_filter(search_filter);
+        }
+        // TODO: fix unwrap
+        let store = store_builder.build().await.unwrap();
+
+        match self.output_format {
+            LLMOutputFormat::SearchResults => {
+                // TODO: see if we can subset similarity search by metadata values
+                let results = query_embeddings(&self.query, self.limit, &store).await?;
+
+                log::info!("Results: {:#?}", results);
+
+                let ids = Series::new(
+                    COL::METRIC_ID,
+                    results
+                        .iter()
+                        .map(|doc| {
+                            doc.metadata
+                                .get(COL::METRIC_ID)
+                                .unwrap()
+                                .as_str()
+                                .unwrap()
+                                .to_string()
+                        })
+                        .collect_vec(),
+                );
+
+                // Filter afterwards with `COL::METRIC_ID`
+                let results = popgetter
+                    .search(&search_params)
+                    .0
+                    .lazy()
+                    .filter(col(COL::METRIC_ID).is_in(lit(ids)))
+                    .collect()
+                    .unwrap();
+
+                if results.shape().0.eq(&0) {
+                    println!("No results found.");
+                    return Ok(());
+                } else {
+                    display_search_results(SearchResults(results), None, false).unwrap();
+                }
+            }
+            LLMOutputFormat::SearchResultsToRecipe => {
+                // TODO: see if we can subset similarity search by metadata values
+                let results = query_embeddings(&self.query, self.limit, &store).await?;
+
+                let ids = Series::new(
+                    COL::METRIC_ID,
+                    results
+                        .iter()
+                        .map(|doc| {
+                            doc.metadata
+                                .get(COL::METRIC_ID)
+                                .unwrap()
+                                .as_str()
+                                .unwrap()
+                                .to_string()
+                        })
+                        .collect_vec(),
+                );
+
+                // Filter afterwards with `COL::METRIC_ID`
+                let mut results = popgetter
+                    .search(&search_params)
+                    .0
+                    .lazy()
+                    .filter(col(COL::METRIC_ID).is_in(lit(ids)))
+                    .collect()
+                    .unwrap();
+
+                if results.shape().0.eq(&0) {
+                    println!("No results found.");
+                    return Ok(());
+                } else {
+                    display_search_results(SearchResults(results.clone()), None, false).unwrap();
+                }
+
+                // Generate full metdata as results, now pass this to the recipe generator
+                let results_json = serialize_to_json(&mut results).unwrap();
+
+                let data_request_spec =
+                    generate_recipe_from_results(&results_json, SYSTEM_PROMPT_2).await?;
+                println!("Recipe:\n{:#?}", data_request_spec);
+            }
+            LLMOutputFormat::DataRequestSpec => {
+                let data_request_spec = generate_recipe(
+                    &self.query,
+                    SYSTEM_PROMPT_1,
+                    &store,
+                    &popgetter,
+                    self.limit,
+                    // TODO: uses human readable name to generate metric text, update to config
+                    false,
+                )
+                .await?;
+                log::info!("Deserialized recipe:");
+                log::info!("{:#?}", data_request_spec);
+
+                // log::info!("Downloading data request...");
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Args)]
+struct QueryArgs {
+    #[arg(index = 1)]
+    query: String,
+    #[arg(long, help = "Number of results to be returned")]
+    limit: usize,
+    #[command(flatten)]
+    search_params_args: SearchParamsArgs,
+    #[arg(long, help = "Output format: 'SearchResults' or 'DataRequestSpec'")]
+    output_format: LLMOutputFormat,
+}
+
 /// Expected behaviour:
 /// N.. -> After(N); ..N -> Before(N); M..N -> Between(M, N); N -> Between(N, N)
 /// Year ranges can be comma-separated
-fn parse_year_range(value: &str) -> Result<Vec<YearRange>, anyhow::Error> {
+fn parse_year_range(value: &str) -> anyhow::Result<Vec<YearRange>> {
     value
         .split(',')
         .map(|range| range.parse())
-        .collect::<Result<Vec<YearRange>, anyhow::Error>>()
+        .collect::<anyhow::Result<Vec<YearRange>>>()
 }
 
 // A simple function to manage similaries across multiple cases.
@@ -514,7 +720,7 @@ impl From<SearchParamsArgs> for SearchParams {
 }
 
 impl RunCommand for MetricsCommand {
-    async fn run(&self, config: Config) -> Result<()> {
+    async fn run(&self, config: Config) -> PopgetterCliResult<()> {
         info!("Running `metrics` subcommand");
         debug!("{:#?}", self);
 
@@ -588,7 +794,7 @@ pub struct CountriesCommand {
 }
 
 impl RunCommand for CountriesCommand {
-    async fn run(&self, config: Config) -> Result<()> {
+    async fn run(&self, config: Config) -> PopgetterCliResult<()> {
         info!("Running `countries` subcommand");
         let sp = (!self.quiet).then(|| {
             let spinner_message = "Downloading countries";
@@ -613,7 +819,7 @@ impl RunCommand for CountriesCommand {
 pub struct SurveysCommand;
 
 impl RunCommand for SurveysCommand {
-    async fn run(&self, _config: Config) -> Result<()> {
+    async fn run(&self, _config: Config) -> PopgetterCliResult<()> {
         info!("Running `surveys` subcommand");
         unimplemented!("The `Surveys` subcommand is not implemented for the current release");
     }
@@ -633,9 +839,12 @@ pub struct RecipeCommand {
 }
 
 impl RunCommand for RecipeCommand {
-    async fn run(&self, config: Config) -> Result<()> {
+    async fn run(&self, config: Config) -> PopgetterCliResult<()> {
         let popgetter = Popgetter::new_with_config(config).await?;
-        let recipe = std::fs::read_to_string(&self.recipe_file)?;
+        let recipe = std::fs::read_to_string(&self.recipe_file).context(format!(
+            "Failed to read recipe from file: {}",
+            self.recipe_file
+        ))?;
         let data_request: DataRequestSpec = serde_json::from_str(&recipe)?;
         let params: Params = data_request.try_into()?;
         let search_results = popgetter.search(&params.search);

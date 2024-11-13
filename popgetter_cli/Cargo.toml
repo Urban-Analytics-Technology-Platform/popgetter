@@ -16,7 +16,17 @@ enum_dispatch = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 nonempty = { workspace = true, features = ["serialize"] }
-polars = { workspace = true, features = ["lazy", "is_in", "http", "streaming", "parquet", "polars-io", "regex", "strings", "rows"] }
+polars = { workspace = true, features = [
+    "lazy",
+    "is_in",
+    "http",
+    "streaming",
+    "parquet",
+    "polars-io",
+    "regex",
+    "strings",
+    "rows",
+] }
 popgetter = { path = "../popgetter" }
 pretty_env_logger = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -26,6 +36,11 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 toml = { workspace = true }
+tiktoken-rs = { workspace = true }
+qdrant-client = { workspace = true }
+popgetter-llm = { version = "0.1.0", path = "../popgetter-llm" }
+langchain-rust = { workspace = true, features = ["qdrant", "qdrant-client"] }
+thiserror.workspace = true
 
 [dev-dependencies]
 tempfile = { workspace = true }
