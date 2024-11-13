@@ -386,7 +386,7 @@ pub struct SearchParamsArgs {
 #[enum_dispatch]
 enum LLMCommands {
     Init(InitArgs),
-    Query(QueryArgs),
+    Query(Box<QueryArgs>),
 }
 
 #[derive(Args)]
