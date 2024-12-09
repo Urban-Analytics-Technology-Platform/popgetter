@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
     pretty_env_logger::init_timed();
     let args = Cli::parse();
     debug!("args: {args:?}");
-    let config: Config = read_config_from_toml();
+    let config: Config = read_config_from_toml(args.dev);
     debug!("config: {config:?}");
 
     if let Some(command) = args.command {
@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn read_config_from_toml() -> Config {
+fn read_config_from_toml(dev: bool) -> Config {
     // macOS: ~/Library/Application Support/popgetter/config.toml
     let file_path = dirs::config_dir()
         .unwrap()
@@ -45,7 +45,10 @@ fn read_config_from_toml() -> Config {
         Ok(contents) => toml::from_str(&contents).expect("Invalid TOML in config file"),
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {
-                Config::default()
+                match dev {
+                    false => Config::default(),
+                    true => Config::dev(),
+                }
             } else {
                 panic!("Error reading config file: {:#?}", e);
             }

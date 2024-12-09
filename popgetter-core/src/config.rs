@@ -15,3 +15,11 @@ impl Default for Config {
         }
     }
 }
+
+impl Config {
+    pub fn dev() -> Config {
+        Config {
+            base_path: "https://popgetter.blob.core.windows.net/dev/v0.2".into(),
+        }
+    }
+}

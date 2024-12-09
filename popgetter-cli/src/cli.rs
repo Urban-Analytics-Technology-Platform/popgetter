@@ -673,7 +673,7 @@ pub struct Cli {
         help = indoc!{"Activate developer mode"},
         global = true
     )]
-    dev: bool,
+    pub dev: bool,
 }
 
 /// Commands contains the list of subcommands avaliable for use in the CLI.
