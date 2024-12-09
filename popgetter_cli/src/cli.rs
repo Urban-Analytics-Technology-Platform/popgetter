@@ -2,7 +2,7 @@ use std::{fs::File, path::Path};
 use std::{io, process};
 
 use anyhow::Context;
-use clap::{Args, Parser, Subcommand};
+use clap::{command, Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 use itertools::Itertools;
 use langchain_rust::vectorstore::qdrant::{Qdrant, StoreBuilder};
@@ -382,15 +382,23 @@ pub struct SearchParamsArgs {
 }
 
 /// LLM
-#[derive(Subcommand)]
-#[enum_dispatch]
-enum LLMCommands {
+#[derive(Subcommand, Debug)]
+pub enum LLMCommands {
     Init(InitArgs),
     Query(Box<QueryArgs>),
 }
 
-#[derive(Args)]
-struct InitArgs {
+impl RunCommand for LLMCommands {
+    async fn run(&self, config: Config) -> PopgetterCliResult<()> {
+        match self {
+            LLMCommands::Init(init) => init.run(config).await,
+            LLMCommands::Query(query) => query.run(config).await,
+        }
+    }
+}
+
+#[derive(Args, Debug)]
+pub struct InitArgs {
     #[arg(long)]
     sample_n: Option<usize>,
     #[arg(long)]
@@ -565,8 +573,8 @@ impl RunCommand for QueryArgs {
     }
 }
 
-#[derive(Args)]
-struct QueryArgs {
+#[derive(Args, Debug)]
+pub struct QueryArgs {
     #[arg(index = 1)]
     query: String,
     #[arg(long, help = "Number of results to be returned")]
@@ -892,6 +900,10 @@ pub enum Commands {
     Surveys(SurveysCommand),
     /// From recipe
     Recipe(RecipeCommand),
+    /// From LLM
+    #[command(subcommand)]
+    #[allow(clippy::upper_case_acronyms)]
+    LLM(LLMCommands),
 }
 
 #[cfg(test)]
