@@ -3,6 +3,7 @@
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
+use indoc::indoc;
 use log::{debug, info};
 use nonempty::nonempty;
 use polars::frame::DataFrame;
@@ -98,6 +99,8 @@ pub struct DataCommand {
     force_run: bool,
     #[arg(from_global)]
     quiet: bool,
+    #[arg(from_global)]
+    dev: bool,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -222,6 +225,8 @@ pub struct MetricsCommand {
     metrics_results_options: MetricsResultsOptions,
     #[arg(from_global)]
     quiet: bool,
+    #[arg(from_global)]
+    dev: bool,
 }
 
 #[derive(Debug, Args)]
@@ -663,6 +668,12 @@ pub struct Cli {
         global = true
     )]
     quiet: bool,
+    #[arg(
+        long = "dev",
+        help = indoc!{"Activate developer mode"},
+        global = true
+    )]
+    dev: bool,
 }
 
 /// Commands contains the list of subcommands avaliable for use in the CLI.
