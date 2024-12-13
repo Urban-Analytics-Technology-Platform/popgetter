@@ -221,7 +221,7 @@ jobs:
       - name: Publish to TestPyPI
         uses: PyO3/maturin-action@v1
         env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+          MATURIN_PYPI_TOKEN: ${{ secrets.TESTPYPI_API_TOKEN }}
         with:
           command: upload
-          args: --non-interactive --skip-existing wheels-*/* --repository-url https://test.pypi.org/legacy/
+          args: --non-interactive --skip-existing --repository-url="https://test.pypi.org/legacy" wheels-*/*
