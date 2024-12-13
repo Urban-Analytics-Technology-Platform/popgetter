@@ -211,23 +211,17 @@ jobs:
 
   publish_test:
     name: Release
+    runs-on: ubuntu-latest
     # TODO: add re-enable manylinux once earlier step is fixed
     # needs: [linux, musllinux, windows, macos, sdist]
     needs: [linux, windows, macos, sdist]
     environment: testpypi
-    permissions:
-      id-token: write
-    runs-on: ubuntu-latest
-
     steps:
       - uses: actions/download-artifact@v4
+      - name: Publish to TestPyPI
+        uses: PyO3/maturin-action@v1
+        env:
+          MATURIN_PYPI_TOKEN: ${{ secrets.TESTPYPI_API_TOKEN }}
         with:
-          name: artifact
-          path: dist
-
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          # Only skip existing distributions on testpypi (not on pypi).
-          # See https://github.com/pypa/gh-action-pypi-publish?tab=readme-ov-file#tolerating-release-package-file-duplicates
-          skip-existing: true
+          command: upload
+          args: --non-interactive --skip-existing --repository-url="https://test.pypi.org/legacy" wheels-*/*
