@@ -1,0 +1,15 @@
+popgetter
+polars
+pandas
+tobler
+ipykernel
+ipython
+geopandas
+matplotlib
+libpysal
+contextily
+cenpy
+pyarrow
+h3
+mapclassify
+watermark
