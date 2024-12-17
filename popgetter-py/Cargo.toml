@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 anyhow = { workspace = true }
 polars = { workspace = true, features = ["lazy", "is_in", "http", "streaming", "parquet", "polars-io", "regex", "strings", "rows"] }
-popgetter = { path = "../popgetter" }
+popgetter-core = { path = "../popgetter-core" }
 pyo3 = { workspace = true, features = ["anyhow", "experimental-async"] }
 pyo3-polars ={ workspace = true }
 serde = { workspace = true }
