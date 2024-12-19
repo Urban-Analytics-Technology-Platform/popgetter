@@ -1,6 +1,6 @@
 use std::default::Default;
 
-use ::popgetter::{
+use ::popgetter_core::{
     config::Config,
     data_request_spec::DataRequestSpec,
     search::{

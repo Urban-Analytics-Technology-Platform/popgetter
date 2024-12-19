@@ -6,7 +6,7 @@ use enum_dispatch::enum_dispatch;
 use log::{debug, info};
 use nonempty::nonempty;
 use polars::frame::DataFrame;
-use popgetter::{
+use popgetter_core::{
     config::Config,
     data_request_spec::{DataRequestSpec, RegionSpec},
     formatters::{

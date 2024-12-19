@@ -1,9 +1,5 @@
 [workspace]
-members = [
-    "popgetter",
-    "popgetter_cli",
-    "popgetter_py"
-]
+members = ["popgetter-core", "popgetter-cli", "popgetter-py"]
 
 resolver = "2"
 
