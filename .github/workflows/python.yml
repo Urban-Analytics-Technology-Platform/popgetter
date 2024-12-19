@@ -209,7 +209,6 @@ jobs:
   release:
     name: Release to PyPI
     runs-on: ubuntu-latest
-    # TODO Re-enable after first successful run 
     if: "startsWith(github.ref, 'refs/tags/')"
     # TODO: add re-enable manylinux once earlier step is fixed
     # needs: [linux, musllinux, windows, macos, sdist]
