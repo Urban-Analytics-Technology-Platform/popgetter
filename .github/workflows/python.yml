@@ -77,6 +77,8 @@ jobs:
           path: dist
 
   # TODO: fix CI to run with manylinux: musllinux_1_2
+  # -- TESTING MANYLINUX CONFIGURATION --
+
   # musllinux:
   #   runs-on: ${{ matrix.platform.runner }}
   #   strategy:
@@ -106,12 +108,25 @@ jobs:
   #             # See example: https://github.com/PyO3/maturin-action/discussions/162#discussioncomment-7978369
   #             sudo apt-get update
   #             sudo apt-get install -y pkg-config libssl-dev
+  #             # For debug purposes:
+  #             sudo apt show libssl-dev
+  #             sudo apt-get install -y apt-file
+  #             sudo apt-file update
+  #             sudo apt-file list libssl-dev
+  #             uname -a
+  #             # Build is failing on 
+  #             # error: failed to run custom build command for `openssl-sys v0.9.102`
+  #         docker-options: >
+  #           --env OPENSSL_INCLUDE_DIR=/usr/include/openssl
+  #           --env PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu
   #         manylinux: musllinux_1_2
   #     - name: Upload wheels
   #       uses: actions/upload-artifact@v4
   #       with:
   #         name: wheels-musllinux-${{ matrix.platform.target }}
   #         path: dist
+
+  # -- END OF MANYLINUX CONFIGURATION --
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
@@ -191,18 +206,37 @@ jobs:
           name: wheels-sdist
           path: dist
 
-  # TODO: uncomment for release to PyPI
-  # release:
-  #   name: Release
-  #   runs-on: ubuntu-latest
-  #   if: "startsWith(github.ref, 'refs/tags/')"
-  #   needs: [linux, musllinux, windows, macos, sdist]
-  #   steps:
-  #     - uses: actions/download-artifact@v4
-  #     - name: Publish to PyPI
-  #       uses: PyO3/maturin-action@v1
-  #       env:
-  #         MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-  #       with:
-  #         command: upload
-  #         args: --non-interactive --skip-existing wheels-*/*
+  release:
+    name: Release to PyPI
+    runs-on: ubuntu-latest
+    if: "startsWith(github.ref, 'refs/tags/')"
+    # TODO: add re-enable manylinux once earlier step is fixed
+    # needs: [linux, musllinux, windows, macos, sdist]
+    needs: [linux, windows, macos, sdist]
+    environment: release
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Publish to PyPI
+        uses: PyO3/maturin-action@v1
+        env:
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        with:
+          command: upload
+          args: --non-interactive --skip-existing wheels-*/*
+
+  publish_test:
+    name: Release to TestPyPI
+    runs-on: ubuntu-latest
+    # TODO: add re-enable manylinux once earlier step is fixed
+    # needs: [linux, musllinux, windows, macos, sdist]
+    needs: [linux, windows, macos, sdist]
+    environment: testpypi
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Publish to TestPyPI
+        uses: PyO3/maturin-action@v1
+        env:
+          MATURIN_PYPI_TOKEN: ${{ secrets.TESTPYPI_API_TOKEN }}
+        with:
+          command: upload
+          args: --non-interactive --skip-existing --repository-url="https://test.pypi.org/legacy" wheels-*/*
