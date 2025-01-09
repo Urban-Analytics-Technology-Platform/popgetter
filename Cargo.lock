@@ -2827,7 +2827,32 @@ dependencies = [
 ]
 
 [[package]]
-name = "popgetter"
+name = "popgetter-cli"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "comfy-table",
+ "dirs",
+ "enum_dispatch",
+ "itertools 0.13.0",
+ "log",
+ "nonempty",
+ "polars",
+ "popgetter-core",
+ "pretty_env_logger",
+ "serde",
+ "serde_json",
+ "spinners",
+ "strum 0.26.2",
+ "strum_macros 0.26.4",
+ "tempfile",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "popgetter-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2856,37 +2881,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "popgetter_cli"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "clap",
- "comfy-table",
- "dirs",
- "enum_dispatch",
- "itertools 0.13.0",
- "log",
- "nonempty",
- "polars",
- "popgetter",
- "pretty_env_logger",
- "serde",
- "serde_json",
- "spinners",
- "strum 0.26.2",
- "strum_macros 0.26.4",
- "tempfile",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "popgetter_py"
+name = "popgetter-py"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "polars",
- "popgetter",
+ "popgetter-core",
  "pyo3",
  "pyo3-polars",
  "serde",
