@@ -2,6 +2,9 @@
 name = "popgetter-cli"
 version = "0.2.0"
 edition = "2021"
+license = "MIT"
+description = "CLI for popgetter"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
 name = "popgetter"
@@ -17,7 +20,7 @@ itertools = { workspace = true }
 log = { workspace = true }
 nonempty = { workspace = true, features = ["serialize"] }
 polars = { workspace = true, features = ["lazy", "is_in", "http", "streaming", "parquet", "polars-io", "regex", "strings", "rows"] }
-popgetter-core = { path = "../popgetter-core" }
+popgetter-core = { path = "../popgetter-core", version = "0.2.0" }
 pretty_env_logger = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
