@@ -8,8 +8,6 @@ on:
   push:
     branches:
       - main
-      # Temporarily add the `add-release-plz` branch to test the release-plz PR workflow
-      - add-release-plz
 
 jobs:
   release-plz-release:
