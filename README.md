@@ -7,20 +7,54 @@ Library and associated command-line application for exploring and fetching [popg
 - Install [Rust](https://www.rust-lang.org/tools/install)
 - Install CLI:
   ```shell
-  cargo install --git https://github.com/Urban-Analytics-Technology-Platform/popgetter-cli.git
+  cargo install popgetter-cli
   ```
 - Run the CLI with e.g.:
   ```shell
   popgetter --help
   ```
 
-### Popgetter version compatibility
+## About the data
 
-Each version of `popgetter-cli` is tied to one specific version of `popgetter` to ensure consistency of data _types_.
+The data used by `popgetter` is collated into a format ready for use, by a tool called [`poppusher`](https://github.com/Urban-Analytics-Technology-Platform/poppusher). See that tool for details about which data is available.
+
+## Popgetter and Poppusher version compatibility
+
+Each version of `popgetter-core` is tied to one specific version of `poppusher` to ensure consistency of data _types_. Changes to `popgetter-core` may require changes to downstream [dependents](https://crates.io/crates/popgetter-core/reverse_dependencies).
 (Note that updates to the actual data and metadata themselves do not lead to a version bump.)
 
-| popgetter | popgetter-cli |
-| --------- | ------------- |
-| 0.1.0     |               |
-| 0.2.0     | 0.2.0         |
-| ...       | ...           |
+| poppusher | popgetter-core | popgetter-cli | popgetter-py |
+| --------- | -------------- | ------------- | ------------ |
+| 0.1.0     | N/A            | N/A           | N/A          |
+| 0.2.0     | 0.2.0          | 0.2.0         | 0.2.0        |
+| 0.2.0     | 0.2.1          | 0.2.1         | 0.2.1        |
+| ...       | ...            |               |              |
+
+
+## Developer guide
+
+### Editable install from source
+
+- Install [Rust](https://www.rust-lang.org/tools/install)
+- Clone the repo:
+  ```shell
+  git clone git@github.com:Urban-Analytics-Technology-Platform/popgetter.git
+  cd popgetter
+  ```
+- Build:
+  ```shell
+  cargo build
+  ```
+  and in release mode:
+  ```shell
+  cargo build --release
+  ```
+- Run the CLI with e.g.:
+  ```shell
+  cargo run --bin popgetter -- --help
+  ```
+
+
+### Release process
+
+The release process in managed by the [`release-plz`](https://release-plz.dev/docs/github) GitHub Action ([workflow](.github/workflows/python.yml)).
