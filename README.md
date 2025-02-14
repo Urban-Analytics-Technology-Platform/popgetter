@@ -58,3 +58,5 @@ Each version of `popgetter-core` is tied to one specific version of `poppusher` 
 ### Release process
 
 The release process in managed by the [`release-plz`](https://release-plz.dev/docs/github) GitHub Action ([workflow](.github/workflows/python.yml)).
+
+Note: the `popgetter-py` module is deployed to [PyPI](https://pypi.org/project/popgetter-py/) at the earilest opportunity (eg when a PR is created which bumps the version number). However it is not deployed to [crates.io](https://crates.io/crates/popgetter-py) until that PR is merged to `main`.
