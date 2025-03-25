@@ -4,13 +4,9 @@ use std::{io, process};
 use anyhow::Context;
 use clap::{command, Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
-use itertools::Itertools;
-use langchain_rust::vectorstore::qdrant::{Qdrant, StoreBuilder};
 use log::{debug, info};
 use nonempty::nonempty;
-use polars::prelude::*;
-use polars::{frame::DataFrame, series::Series};
-use popgetter::search::SearchResults;
+use polars::frame::DataFrame;
 use popgetter::{
     config::Config,
     data_request_spec::{DataRequestSpec, RegionSpec},
@@ -23,17 +19,28 @@ use popgetter::{
         MetricId, Params, SearchConfig, SearchContext, SearchParams, SearchText, SourceDataRelease,
         SourceDownloadUrl, SourceMetricId, YearRange,
     },
-    Popgetter, COL,
+    Popgetter,
 };
-use popgetter_llm::{
-    chain::{generate_recipe, generate_recipe_from_results, SYSTEM_PROMPT_1, SYSTEM_PROMPT_2},
-    embedding::{init_embeddings, query_embeddings},
-    utils::{api_key, azure_open_ai_embedding, serialize_to_json},
-};
-use qdrant_client::qdrant::{Condition, Filter};
 use serde::{Deserialize, Serialize};
 use spinners::{Spinner, Spinners};
 use strum_macros::EnumString;
+
+#[cfg(feature = "llm")]
+mod llm_imports {
+    pub use itertools::Itertools;
+    pub use langchain_rust::vectorstore::qdrant::{Qdrant, StoreBuilder};
+    pub use polars::prelude::*;
+    pub use polars::series::Series;
+    pub use popgetter::{search::SearchResults, COL};
+    pub use popgetter_llm::{
+        chain::{generate_recipe, generate_recipe_from_results, SYSTEM_PROMPT_1, SYSTEM_PROMPT_2},
+        embedding::{init_embeddings, query_embeddings},
+        utils::{api_key, azure_open_ai_embedding, serialize_to_json},
+    };
+    pub use qdrant_client::qdrant::{Condition, Filter};
+}
+#[cfg(feature = "llm")]
+use llm_imports::*;
 
 use crate::display::display_search_results;
 use crate::display::{
@@ -382,12 +389,14 @@ pub struct SearchParamsArgs {
 }
 
 /// LLM
+#[cfg(feature = "llm")]
 #[derive(Subcommand, Debug)]
 pub enum LLMCommands {
     Init(InitArgs),
     Query(Box<QueryArgs>),
 }
 
+#[cfg(feature = "llm")]
 impl RunCommand for LLMCommands {
     async fn run(&self, config: Config) -> PopgetterCliResult<()> {
         match self {
@@ -415,6 +424,7 @@ enum LLMOutputFormat {
     SearchResultsToRecipe,
 }
 
+#[cfg(feature = "llm")]
 impl RunCommand for InitArgs {
     async fn run(&self, _config: Config) -> PopgetterCliResult<()> {
         // Initialize Embedder
@@ -442,6 +452,7 @@ impl RunCommand for InitArgs {
     }
 }
 
+#[cfg(feature = "llm")]
 impl RunCommand for QueryArgs {
     async fn run(&self, config: Config) -> PopgetterCliResult<()> {
         // Initialize Embedder
@@ -901,6 +912,7 @@ pub enum Commands {
     /// From recipe
     Recipe(RecipeCommand),
     /// From LLM
+    #[cfg(feature = "llm")]
     #[command(subcommand)]
     #[allow(clippy::upper_case_acronyms)]
     LLM(LLMCommands),

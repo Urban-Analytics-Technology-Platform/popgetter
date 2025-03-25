@@ -1,6 +1,8 @@
+#[cfg(feature = "llm")]
 use langchain_rust::chain::ChainError;
 use polars::error::PolarsError;
 use popgetter::error::PopgetterError;
+#[cfg(feature = "llm")]
 use popgetter_llm::error::PopgetterLLMError;
 
 #[derive(thiserror::Error, Debug)]
@@ -10,6 +12,7 @@ pub enum PopgetterCliError {
     Generic(#[from] Box<dyn std::error::Error>),
     #[error("Anyhow error")]
     Anyhow(#[from] anyhow::Error),
+    #[cfg(feature = "llm")]
     #[error("Chain error")]
     ChainError(#[from] ChainError),
     #[error("serde JSON error")]
@@ -18,6 +21,7 @@ pub enum PopgetterCliError {
     PolarsError(#[from] PolarsError),
     #[error("popgetter error")]
     PopgetterError(#[from] PopgetterError),
+    #[cfg(feature = "llm")]
     #[error("popgetter error")]
     PopgetterLLMError(#[from] PopgetterLLMError),
     #[error("std IO error")]

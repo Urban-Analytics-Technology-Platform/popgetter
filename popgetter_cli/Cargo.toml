@@ -2,6 +2,7 @@
 name = "popgetter_cli"
 version = "0.2.0"
 edition = "2021"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
 name = "popgetter"
@@ -36,11 +37,24 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 toml = { workspace = true }
-tiktoken-rs = { workspace = true }
-qdrant-client = { workspace = true }
-popgetter-llm = { version = "0.1.0", path = "../popgetter-llm" }
-langchain-rust = { workspace = true, features = ["qdrant", "qdrant-client"] }
+tiktoken-rs = { workspace = true, optional = true }
+qdrant-client = { workspace = true, optional = true }
+popgetter-llm = { version = "0.1.0", path = "../popgetter-llm", optional = true }
+langchain-rust = { workspace = true, features = [
+    "qdrant",
+    "qdrant-client",
+], optional = true }
 thiserror.workspace = true
 
 [dev-dependencies]
 tempfile = { workspace = true }
+
+
+[features]
+default = ["llm"]
+llm = [
+    "dep:popgetter-llm",
+    "dep:langchain-rust",
+    "dep:tiktoken-rs",
+    "dep:qdrant-client",
+]
