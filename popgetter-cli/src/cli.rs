@@ -99,8 +99,6 @@ pub struct DataCommand {
     force_run: bool,
     #[arg(from_global)]
     quiet: bool,
-    #[arg(from_global)]
-    dev: bool,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -225,8 +223,6 @@ pub struct MetricsCommand {
     metrics_results_options: MetricsResultsOptions,
     #[arg(from_global)]
     quiet: bool,
-    #[arg(from_global)]
-    dev: bool,
 }
 
 #[derive(Debug, Args)]
@@ -628,10 +624,8 @@ impl RunCommand for SurveysCommand {
 pub struct RecipeCommand {
     #[arg(index = 1)]
     recipe_file: String,
-
     #[arg(short = 'f', long)]
     output_format: OutputFormat,
-
     #[arg(short = 'o', long)]
     output_file: Option<String>,
 }
@@ -674,6 +668,15 @@ pub struct Cli {
         global = true
     )]
     pub dev: bool,
+    #[arg(
+        long,
+        help = indoc!{
+            "Override config with a specified base path. Default config base path is:
+            https://popgetter.blob.core.windows.net/releases/v0.2"
+        },
+        global = true
+    )]
+    pub base_path: Option<String>,
 }
 
 /// Commands contains the list of subcommands avaliable for use in the CLI.
