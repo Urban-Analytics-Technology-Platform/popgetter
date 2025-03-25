@@ -1,7 +1,9 @@
 [package]
-name = "popgetter_py"
-version = "0.1.0"
+name = "popgetter-py"
+version = "0.2.1"
 edition = "2021"
+license = "MIT"
+description = "Python bindings for popgetter"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -11,7 +13,7 @@ crate-type = ["cdylib"]
 [dependencies]
 anyhow = { workspace = true }
 polars = { workspace = true, features = ["lazy", "is_in", "http", "streaming", "parquet", "polars-io", "regex", "strings", "rows"] }
-popgetter = { path = "../popgetter" }
+popgetter-core = { path = "../popgetter-core", version = "0.2.0"}
 pyo3 = { workspace = true, features = ["anyhow", "experimental-async"] }
 pyo3-polars ={ workspace = true }
 serde = { workspace = true }

@@ -6,7 +6,7 @@ use clap::Parser;
 use cli::{Cli, RunCommand};
 use error::{PopgetterCliError, PopgetterCliResult};
 use log::debug;
-use popgetter::config::Config;
+use popgetter_core::config::Config;
 
 const DEFAULT_LOGGING_LEVEL: &str = "warn";
 

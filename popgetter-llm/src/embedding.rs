@@ -9,7 +9,7 @@ use langchain_rust::{
     vectorstore::{qdrant::Store, VecStoreOptions, VectorStore},
 };
 use log::info;
-use popgetter::{Popgetter, COL};
+use popgetter_core::{Popgetter, COL};
 use rand::{
     rngs::StdRng,
     seq::{IteratorRandom, SliceRandom},

@@ -5,7 +5,7 @@ use std::sync::OnceLock;
 use comfy_table::{presets::NOTHING, *};
 use itertools::izip;
 use polars::{frame::DataFrame, prelude::SortMultipleOptions};
-use popgetter::{metadata::ExpandedMetadata, search::SearchResults, COL};
+use popgetter_core::{metadata::ExpandedMetadata, search::SearchResults, COL};
 
 static LOOKUP: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
 

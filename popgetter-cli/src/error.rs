@@ -1,7 +1,7 @@
 #[cfg(feature = "llm")]
 use langchain_rust::chain::ChainError;
 use polars::error::PolarsError;
-use popgetter::error::PopgetterError;
+use popgetter_core::error::PopgetterError;
 #[cfg(feature = "llm")]
 use popgetter_llm::error::PopgetterLLMError;
 

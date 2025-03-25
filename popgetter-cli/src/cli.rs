@@ -7,7 +7,7 @@ use enum_dispatch::enum_dispatch;
 use log::{debug, info};
 use nonempty::nonempty;
 use polars::frame::DataFrame;
-use popgetter::{
+use popgetter_core::{
     config::Config,
     data_request_spec::{DataRequestSpec, RegionSpec},
     formatters::{
@@ -31,7 +31,7 @@ mod llm_imports {
     pub use langchain_rust::vectorstore::qdrant::{Qdrant, StoreBuilder};
     pub use polars::prelude::*;
     pub use polars::series::Series;
-    pub use popgetter::{search::SearchResults, COL};
+    pub use popgetter_core::{search::SearchResults, COL};
     pub use popgetter_llm::{
         chain::{generate_recipe, generate_recipe_from_results, SYSTEM_PROMPT_1, SYSTEM_PROMPT_2},
         embedding::{init_embeddings, query_embeddings},

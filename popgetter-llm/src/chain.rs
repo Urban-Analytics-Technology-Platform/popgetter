@@ -11,7 +11,7 @@ use langchain_rust::{
 };
 use log::info;
 use polars::prelude::*;
-use popgetter::{
+use popgetter_core::{
     data_request_spec::{DataRequestSpec, GeometrySpec, MetricSpec},
     Popgetter, COL,
 };

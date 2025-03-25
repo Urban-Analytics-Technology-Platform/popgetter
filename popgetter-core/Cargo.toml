@@ -1,7 +1,9 @@
 [package]
-name = "popgetter"
-version = "0.1.0"
+name = "popgetter-core"
+version = "0.2.1"
 edition = "2021"
+license = "MIT"
+description = "Core library for popgetter"
 
 [dependencies]
 anyhow = { workspace = true }

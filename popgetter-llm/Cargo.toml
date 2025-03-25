@@ -10,7 +10,7 @@ itertools.workspace = true
 langchain-rust = { workspace = true, features = ["qdrant", "qdrant-client"] }
 pretty_env_logger.workspace = true
 polars = { workspace = true, features = ["json"] }
-popgetter = { path = "../popgetter" }
+popgetter-core = { path = "../popgetter-core" }
 rand = { workspace = true }
 serde = { workspace = true, features = ["serde_derive"] }
 serde_json.workspace = true
