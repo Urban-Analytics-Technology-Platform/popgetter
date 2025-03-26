@@ -2835,6 +2835,7 @@ dependencies = [
  "comfy-table",
  "dirs",
  "enum_dispatch",
+ "indoc",
  "itertools 0.13.0",
  "log",
  "nonempty",
