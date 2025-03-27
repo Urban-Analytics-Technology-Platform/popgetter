@@ -49,11 +49,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
+          # PyO3 0.22 not compatible with pypy3.11. Manually specifying interpreters as workaround
+          # until version upgraded.
           args: >
             --release
             --manifest-path popgetter-py/Cargo.toml
             --out dist
-            --find-interpreter
+            --interpreter python3.8 python3.9 python3.10 python3.11 python3.12 python3.13 pypy3.10
           sccache: "true"
           # Install openssl as required for popgetter to compile
           # TODO: see dicussion for openssl install for different targets:

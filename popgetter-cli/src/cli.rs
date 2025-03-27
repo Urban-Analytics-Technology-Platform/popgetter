@@ -4,6 +4,7 @@ use std::{io, process};
 use anyhow::Context;
 use clap::{command, Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
+use indoc::indoc;
 use log::{debug, info};
 use nonempty::nonempty;
 use polars::frame::DataFrame;
@@ -849,10 +850,8 @@ impl RunCommand for SurveysCommand {
 pub struct RecipeCommand {
     #[arg(index = 1)]
     recipe_file: String,
-
     #[arg(short = 'f', long)]
     output_format: OutputFormat,
-
     #[arg(short = 'o', long)]
     output_file: Option<String>,
 }
@@ -892,6 +891,21 @@ pub struct Cli {
         global = true
     )]
     quiet: bool,
+    #[arg(
+        long = "dev",
+        help = indoc!{"Activate developer mode"},
+        global = true
+    )]
+    pub dev: bool,
+    #[arg(
+        long,
+        help = indoc!{
+            "Override config with a specified base path. Default config base path is:
+            https://popgetter.blob.core.windows.net/releases/v0.2"
+        },
+        global = true
+    )]
+    pub base_path: Option<String>,
 }
 
 /// Commands contains the list of subcommands avaliable for use in the CLI.
