@@ -13,3 +13,9 @@ classifiers = [
 dynamic = ["version"]
 [tool.maturin]
 features = ["pyo3/extension-module"]
+
+[project.optional-dependencies]
+docs = [
+  "mkdocs >=1.6.0",
+  "mkdocs-mermaid2-plugin >=1.2.1",
+]

@@ -4,14 +4,14 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.11"
-    rust: "1.75"
+    rust: "1.82"
 
 mkdocs:
   configuration: mkdocs.yml
 
-# python:
-#   install:
-#     - method: pip
-#       path: .
-#       extra_requirements:
-#         - docs
+python:
+  install:
+    - method: pip
+      path: popgetter-py
+      extra_requirements:
+        - docs
