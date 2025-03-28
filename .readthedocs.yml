@@ -5,6 +5,12 @@ build:
   tools:
     python: "3.11"
     rust: "1.82"
+  jobs:
+    pre_build:
+      # Copy the README.md file of each package into the docs directory
+      - cp popgetter-py/README.md docs/popgetter-py.md
+      - cp popgetter-cli/README.md docs/popgetter-cli.md
+      - cp popgetter-core/README.md docs/popgetter-core.md
 
 mkdocs:
   configuration: mkdocs.yml
