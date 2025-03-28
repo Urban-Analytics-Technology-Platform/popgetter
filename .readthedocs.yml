@@ -15,9 +15,10 @@ build:
 mkdocs:
   configuration: mkdocs.yml
 
-python:
-  install:
-    - method: pip
-      path: popgetter-py
-      extra_requirements:
-        - docs
+# Not required? Currently we're not using any of the docstrings in the code
+# python:
+#   install:
+#     - method: pip
+#       path: popgetter-py
+#       extra_requirements:
+#         - docs
