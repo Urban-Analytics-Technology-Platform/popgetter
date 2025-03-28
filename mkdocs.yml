@@ -1,0 +1,6 @@
+site_name: Popgetter
+
+plugins:
+  - search
+  - mermaid2:
+      javascript: https://unpkg.com/mermaid@11.4.0/dist/mermaid.esm.min.mjs
