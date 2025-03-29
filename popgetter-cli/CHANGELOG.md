@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/Urban-Analytics-Technology-Platform/popgetter/compare/popgetter-cli-v0.2.1...popgetter-cli-v0.2.2) - 2025-03-29
+
+### Other
+
+- enforces consistant naming of README,md files
+- add extra readmes
+- Add base path to CLI, remove dev from subcommands
+- Add dev config to CLI
+- Add dev mode flag to CLI
+
 ### Fixed
 
 - minor tweaks to the release process.
