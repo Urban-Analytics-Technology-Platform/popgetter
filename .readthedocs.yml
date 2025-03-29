@@ -6,6 +6,8 @@ build:
     python: "3.11"
     rust: "1.82"
   jobs:
+    install:
+      - pip install "mkdocs-mermaid2-plugin>=1.2.1"
     pre_build:
       # Copy the README.md file of each package into the docs directory
       - cp popgetter-py/README.md docs/popgetter-py.md
@@ -15,9 +17,10 @@ build:
 mkdocs:
   configuration: mkdocs.yml
 
-python:
-  install:
-    - method: pip
-      path: popgetter-py
-      extra_requirements:
-        - docs
+# Not required? Currently we're not using any of the docstrings in the code
+# python:
+#   install:
+#     - method: pip
+#       path: popgetter-py
+#       extra_requirements:
+#         - docs
