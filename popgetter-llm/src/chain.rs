@@ -307,6 +307,7 @@ mod tests {
 
     const TEST_PROMPT: &str = "Test prompt";
 
+    #[ignore = "API key/local database required"]
     #[tokio::test]
     async fn test_llm_example() {
         let open_ai = azure_open_ai_gpt4o(&api_key().unwrap());
@@ -314,6 +315,7 @@ mod tests {
         println!("{}", response);
     }
 
+    #[ignore = "API key/local database required"]
     #[tokio::test]
     async fn geopgraphic_entries_should_be_extracted() {
         let expected_entries = vec![
@@ -336,6 +338,7 @@ mod tests {
             .all(|(actual, expected)| actual.eq(&expected)))
     }
 
+    #[ignore = "API key/local database required"]
     #[tokio::test]
     async fn data_request_spec_should_be_extracted() {
         let _ = env_logger::try_init();
@@ -352,6 +355,7 @@ mod tests {
         println!("{:?}", result);
     }
 
+    #[ignore = "API key/local database required"]
     #[tokio::test]
     async fn data_request_spec_should_be_downloaded() {
         let _ = env_logger::try_init();
