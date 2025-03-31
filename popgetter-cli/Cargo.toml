@@ -54,7 +54,7 @@ tempfile = { workspace = true }
 
 
 [features]
-default = ["llm"]
+default = []
 llm = [
     "dep:popgetter-llm",
     "dep:langchain-rust",
