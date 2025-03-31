@@ -1,7 +1,8 @@
-# Popgetter-core
+# popgetter-core
 
-Hello World
+`popgetter-core` is a library and API providing core functionality for downstream Popgetter applications.
 
-This is a landing page for popgetter-core
-
-To be continued...
+Please refer to:
+- [`popgetter-cli`](https://crates.io/crates/popgetter-cli) for the CLI
+- [`popgetter-py`](https://crates.io/crates/popgetter-py) for the Python bindings and [PyPI package](https://pypi.org/project/popgetter/)
+- [`popgetter-browser`](https://github.com/Urban-Analytics-Technology-Platform/popgetter-browser) for the web interface
