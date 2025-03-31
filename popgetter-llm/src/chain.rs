@@ -121,13 +121,6 @@ impl GeographicEntity {
     }
 }
 
-// Process:
-// Step 1 (Stuart to start): get BBoxes (mapbox geocoder)
-// Step 2 (move Qdrant protoypes into lib): provide top n metrics of interest
-// Step 3 (Sam to start): combine above and ask to generate recipe that looks like a DataRequestSpec
-//   - System prompt: Rust structs (e.g. DataRequestSpec), vec of BBoxes, vec of Metric details (e.g. top n)
-//   - Return expected to be the recipe.json
-
 // TODO (step 1): add function to take Vec<GeographicEntit> and return Vec<BBox> (use an external API endpoint)
 
 pub async fn extract_geographic_entities(
