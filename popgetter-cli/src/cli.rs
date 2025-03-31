@@ -406,7 +406,7 @@ impl RunCommand for LLMCommands {
         }
     }
 }
-
+#[cfg(feature = "llm")]
 #[derive(Args, Debug)]
 pub struct InitArgs {
     #[arg(long)]
@@ -417,6 +417,7 @@ pub struct InitArgs {
     skip: Option<usize>,
 }
 
+#[cfg(feature = "llm")]
 #[derive(Clone, Debug, Deserialize, Serialize, EnumString, PartialEq, Eq)]
 #[strum(ascii_case_insensitive)]
 enum LLMOutputFormat {
@@ -585,6 +586,7 @@ impl RunCommand for QueryArgs {
     }
 }
 
+#[cfg(feature = "llm")]
 #[derive(Args, Debug)]
 pub struct QueryArgs {
     #[arg(index = 1)]
