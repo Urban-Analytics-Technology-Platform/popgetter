@@ -251,7 +251,12 @@ mod tests {
         let output = formatter.format(&mut df);
         assert!(output.is_ok(), "Output should not error");
         let correct_str = r#"{"features":[{"geometry":{"coordinates":[0.0,0.0],"type":"Point"},"properties":{"float_val":2.0,"int_val":2,"str_val":"two"},"type":"Feature"},{"geometry":{"coordinates":[20.0,20.0],"type":"Point"},"properties":{"float_val":3.0,"int_val":3,"str_val":"three"},"type":"Feature"},{"geometry":{"coordinates":[30.0,44.0],"type":"Point"},"properties":{"float_val":4.0,"int_val":4,"str_val":"four"},"type":"Feature"}],"type":"FeatureCollection"}"#;
-        assert_eq!(output.unwrap(), correct_str, "Output should be correct");
+
+        // Deserialize back to `Value` to compare for equality as order of fields not guaranteed
+        // within the JSON serialized string
+        let actual_value: Value = serde_json::from_str(output.as_ref().unwrap()).unwrap();
+        let correct_value: Value = serde_json::from_str(correct_str).unwrap();
+        assert_eq!(actual_value, correct_value, "Output should be correct");
     }
 
     #[test]
@@ -264,10 +269,20 @@ mod tests {
             r#"{"geometry":{"coordinates":[0.0,0.0],"type":"Point"},"properties":{"float_val":2.0,"int_val":2,"str_val":"two"},"type":"Feature"}"#,
             r#"{"geometry":{"coordinates":[20.0,20.0],"type":"Point"},"properties":{"float_val":3.0,"int_val":3,"str_val":"three"},"type":"Feature"}"#,
             r#"{"geometry":{"coordinates":[30.0,44.0],"type":"Point"},"properties":{"float_val":4.0,"int_val":4,"str_val":"four"},"type":"Feature"}"#,
-            ""
         ].join("\n");
         assert!(output.is_ok(), "Output should not error");
-        assert_eq!(output.unwrap(), correct_str, "Output should be correct");
+        assert_eq!(
+            correct_str.lines().count(),
+            output.as_ref().unwrap().lines().count()
+        );
+        // Deserialize each line back to `Value` to compare for equality as order of fields not
+        // guaranteed within the JSON serialized string
+        for (correct, actual) in correct_str.lines().zip(output.unwrap().lines()) {
+            assert_eq!(
+                serde_json::from_str::<Value>(correct).unwrap(),
+                serde_json::from_str::<Value>(actual).unwrap()
+            );
+        }
     }
 
     #[test]
