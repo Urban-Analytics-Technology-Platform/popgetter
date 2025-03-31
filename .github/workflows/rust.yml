@@ -11,14 +11,13 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
     - uses: actions/checkout@v3
-    # - name: Cache Rust dependencies
-    #   uses: Swatinem/rust-cache@v2
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -28,12 +27,9 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
 
-
   rustfmt:
     name: rustfmt
-
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
