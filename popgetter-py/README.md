@@ -1,4 +1,4 @@
-# popgetter_py
+# popgetter-py
 
 Python bindings for popgetter library for searching and downloading [popgetter](https://github.com/Urban-Analytics-Technology-Platform/popgetter) data.
 
