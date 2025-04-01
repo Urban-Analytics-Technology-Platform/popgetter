@@ -18,6 +18,10 @@ dirs = { workspace = true }
 enum_dispatch = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
+langchain-rust = { workspace = true, features = [
+    "qdrant",
+    "qdrant-client",
+], optional = true }
 log = { workspace = true }
 nonempty = { workspace = true, features = ["serialize"] }
 polars = { workspace = true, features = [
@@ -32,26 +36,21 @@ polars = { workspace = true, features = [
     "rows",
 ] }
 popgetter-core = { path = "../popgetter-core", version = "0.2.0" }
+popgetter-llm = { version = "0.1.0", path = "../popgetter-llm", optional = true }
 pretty_env_logger = { workspace = true }
+qdrant-client = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 spinners = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
+thiserror = { workspace = true }
+tiktoken-rs = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["full"] }
 toml = { workspace = true }
-tiktoken-rs = { workspace = true, optional = true }
-qdrant-client = { workspace = true, optional = true }
-popgetter-llm = { version = "0.1.0", path = "../popgetter-llm", optional = true }
-langchain-rust = { workspace = true, features = [
-    "qdrant",
-    "qdrant-client",
-], optional = true }
-thiserror.workspace = true
 
 [dev-dependencies]
 tempfile = { workspace = true }
-
 
 [features]
 default = []
