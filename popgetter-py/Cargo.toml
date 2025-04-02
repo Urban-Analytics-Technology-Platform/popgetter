@@ -1,6 +1,6 @@
 [package]
 name = "popgetter-py"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT"
 description = "Python bindings for popgetter"
@@ -23,7 +23,7 @@ polars = { workspace = true, features = [
     "strings",
     "rows",
 ] }
-popgetter-core = { path = "../popgetter-core", version = "0.2.1" }
+popgetter-core = { path = "../popgetter-core", version = "0.2.2" }
 pyo3 = { workspace = true, features = ["anyhow", "experimental-async"] }
 pyo3-polars = { workspace = true, features = ["derive", "dtype-struct"] }
 serde = { workspace = true }

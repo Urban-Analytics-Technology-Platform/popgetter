@@ -1,6 +1,6 @@
 [package]
 name = "popgetter-cli"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT"
 description = "CLI for popgetter"
@@ -35,7 +35,7 @@ polars = { workspace = true, features = [
     "strings",
     "rows",
 ] }
-popgetter-core = { path = "../popgetter-core", version = "0.2.1" }
+popgetter-core = { path = "../popgetter-core", version = "0.2.2" }
 popgetter-llm = { version = "0.1.0", path = "../popgetter-llm", optional = true }
 pretty_env_logger = { workspace = true }
 qdrant-client = { workspace = true, optional = true }
