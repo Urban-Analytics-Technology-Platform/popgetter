@@ -23,7 +23,7 @@ polars = { workspace = true, features = [
     "strings",
     "rows",
 ] }
-popgetter-core = { path = "../popgetter-core", version = "0.2.0" }
+popgetter-core = { path = "../popgetter-core", version = "0.2.1" }
 pyo3 = { workspace = true, features = ["anyhow", "experimental-async"] }
 pyo3-polars = { workspace = true, features = ["derive", "dtype-struct"] }
 serde = { workspace = true }
