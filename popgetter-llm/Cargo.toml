@@ -2,6 +2,8 @@
 name = "popgetter-llm"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "LLM integration for popgetter"
 
 [dependencies]
 anyhow = { workspace = true }
