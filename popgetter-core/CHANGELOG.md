@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/Urban-Analytics-Technology-Platform/popgetter/compare/popgetter-core-v0.2.1...popgetter-core-v0.2.2) - 2025-04-02
+
+### Added
+
+- Add dev config to CLI
+
 ### Fixed
 
 - minor tweaks to the release process.
-
-### Other
-
-- none
+- tests by deserializing back to Value
+- inconsistent naming of README.md files
 
 ## [0.2.0](https://github.com/Urban-Analytics-Technology-Platform/popgetter/releases/tag/popgetter-core-v0.2.0) - 2025-01-10
 
